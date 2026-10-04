@@ -415,6 +415,7 @@ public class UltimateBankTabsPlugin extends Plugin
 		Map<String, BankTagsWriter.Tab> tabs = new LinkedHashMap<>();
 		Map<String, String> titles = new HashMap<>();
 		Map<String, Map<Integer, String>> why = new HashMap<>();
+		Set<Integer> shown = new HashSet<>();
 		for (TabData.Tab def : data.tabs)
 		{
 			titles.put(def.key, def.name);
@@ -422,7 +423,9 @@ public class UltimateBankTabsPlugin extends Plugin
 			{
 				continue;
 			}
+			options.shownElsewhere = shown;
 			TabBuilder.Built built = builder.build(def, owned, options);
+			shown.addAll(built.itemIds());
 			if (built.isEmpty())
 			{
 				continue;

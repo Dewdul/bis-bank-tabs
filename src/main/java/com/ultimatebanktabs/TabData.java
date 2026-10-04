@@ -38,6 +38,12 @@ class TabData
 		{
 			return "gear".equals(kind);
 		}
+
+		/** Leftovers tab: shows only what no other tab already shows. */
+		boolean isCosmetic()
+		{
+			return "cosmetic".equals(kind);
+		}
 	}
 
 	static class Section
@@ -68,6 +74,8 @@ class TabData
 		boolean requiresPlaced;
 		/** hover text: one per entry (may be shorter than entries), else the label */
 		List<String> reasons = Collections.emptyList();
+		/** "all" picks: the outfit/set each entry belongs to, kept together on one row by the "sets" layout */
+		List<String> groups = Collections.emptyList();
 		String label;
 		List<String> unless = Collections.emptyList();
 		List<Integer> requires = Collections.emptyList();

@@ -31,6 +31,8 @@ class TabBuilder
 		boolean combatSupplies = true;
 		/** how many foods the combat tabs show */
 		int foodCount = 4;
+		/** items other tabs already show; the cosmetics tab leaves them out */
+		Set<Integer> shownElsewhere = Collections.emptySet();
 	}
 
 	@Value
@@ -116,6 +118,11 @@ class TabBuilder
 
 	Built build(TabData.Tab tab, Set<Integer> owned, Options options)
 	{
+		if (tab.isCosmetic() && !options.shownElsewhere.isEmpty())
+		{
+			owned = new HashSet<>(owned);
+			owned.removeAll(options.shownElsewhere);
+		}
 		Context ctx = new Context(owned, options);
 		List<Section> sections = new ArrayList<>();
 		int hero = -1;
@@ -207,11 +214,13 @@ class TabBuilder
 				break;
 			}
 			case "all":
-				for (List<Integer> entry : pick.entries)
+				for (int i = 0; i < pick.entries.size(); i++)
 				{
-					chosen.addAll(ownedOf(entry, ctx));
+					List<Integer> got = ownedOf(pick.entries.get(i), ctx);
+					String group = i < pick.groups.size() ? pick.groups.get(i) : pick.key;
+					chosen.addAll(got);
+					add(out, got, pick.slot, group, ctx, id -> entryReason(pick, id, ctx));
 				}
-				add(out, chosen, pick.slot, pick.key, ctx, id -> entryReason(pick, id, ctx));
 				break;
 			case "auto":
 				chosen.addAll(firstOwned(pick.entries, ctx, 1 + ctx.options.backups));

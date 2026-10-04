@@ -154,8 +154,22 @@ class Resolver:
                 for v in self.var_group.get(i, ()):
                     if v not in claimed and v not in ids and v not in extra and self._same_family(i, v):
                         extra.append(v)
-            out.append(ids + extra)
+            out.append(sorted(ids, key=self._version_order) + extra)
         return list(zip(out, [why for _, why in unique]))
+
+    UNCHARGED = re.compile(r"(?i)\((?:uncharged|empty|inactive|broken|u|0)\)$|\bbroken\b| 0$")
+    NUMBER = re.compile(r"\((?:t)?(\d+)\)$|\(i(\d+)\)$| (\d+)$|\((\d+) dose\)$")
+
+    def _version_order(self, item_id):
+        """Highest first within one item: potions (4)..(1), jewellery (8)..(1),
+        Barrows 100..0, numbered versions before the bare name, uncharged last."""
+        name = self.wiki.id_name.get(item_id, "")
+        if self.UNCHARGED.search(name):
+            return (2, 0)
+        m = self.NUMBER.search(name)
+        if m:
+            return (0, -int(next(g for g in m.groups() if g)))
+        return (1, 0)
 
     def _same_family(self, a, b):
         """Only borrow a variation id when it isn't a separately listed wiki item
@@ -279,6 +293,120 @@ def supply_sections(wiki, recipes, uses, skill, rules, taken):
     return sections
 
 
+STAT_FIELDS = ["stab_attack_bonus", "slash_attack_bonus", "crush_attack_bonus", "range_attack_bonus",
+               "magic_attack_bonus", "strength_bonus", "ranged_strength_bonus", "magic_damage_bonus", "prayer_bonus",
+               "stab_defence_bonus", "slash_defence_bonus", "crush_defence_bonus", "range_defence_bonus",
+               "magic_defence_bonus"]
+
+
+def fetch_bonuses():
+    return wiki_recipes.fetch_all("infobox_bonuses", ["page_name", "page_name_sub", "equipment_slot",
+                                                      "weapon_attack_speed"] + STAT_FIELDS)
+
+
+def fetch_categories():
+    out = {}
+    for cat in curated.COSMETIC_CATEGORIES:
+        titles, cont = [], {}
+        while True:
+            q = {"action": "query", "list": "categorymembers", "cmtitle": "Category:" + cat, "cmlimit": "500",
+                 "cmtype": "page"}
+            q.update(cont)
+            d = wiki_recipes.api(q)
+            titles += [m["title"] for m in d["query"]["categorymembers"]]
+            if "continue" not in d:
+                break
+            cont = d["continue"]
+        out[cat] = titles
+    return out
+
+
+def set_stem(name):
+    """'Rune platebody (g)' -> 'Rune (g)', 'Antisanta mask' -> 'Antisanta': items of one
+    outfit share a stem so the layout keeps them on one row."""
+    for rx, family in curated.COSMETIC_FAMILIES:
+        if re.search(rx, name):
+            return family
+    m = re.match(r"^(.*?)(\s*\([^()]*\))?$", name)
+    base, qualifier = m.group(1), (m.group(2) or "").strip()
+    words = base.split()
+    for n in (3, 2, 1):
+        if len(words) > n and " ".join(words[-n:]).lower() in curated.COSMETIC_SLOT_WORDS:
+            words = words[:-n]
+            break
+    return (" ".join(words) + (" " + qualifier if qualifier else "")).strip()
+
+
+def cosmetics_tab(wiki, res, elsewhere):
+    """Purely visual items: holiday and event rewards, cosmetic clue rewards
+    (trimmed, gilded, heraldic, 3rd age...), random event outfits, graceful
+    recolours, other zero-stat clothing, and ornament kits. The plugin also
+    drops anything another tab already shows."""
+    bonuses = defaultdict(list)
+    for b in cached("bonuses.json", fetch_bonuses):
+        bonuses[b["page_name"].lower()].append(b)
+    cats = cached("categories.json", fetch_categories)
+
+    def zero_stats(page):
+        rows = bonuses.get(page.lower())
+        return bool(rows) and all(not float(r.get(f) or 0) for r in rows for f in STAT_FIELDS)
+
+    def slot(page):
+        rows = bonuses.get(page.lower())
+        return rows[0].get("equipment_slot") if rows else None
+
+    skip = re.compile(curated.COSMETIC_EXCLUDE)
+    variant = re.compile(curated.COSMETIC_VARIANT)
+    taken = set()
+
+    def usable(page):
+        key = page.lower()
+        if key not in wiki.page_ids or key in taken or skip.search(page) or key in wiki.quest_only:
+            return False
+        return not any(i in elsewhere for i in wiki.page_ids[key])
+
+    def take(pages):
+        out = []
+        for p in sorted(set(pages), key=lambda p: (set_stem(p).lower(), p.lower())):
+            if usable(p):
+                taken.add(p.lower())
+                out.append(wiki.page_name[p.lower()])
+        return out
+
+    equipable = lambda p: p.lower() in bonuses
+    groups = [
+        ("events", "Holiday & events",
+         [p for c in ("Event rewards", "Cosmetics") for p in cats.get(c, []) if equipable(p)]),
+        ("clues", "Treasure Trails",
+         [p for p in cats.get("Treasure Trails rewards", []) if equipable(p) and (zero_stats(p) or variant.search(p))]),
+        ("random", "Random events", [p for p in cats.get("Random event rewards", []) if equipable(p)]),
+        ("graceful", "Graceful recolours", [p for p in wiki.pages if p.startswith("Graceful ") and equipable(p)]),
+        ("other", "Other cosmetics",
+         [p for p in wiki.pages if equipable(p) and zero_stats(p) and slot(p) in curated.COSMETIC_ZERO_STAT_SLOTS]),
+        ("kits", "Ornament kits", [p for p in cats.get("Ornament kits", []) if not equipable(p)]),
+    ]
+    sections = []
+    for key, title, pages in groups:
+        if key == "graceful":
+            # the movement tab shows one colour; the rest are cosmetic here
+            pages_ok = sorted(p for p in pages if p.lower() in wiki.page_ids and not skip.search(p))
+            for p in pages_ok:
+                taken.add(p.lower())
+            names = pages_ok
+        else:
+            names = take(pages)
+        if not names:
+            continue
+        resolved = res.entries(names)
+        sections.append({"key": key, "title": title, "layout": "sets", "picks": [{
+            "key": "cosmetic_" + key, "mode": "all", "entries": resolved, "label": title,
+            "groups": [set_stem(n) for n in names]}]})
+    icon = res.base_ids(curated.COSMETIC_ICON)
+    print("  cosmetics: %s" % ", ".join("%s %d" % (s["key"], len(s["picks"][0]["entries"])) for s in sections))
+    return {"key": "cosmetics", "name": "Cosmetics", "kind": "cosmetic", "icon": icon[0] if icon else 0,
+            "sections": sections}
+
+
 def main():
     rows = cached("items.json", fetch_items)
     variations = cached("item_variations.json", fetch_variations)
@@ -302,6 +430,11 @@ def main():
     for skill, key, rules in curated.SUPPLY_RULES:
         tab = by_key[key]
         tab["sections"] += supply_sections(wiki, recipes, uses, skill, rules, curated_ids(tab))
+
+    elsewhere = set()
+    for t in tabs:
+        elsewhere |= curated_ids(t)
+    tabs.append(cosmetics_tab(wiki, res, elsewhere))
 
     launcher_ammo = {}
     for name, cls in curated.LAUNCHER_AMMO.items():

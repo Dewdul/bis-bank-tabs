@@ -22,7 +22,8 @@ import java.util.TreeMap;
  * The best-in-slot set sits in the equipment-screen shape, column 3 is a
  * gutter, and each situational set (void, inquisitor...) gets its own
  * alternatives column so its pieces line up with the slots they replace.
- * Everything else follows in row sections, each starting on a fresh row.
+ * Everything else follows in row sections, each starting on a fresh row. A
+ * "sets" section (cosmetics) also keeps each outfit on one row when it fits.
  */
 class LayoutPlanner
 {
@@ -105,15 +106,22 @@ class LayoutPlanner
 		{
 			rowSections.add(overflow);
 		}
+		List<Boolean> keepSets = new ArrayList<>();
+		if (!overflow.isEmpty())
+		{
+			keepSets.add(false);
+		}
 		for (TabBuilder.Section s : tab.getSections())
 		{
-			if ("rows".equals(s.getLayout()) && !s.getItems().isEmpty())
+			boolean sets = "sets".equals(s.getLayout());
+			if ((sets || "rows".equals(s.getLayout())) && !s.getItems().isEmpty())
 			{
 				rowSections.add(s.getItems());
+				keepSets.add(sets);
 			}
 		}
 		boolean first = !block;
-		for (List<TabBuilder.Placement> items : rowSections)
+		for (int i = 0; i < rowSections.size(); i++)
 		{
 			if (gapRows && !first)
 			{
@@ -121,14 +129,25 @@ class LayoutPlanner
 			}
 			first = false;
 			int col = 0;
-			for (TabBuilder.Placement p : items)
+			List<List<TabBuilder.Placement>> chunks = keepSets.get(i)
+				? groups(rowSections.get(i)) : Arrays.asList(rowSections.get(i));
+			for (List<TabBuilder.Placement> chunk : chunks)
 			{
-				if (col == WIDTH)
+				// an outfit that fits on one row never straddles two
+				if (keepSets.get(i) && col > 0 && col + chunk.size() > WIDTH && chunk.size() <= WIDTH)
 				{
 					col = 0;
 					row++;
 				}
-				put(row, col++, p.getItemId());
+				for (TabBuilder.Placement p : chunk)
+				{
+					if (col == WIDTH)
+					{
+						col = 0;
+						row++;
+					}
+					put(row, col++, p.getItemId());
+				}
 			}
 			row++;
 		}

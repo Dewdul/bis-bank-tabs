@@ -928,3 +928,29 @@ MELEE_WEAPON_MULTIPLIER = {
 }
 # Weapons that roll accuracy twice (hit chance 1 - (1 - p)^2).
 MELEE_DOUBLE_ACCURACY = ["Osmumten's fang"]
+
+
+# ---------------------------------------------------------------- cosmetics
+# The cosmetics tab is generated from wiki categories and zero-stat clothing
+# (see cosmetics_tab in generate_data.py); these rules steer it.
+COSMETIC_ICON = "Red partyhat"
+COSMETIC_CATEGORIES = ["Event rewards", "Cosmetics", "Ornament kits", "Random event rewards", "Treasure Trails rewards"]
+# clue rewards with combat stats only count when they are a cosmetic variant
+COSMETIC_VARIANT = r"\((?:g|t|h\d|gold|trimmed)\)$|^Gilded |^3rd Age |^Ring of 3rd age"
+# zero-stat items in these slots are clothing; zero-stat rings/amulets are usually functional
+COSMETIC_ZERO_STAT_SLOTS = {"head", "body", "legs", "feet", "hands", "cape"}
+COSMETIC_EXCLUDE = r"(?i)^(Ghostspeak|Desert |Mining helmet|Bullseye|Lantern|Candle|Diving apparatus|Fishbowl|" \
+                   r"Ice gloves|Spiny|Earmuffs|Nose peg|Facemask|Gas mask|Slayer|Black mask|Climbing boots|" \
+                   r"Team-\d+ cape|Hunting knife|Masori crafting kit|Granite clamp|.*bracelet.*|.*coffin.*|"                    r".*apparatus|.*\(Last Man Standing\)|.*\(beta\)|.*\(Deadman.*)"
+# items of one outfit share a set stem so they stay together on a row
+COSMETIC_FAMILIES = [(r"(?i)partyhat$", "Partyhats"), (r"(?i)h(?:allo)?'?ween mask$", "Halloween masks"),
+                     (r"(?i)santa hat$", "Santa hats")]
+COSMETIC_SLOT_WORDS = {
+    "hat", "hood", "helm", "helmet", "full helm", "full helmet", "med helm", "mask", "coif", "cap", "beret",
+    "headband", "headdress", "crown", "tiara", "wig", "mitre", "top", "shirt", "jacket", "robe top", "robe", "robes",
+    "body", "platebody", "chainbody", "garb", "torso", "tabard", "blouse", "legs", "platelegs", "plateskirt",
+    "skirt", "bottom", "bottoms", "robe bottom", "robe bottoms", "robe skirt", "robeskirt", "trousers", "pantaloons",
+    "chaps", "tassets", "leggings", "shorts", "boots", "shoes", "feet", "slippers", "sandals", "gloves",
+    "gauntlets", "vambraces", "bracers", "cape", "cloak", "kiteshield", "sq shield", "shield", "amulet",
+    "necklace", "scarf", "stole", "crozier", "staff", "sword", "wand", "outfit", "set",
+}

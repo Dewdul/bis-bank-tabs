@@ -19,7 +19,7 @@ public interface UltimateBankTabsConfig extends Config
 	@ConfigSection(name = "Combat & movement tabs", description = "Which combat and movement tabs to create", position = 1)
 	String gearTabs = "gearTabs";
 
-	@ConfigSection(name = "Skill tabs", description = "Which skill tabs to create", position = 2)
+	@ConfigSection(name = "Skill & other tabs", description = "Which skill tabs, and the cosmetics tab, to create", position = 2)
 	String skillTabs = "skillTabs";
 
 	@ConfigItem(keyName = "countCarried", name = "Count worn & carried items", position = 0, section = contents,
@@ -221,6 +221,14 @@ public interface UltimateBankTabsConfig extends Config
 
 	@ConfigItem(keyName = TAB_PREFIX + "sailing", name = "Sailing", position = 37, section = skillTabs, description = "Sailing tab")
 	default boolean sailing()
+	{
+		return true;
+	}
+
+	@ConfigItem(keyName = TAB_PREFIX + "cosmetics", name = "Cosmetics", position = 38, section = skillTabs,
+		description = "Purely visual items no other tab shows: holiday items, trimmed and gilded clue rewards, spare"
+			+ " graceful colours, ornament kits...")
+	default boolean cosmetics()
 	{
 		return true;
 	}
