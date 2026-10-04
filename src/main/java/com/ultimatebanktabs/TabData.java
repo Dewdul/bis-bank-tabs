@@ -72,6 +72,10 @@ class TabData
 		int take;
 		/** requirements must already be in the tab rather than merely owned */
 		boolean requiresPlaced;
+		/** "all" picks: an item may show again (a secondary shared by two herb columns) */
+		boolean repeat;
+		/** "all" picks: show only the first owned version of each entry (the fullest dose) */
+		boolean one;
 		/** hover text: one per entry (may be shorter than entries), else the label */
 		List<String> reasons = Collections.emptyList();
 		/** "all" picks: the outfit/set each entry belongs to, kept together on one row by the "sets" layout */

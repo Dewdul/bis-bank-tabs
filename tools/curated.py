@@ -49,8 +49,12 @@ def set_(key, pieces, complete=False, **kw):
                 pieces=[dict(slot=s, entries=list(e)) for s, e in pieces])
 
 
-def section(key, title, layout, picks):
-    return dict(key=key, title=title, layout=layout, picks=picks)
+def section(key, title, layout, picks, supplies=False):
+    """supplies: hidden when the player turns off "Supplies in skill tabs"."""
+    out = dict(key=key, title=title, layout=layout, picks=picks)
+    if supplies:
+        out["supplies"] = True
+    return out
 
 
 def tab(key, name, icon, sections, kind="skill"):
@@ -909,6 +913,52 @@ FLETCHING = tab("fletching", "Fletching", "Knife", sections=[
     ]),
 ])
 
+# One column per herb: its grimy herb, clean herb, unfinished potion, main secondary and main
+# potion line up vertically. (clean herb, unfinished potion, secondary, potion) - the potion most
+# players make from each herb; other secondaries and potions follow in the supply sections.
+HERB_CHAINS = [
+    ("Guam leaf", "Guam potion (unf)", "Eye of newt", "Attack potion"),
+    ("Marrentill", "Marrentill potion (unf)", "Unicorn horn dust", "Antipoison"),
+    ("Tarromin", "Tarromin potion (unf)", "Limpwurt root", "Strength potion"),
+    ("Harralander", "Harralander potion (unf)", "Red spiders' eggs", "Restore potion"),
+    ("Ranarr weed", "Ranarr potion (unf)", "Snape grass", "Prayer potion"),
+    ("Toadflax", "Toadflax potion (unf)", "Crushed nest", "Saradomin brew"),
+    ("Irit leaf", "Irit potion (unf)", "Eye of newt", "Super attack"),
+    ("Avantoe", "Avantoe potion (unf)", "Mort myre fungus", "Super energy"),
+    ("Kwuarm", "Kwuarm potion (unf)", "Limpwurt root", "Super strength"),
+    ("Huasca", "Huasca potion (unf)", "Aldarium", "Prayer regeneration potion"),
+    ("Snapdragon", "Snapdragon potion (unf)", "Red spiders' eggs", "Super restore"),
+    ("Cadantine", "Cadantine potion (unf)", "White berries", "Super defence"),
+    ("Lantadyme", "Lantadyme potion (unf)", "Dragon scale dust", "Antifire potion"),
+    ("Dwarf weed", "Dwarf weed potion (unf)", "Wine of Zamorak", "Ranging potion"),
+    ("Torstol", "Torstol potion (unf)", "Jangerberries", "Zamorak brew"),
+]
+
+
+def herb_columns():
+    keys = [h for h, _, _, _ in HERB_CHAINS]
+
+    def row(key, title, items, one=False):
+        # repeat: a secondary shared by two herbs (eye of newt...) shows under both
+        return section(key, title, "columns", [dict(all_(key, items), groups=keys, repeat=True, one=one)],
+                       supplies=True)
+
+    return [
+        row("herbs_grimy", "Grimy herbs",
+            [("Grimy " + h[0].lower() + h[1:], "Clean it for %s (%s)" % (pot.lower(), sec.lower()))
+             for h, _, sec, pot in HERB_CHAINS]),
+        row("herbs_clean", "Clean herbs",
+            [(h, "Herb for %s, with %s" % (pot.lower(), sec.lower())) for h, _, sec, pot in HERB_CHAINS]),
+        row("herbs_unf", "Unfinished potions",
+            [(unf, "Add %s to make %s" % (sec.lower(), pot.lower())) for _, unf, sec, pot in HERB_CHAINS]),
+        row("herbs_secondary", "Secondaries",
+            [(sec, "Secondary for %s (with %s)" % (pot.lower(), h.lower())) for h, _, sec, pot in HERB_CHAINS]),
+        # one: only your fullest dose sits in the column; other doses follow in Potions
+        row("herbs_potion", "Potions",
+            [(pot, "%s: %s + %s" % (pot, h.lower(), sec.lower())) for h, _, sec, pot in HERB_CHAINS], one=True),
+    ]
+
+
 HERBLORE = tab("herblore", "Herblore", "Pestle and mortar", sections=[
     section("gear", "Tools", "rows", [
         first("pestle", ["Pestle and mortar"]),
@@ -922,6 +972,7 @@ HERBLORE = tab("herblore", "Herblore", "Pestle and mortar", sections=[
         outfit("alchemist", [("BODY", ["Alchemist labcoat"]), ("LEGS", ["Alchemist pants"]),
                              ("GLOVES", ["Alchemist gloves"])]),
     ]),
+    *herb_columns(),
 ])
 
 CONSTRUCTION = tab("construction", "Construction", "Saw", sections=[
@@ -1048,8 +1099,6 @@ HERBS = ["Guam leaf", "Marrentill", "Tarromin", "Harralander", "Ranarr weed", "T
 
 SUPPLY_RULES = [
     ("Herblore", "herblore", [
-        ("Grimy herbs", r"(?i)^Grimy (?:%s)$" % "|".join(HERBS), HERBS),
-        ("Clean herbs", r"(?i)^(?:%s)$" % "|".join(HERBS), HERBS),
         # coral is the Sailing herb: coral + vial of water makes the coral unfinished potions
         ("Corals", r"(?i)^(?:Elkhorn|Pillar|Umbral) coral$", ["Elkhorn coral", "Pillar coral", "Umbral coral"]),
         # herb (unf) in herb order, then cadantine blood, coral, coconut milk, then other half-made potions;

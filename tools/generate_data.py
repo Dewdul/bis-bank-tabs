@@ -184,13 +184,18 @@ class Resolver:
 
 def build_pick(res, pick):
     out = {"key": pick["key"], "mode": pick["mode"]}
-    for k in ("slot", "profile", "style", "launcher", "fallback", "complete", "unless", "take"):
+    for k in ("slot", "profile", "style", "launcher", "fallback", "complete", "unless", "take", "groups", "repeat",
+              "one"):
         if pick.get(k):
             out[k] = pick[k]
     if pick.get("why"):
         out["label"] = pick["why"]
     if pick.get("entries"):
-        resolved = res.entries_with_reasons(pick["entries"], split_regex=pick["mode"] == "all")
+        if pick.get("repeat"):
+            # the same item may stand in several columns, so resolve each entry on its own
+            resolved = [res.entries_with_reasons([n])[0] for n in pick["entries"]]
+        else:
+            resolved = res.entries_with_reasons(pick["entries"], split_regex=pick["mode"] == "all")
         out["entries"] = [ids for ids, _ in resolved]
         reasons = [why or "" for _, why in resolved]
         while reasons and not reasons[-1]:
@@ -216,9 +221,13 @@ def build_pick(res, pick):
 
 
 def curated_ids(tab):
+    """Ids a tab's curated picks already show, so supply sections skip them. A pick
+    that shows one version per entry ("one") leaves the other versions to supplies."""
     ids = set()
 
     def walk(o):
+        if isinstance(o, dict) and o.get("one"):
+            return
         if isinstance(o, dict):
             for v in o.values():
                 walk(v)
@@ -427,8 +436,10 @@ def main():
     for t in curated.TABS:
         icon = res.base_ids(t["icon"])
         tab = {"key": t["key"], "name": t["name"], "kind": t["kind"], "icon": icon[0] if icon else 0,
-               "sections": [{"key": s["key"], "title": s["title"], "layout": s["layout"],
-                             "picks": [build_pick(res, p) for p in s["picks"]]} for s in t["sections"]]}
+               "sections": [dict({"key": s["key"], "title": s["title"], "layout": s["layout"],
+                                  "picks": [build_pick(res, p) for p in s["picks"]]},
+                                 **({"supplies": True} if s.get("supplies") else {}))
+                            for s in t["sections"]]}
         tabs.append(tab)
 
     by_key = {t["key"]: t for t in tabs}

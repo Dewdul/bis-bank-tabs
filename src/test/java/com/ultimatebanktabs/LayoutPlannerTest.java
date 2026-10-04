@@ -131,6 +131,20 @@ public class LayoutPlannerTest
 	}
 
 	@Test
+	public void columnsKeepEachKeyInItsColumn()
+	{
+		List<String> herbs = Arrays.asList("guam", "marrentill", "tarromin");
+		int[] layout = plan(
+			new TabBuilder.Section("grimy", "Grimy", "columns", Arrays.asList(p(1, null, "tarromin")), herbs),
+			new TabBuilder.Section("clean", "Clean", "columns", Arrays.asList(p(2, null, "guam"), p(3, null, "tarromin")), herbs));
+		// marrentill has nothing, so tarromin takes column 1 in both rows
+		assertEquals(1, at(layout, 0, 1));
+		assertEquals(-1, at(layout, 0, 0));
+		assertEquals(2, at(layout, 1, 0));
+		assertEquals(3, at(layout, 1, 1));
+	}
+
+	@Test
 	public void emptyTab()
 	{
 		assertEquals(0, plan(new TabBuilder.Section("x", "x", "rows", Collections.emptyList())).length);

@@ -320,6 +320,26 @@ public class TabBuilderTest
 	}
 
 	@Test
+	public void herbChainsLineUpInColumns()
+	{
+		TabBuilder.Built herb = build("herblore", own("Guam leaf", "Eye of newt", "Irit leaf", "Grimy ranarr weed",
+			"Ranarr weed", "Ranarr potion (unf)", "Snape grass", "Prayer potion"));
+		int[] layout = LayoutPlanner.plan(herb, false);
+		int w = LayoutPlanner.WIDTH;
+		// only herbs you have something for get a column: guam 0, ranarr 1, irit 2
+		assertEquals(id("Grimy ranarr weed"), layout[1]);
+		assertEquals(id("Guam leaf"), layout[w]);
+		assertEquals(id("Ranarr weed"), layout[w + 1]);
+		assertEquals(id("Irit leaf"), layout[w + 2]);
+		assertEquals(id("Ranarr potion (unf)"), layout[2 * w + 1]);
+		assertEquals("eye of newt under guam", id("Eye of newt"), layout[3 * w]);
+		assertEquals(id("Snape grass"), layout[3 * w + 1]);
+		assertEquals("and under irit", id("Eye of newt"), layout[3 * w + 2]);
+		assertEquals(id("Prayer potion"), layout[4 * w + 1]);
+		assertTrue(herb.reasons().get(id("Eye of newt")).contains("super attack"));
+	}
+
+	@Test
 	public void emptyBankBuildsEmptyTabs()
 	{
 		for (TabData.Tab t : data.tabs)

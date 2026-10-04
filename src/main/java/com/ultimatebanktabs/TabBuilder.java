@@ -54,6 +54,22 @@ class TabBuilder
 		String title;
 		String layout;
 		List<Placement> items;
+		/** "columns" layout: the column of every possible entry, in order (e.g. herbs guam..torstol) */
+		List<String> columns;
+
+		Section(String key, String title, String layout, List<Placement> items, List<String> columns)
+		{
+			this.key = key;
+			this.title = title;
+			this.layout = layout;
+			this.items = items;
+			this.columns = columns;
+		}
+
+		Section(String key, String title, String layout, List<Placement> items)
+		{
+			this(key, title, layout, items, Collections.emptyList());
+		}
 	}
 
 	@Value
@@ -64,7 +80,7 @@ class TabBuilder
 		/** best item to use as the tab icon, or -1 */
 		int hero;
 
-		/** item id -> why it is in the tab */
+		/** item id -> why it is in the tab (an item shown twice lists both reasons) */
 		Map<Integer, String> reasons()
 		{
 			Map<Integer, String> reasons = new HashMap<>();
@@ -72,7 +88,8 @@ class TabBuilder
 			{
 				for (Placement p : s.items)
 				{
-					reasons.putIfAbsent(p.itemId, p.reason);
+					reasons.merge(p.itemId, p.reason == null ? "" : p.reason,
+						(a, b) -> a.isEmpty() || a.contains(b) ? (a.isEmpty() ? b : a) : a + "; " + b);
 				}
 			}
 			return reasons;
@@ -147,7 +164,9 @@ class TabBuilder
 				}
 				items.addAll(got);
 			}
-			sections.add(new Section(def.key, def.title, def.layout, items));
+			List<String> columns = def.picks.stream().filter(p -> !p.groups.isEmpty()).findFirst()
+				.map(p -> p.groups).orElse(Collections.emptyList());
+			sections.add(new Section(def.key, def.title, def.layout, items, columns));
 		}
 		if (hero == -1)
 		{
@@ -217,9 +236,26 @@ class TabBuilder
 				for (int i = 0; i < pick.entries.size(); i++)
 				{
 					List<Integer> got = ownedOf(pick.entries.get(i), ctx);
+					if (pick.one && got.size() > 1)
+					{
+						got = got.subList(0, 1);
+					}
 					String group = i < pick.groups.size() ? pick.groups.get(i) : pick.key;
+					String reason = i < pick.reasons.size() && !pick.reasons.get(i).isEmpty() ? pick.reasons.get(i)
+						: pick.label != null ? pick.label : ctx.sectionTitle;
 					chosen.addAll(got);
-					add(out, got, pick.slot, group, ctx, id -> entryReason(pick, id, ctx));
+					if (pick.repeat)
+					{
+						for (int id : got)
+						{
+							ctx.placed.add(id);
+							out.add(new Placement(id, pick.slot, group, reason));
+						}
+					}
+					else
+					{
+						add(out, got, pick.slot, group, ctx, id -> reason);
+					}
 				}
 				break;
 			case "auto":

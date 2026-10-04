@@ -2,9 +2,11 @@ package com.ultimatebanktabs;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 
 /**
@@ -23,7 +25,9 @@ import java.util.TreeMap;
  * gutter, and each situational set (void, inquisitor...) gets its own
  * alternatives column so its pieces line up with the slots they replace.
  * Everything else follows in row sections, each starting on a fresh row. A
- * "sets" section (cosmetics) also keeps each outfit on one row when it fits.
+ * "sets" section (cosmetics) also keeps each outfit on one row when it fits,
+ * and "columns" sections (herblore) give each herb the same column in every
+ * row: grimy, clean, unfinished, secondary and potion line up vertically.
  */
 class LayoutPlanner
 {
@@ -101,40 +105,40 @@ class LayoutPlanner
 		}
 
 		int row = block ? BLOCK_ROWS : 0;
-		List<List<TabBuilder.Placement>> rowSections = new ArrayList<>();
+		List<TabBuilder.Section> rowSections = new ArrayList<>();
 		if (!overflow.isEmpty())
 		{
-			rowSections.add(overflow);
-		}
-		List<Boolean> keepSets = new ArrayList<>();
-		if (!overflow.isEmpty())
-		{
-			keepSets.add(false);
+			rowSections.add(new TabBuilder.Section("overflow", "", "rows", overflow));
 		}
 		for (TabBuilder.Section s : tab.getSections())
 		{
-			boolean sets = "sets".equals(s.getLayout());
-			if ((sets || "rows".equals(s.getLayout())) && !s.getItems().isEmpty())
+			String l = s.getLayout();
+			if (("rows".equals(l) || "sets".equals(l) || "columns".equals(l)) && !s.getItems().isEmpty())
 			{
-				rowSections.add(s.getItems());
-				keepSets.add(sets);
+				rowSections.add(s);
 			}
 		}
+		List<String> columns = activeColumns(rowSections);
 		boolean first = !block;
-		for (int i = 0; i < rowSections.size(); i++)
+		for (TabBuilder.Section s : rowSections)
 		{
 			if (gapRows && !first)
 			{
 				row++;
 			}
 			first = false;
+			if ("columns".equals(s.getLayout()))
+			{
+				row = placeColumns(s.getItems(), columns, row);
+				continue;
+			}
+			boolean sets = "sets".equals(s.getLayout());
 			int col = 0;
-			List<List<TabBuilder.Placement>> chunks = keepSets.get(i)
-				? groups(rowSections.get(i)) : Arrays.asList(rowSections.get(i));
+			List<List<TabBuilder.Placement>> chunks = sets ? groups(s.getItems()) : Arrays.asList(s.getItems());
 			for (List<TabBuilder.Placement> chunk : chunks)
 			{
 				// an outfit that fits on one row never straddles two
-				if (keepSets.get(i) && col > 0 && col + chunk.size() > WIDTH && chunk.size() <= WIDTH)
+				if (sets && col > 0 && col + chunk.size() > WIDTH && chunk.size() <= WIDTH)
 				{
 					col = 0;
 					row++;
@@ -157,6 +161,63 @@ class LayoutPlanner
 		Arrays.fill(layout, -1);
 		grid.forEach((pos, id) -> layout[pos] = id);
 		return layout;
+	}
+
+	/**
+	 * Columns shared by every "columns" section (herbs): only those with something
+	 * placed, in the data's order, so each herb keeps one column all the way down.
+	 */
+	private static List<String> activeColumns(List<TabBuilder.Section> sections)
+	{
+		List<String> order = new ArrayList<>();
+		Set<String> used = new HashSet<>();
+		for (TabBuilder.Section s : sections)
+		{
+			if ("columns".equals(s.getLayout()))
+			{
+				if (order.isEmpty())
+				{
+					order.addAll(s.getColumns());
+				}
+				s.getItems().forEach(p -> used.add(p.getGroup()));
+			}
+		}
+		List<String> active = new ArrayList<>();
+		for (String c : order)
+		{
+			if (used.contains(c))
+			{
+				active.add(c);
+			}
+		}
+		return active;
+	}
+
+	/** Place a columns section at its items' column positions; returns the next free row. */
+	private int placeColumns(List<TabBuilder.Placement> items, List<String> columns, int row)
+	{
+		int rows = (columns.size() + WIDTH - 1) / WIDTH;
+		List<TabBuilder.Placement> extra = new ArrayList<>();
+		for (TabBuilder.Placement p : items)
+		{
+			int idx = columns.indexOf(p.getGroup());
+			if (idx < 0 || !put(row + idx / WIDTH, idx % WIDTH, p.getItemId()))
+			{
+				extra.add(p);
+			}
+		}
+		row += Math.max(rows, 1);
+		int col = 0;
+		for (TabBuilder.Placement p : extra)
+		{
+			if (col == WIDTH)
+			{
+				col = 0;
+				row++;
+			}
+			put(row, col++, p.getItemId());
+		}
+		return extra.isEmpty() ? row : row + 1;
 	}
 
 	private static List<List<TabBuilder.Placement>> groups(List<TabBuilder.Placement> items)
