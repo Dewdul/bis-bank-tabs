@@ -840,6 +840,7 @@ LAUNCHER_AMMO.update({c: "bolt" for c in CROSSBOWS if c != "Hunters' crossbow"})
 # ".*" rule is a catch-all that only takes items this skill uses more than any
 # other skill. Items matching EXCLUDE_SUPPLIES and untradeable quest items are
 # dropped. An order list sorts by position (grimy herb before its clean herb).
+GEMS = ["Opal", "Jade", "Red topaz", "Sapphire", "Emerald", "Ruby", "Diamond", "Dragonstone", "Onyx", "Zenyte"]
 HERBS = ["Guam leaf", "Marrentill", "Tarromin", "Harralander", "Ranarr weed", "Toadflax", "Irit leaf", "Avantoe",
          "Kwuarm", "Huasca", "Snapdragon", "Cadantine", "Lantadyme", "Dwarf weed", "Torstol"]
 
@@ -852,7 +853,8 @@ SUPPLY_RULES = [
         ("Secondaries", r".*"),
     ]),
     ("Crafting", "crafting", [
-        ("Gems", r"^(Uncut .*|Sapphire|Emerald|Ruby|Diamond|Dragonstone|Onyx|Zenyte|Opal|Jade|Red topaz)$"),
+        ("Uncut gems", r"(?i)^Uncut (?:%s)$" % "|".join(GEMS), GEMS),
+        ("Cut gems", r"(?i)^(?:%s)$" % "|".join(GEMS), GEMS),
         ("Leather & hides", r"(?i)^(Cowhide|Leather|Hard leather|Snakeskin|Snake hide|Cured yak-hide|Yak-hide|"
                             r".* dragonhide|.* dragon leather|Hueycoatl hide|Suqah hide|Suqah leather)$"),
         ("Glass", r"(?i)^(Molten glass|Bucket of sand|Soda ash|Seaweed|Giant seaweed|Sandstone \(\d+kg\))$"),

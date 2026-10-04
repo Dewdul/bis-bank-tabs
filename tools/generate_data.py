@@ -274,7 +274,7 @@ def supply_sections(wiki, recipes, uses, skill, rules, taken):
             if rx == r".*" and not primary:
                 break
             if len(rule) > 2:
-                base = re.sub(r"^Grimy ", "", name)
+                base = re.sub(r"^(?:Grimy|Uncut) ", "", name)
                 order = [o.lower() for o in rule[2]]
                 rank = order.index(base.lower()) if base.lower() in order else len(order)
                 key = (rank, 0 if name.startswith("Grimy ") else 1, name.lower())
