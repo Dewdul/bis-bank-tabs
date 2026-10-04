@@ -86,7 +86,8 @@ FOOD = [("Marlin", "Heals 24"), ("Cooked moonlight antelope", "Heals 14, then 12
 ANTIPOISON = ["Extended anti-venom+", "Anti-venom+", "Anti-venom", "Antidote++", "Antidote+",
               "Superantipoison", "Antipoison"]
 ANTIFIRE = ["Extended super antifire", "Super antifire potion", "Extended antifire", "Antifire potion"]
-RESTORE = ["Super restore", "Prayer potion"]
+RESTORE = [("Super restore", "Restores prayer and stats drained by attacks"), ("Prayer potion", "Restores prayer"),
+           ("Prayer regeneration potion", "Restores prayer gradually over time")]
 
 ELEMENTAL_RUNES = ["Fire rune", "Water rune", "Air rune", "Earth rune"]
 COMBO_RUNES = ["Smoke rune", "Steam rune", "Mist rune", "Dust rune", "Mud rune", "Lava rune"]
@@ -95,7 +96,7 @@ RUNE_POUCH = ["Divine rune pouch", "Rune pouch"]
 
 def combat_supplies(boosts):
     return section("supplies", "Supplies", "rows", boosts + [
-        first("restore", RESTORE),
+        all_("restore", RESTORE),
         first("brew", ["Saradomin brew"]),
         # how many foods comes from the "Food items" setting
         first("food", FOOD, take=4),
