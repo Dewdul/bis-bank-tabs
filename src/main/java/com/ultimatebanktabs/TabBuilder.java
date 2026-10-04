@@ -28,6 +28,7 @@ class TabBuilder
 		/** extra next-best items per "first"/"auto"/"weapon" pick */
 		int backups;
 		boolean skillSupplies = true;
+		boolean skillGoods = true;
 		boolean combatSupplies = true;
 		/** how many foods the combat tabs show */
 		int foodCount = 4;
@@ -146,6 +147,7 @@ class TabBuilder
 		for (TabData.Section def : tab.sections)
 		{
 			if (def.supplies && !options.skillSupplies
+				|| "goods".equals(def.layout) && !options.skillGoods
 				|| tab.isGear() && "supplies".equals(def.key) && !options.combatSupplies)
 			{
 				continue;

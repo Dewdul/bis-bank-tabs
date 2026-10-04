@@ -110,7 +110,8 @@ class Resolver:
     def entry_pages(self, name):
         if name.startswith("re:"):
             rx = re.compile(name[3:])
-            pages = [p for p in self.wiki.pages if rx.search(p)]
+            # pages without item ids (set pages, minigame items) can't be owned
+            pages = [p for p in self.wiki.pages if rx.search(p) and self.wiki.page_ids.get(p.lower())]
             if not pages:
                 self.errors.append("regex matched nothing: %s" % name)
             return pages
@@ -422,6 +423,90 @@ def cosmetics_tab(wiki, res, elsewhere):
             "sections": sections}
 
 
+GEAR_SECTIONS = {"main", "situational", "weapons", "specials", "gear", "outfit", "run", "jewellery", "diary", "items",
+                 "protection", "cannon", "tools"}
+
+
+def combat_gear_ids(tabs):
+    """Gear and tools any tab curates (crystal armour, Bow of Faerdhinen, crystal
+    axe...): made by skilling recipes but not a skill's finished goods. Ammo,
+    potions and runes still count as goods (arrows, potions, runes)."""
+    ids = set()
+    for t in tabs:
+        for s in t["sections"]:
+            if s["key"] in GEAR_SECTIONS or s.get("layout") in ("equipment", "alts"):
+                ids |= curated_ids({"sections": [s]})
+    return ids
+
+
+def add_goods(wiki, recipes, res, tab, gear):
+    """Append the tab's finished goods: recipe products of its skill grouped by the
+    supply section their main ingredient comes from (or the curated GOODS_LISTS for
+    gathering skills), after any supply sections that are really goods."""
+    key = tab["key"]
+    taken = curated_ids(tab)
+    goods = []
+    moved = curated.GOODS_FROM_SUPPLIES.get(key, [])
+    for s in [s for s in tab["sections"] if s.get("supplies") and s["layout"] == "rows" and s["title"] in moved]:
+        tab["sections"].remove(s)
+        goods.append(dict(s, layout="goods", title="Finished goods: " + s["title"].lower()))
+    for title, names in curated.GOODS_LISTS.get(key, []):
+        entries = [ids for ids in res.entries(names, split_regex=True) if not any(i in taken for i in ids)]
+        if entries:
+            goods.append(goods_section(key, title, entries))
+
+    section_of = {}
+    for s in tab["sections"]:
+        for p in s["picks"]:
+            for ids in p.get("entries", []):
+                for i in ids:
+                    section_of.setdefault(wiki.id_page.get(i), s["title"])
+    skill = key.lower()
+    products = {}
+    junk = (re.compile(curated.EXCLUDE_SUPPLIES), re.compile(curated.EXCLUDE_GOODS))
+    for r in recipes:
+        if (r.get("skill") or "").lower() != skill:
+            continue
+        page = wiki.id_page.get(r.get("productId") or 0)
+        names = (wiki.page_name.get(page, ""), wiki.id_name.get(r.get("productId"), ""))
+        if not page or page in wiki.quest_only or any(j.search(n) for j in junk for n in names):
+            continue
+        ids = wiki.page_ids[page]
+        if any(i in taken or i in gear for i in ids):
+            continue
+        group = "Other"
+        for ing in r.get("ingredients", []):
+            title = section_of.get(wiki.id_page.get(ing["itemId"]))
+            if title and not title.startswith("Finished goods"):
+                group = title
+                break
+        level = r.get("level") or 1
+        if page not in products or level < products[page][0]:
+            products[page] = (level, group)
+    shown = {i for g in goods for p in g["picks"] for ids in p["entries"] for i in ids}
+    order = [s["title"] for s in tab["sections"]] + ["Other"]
+    by_group = defaultdict(list)
+    for page, (level, group) in products.items():
+        ids = res.entries([wiki.page_name[page]])[0]
+        if not any(i in shown for i in ids):
+            by_group[group].append((level, wiki.page_name[page].lower(), ids))
+    for group in sorted(by_group, key=lambda g: order.index(g) if g in order else len(order)):
+        entries = [ids for _, _, ids in sorted(by_group[group])]
+        same = next((g for g in goods if g["title"] == "Finished goods: " + group.lower()), None)
+        if same:
+            # e.g. potions made from potions join the moved Potions section
+            same["picks"][0]["entries"] += entries
+        else:
+            goods.append(goods_section(key, group, entries))
+    tab["sections"] += goods
+
+
+def goods_section(tab_key, title, entries):
+    slug = re.sub(r"\W+", "_", title.lower()).strip("_")
+    return {"key": "goods_" + slug, "title": "Finished goods: " + title.lower(), "layout": "goods",
+            "picks": [{"key": "goods_" + slug, "mode": "all", "entries": entries}]}
+
+
 def main():
     rows = cached("items.json", fetch_items)
     variations = cached("item_variations.json", fetch_variations)
@@ -447,6 +532,10 @@ def main():
     for skill, key, rules in curated.SUPPLY_RULES:
         tab = by_key[key]
         tab["sections"] += supply_sections(wiki, recipes, uses, skill, rules, curated_ids(tab))
+    gear = combat_gear_ids(tabs)
+    for t in curated.TABS:
+        if t["kind"] == "skill":
+            add_goods(wiki, recipes, res, by_key[t["key"]], gear)
 
     elsewhere = set()
     for t in tabs:

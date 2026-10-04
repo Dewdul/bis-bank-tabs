@@ -457,6 +457,7 @@ public class UltimateBankTabsPlugin extends Plugin
 		TabBuilder.Options options = new TabBuilder.Options();
 		options.backups = config.backups();
 		options.skillSupplies = config.skillSupplies();
+		options.skillGoods = config.skillGoods();
 		options.combatSupplies = config.combatSupplies();
 		options.foodCount = config.foodCount();
 

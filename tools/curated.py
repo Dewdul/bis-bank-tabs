@@ -1412,7 +1412,7 @@ TAB_ICONS = {
     # always a seed: your best tree or herb seed, else any seed you have
     "farming": ["Magic seed", "Yew seed", "Torstol seed", "Snapdragon seed", "Ranarr seed", "Maple seed",
                 "Dwarf weed seed", "Lantadyme seed", "Cadantine seed", "Kwuarm seed", "Avantoe seed", "Irit seed",
-                "Toadflax seed", "Willow seed", "Acorn", "re:^(?!.*\().* seed$"],
+                "Toadflax seed", "Willow seed", "Acorn", r"re:^(?!.*\().* seed$"],
     "runecraft": ["Rune essence"],
     "construction": ["Mahogany plank", "Teak plank", "Oak plank", "Plank", "Saw", "Hammer"],
     "sailing": ["Gwyna's fabric roll", "Gurtob's fabric roll", "Ralph's fabric roll"],
@@ -1427,3 +1427,44 @@ DEFAULT_ICONS = {"cooking": "Shark", "herblore": "Ranarr weed", "crafting": "Unc
                  "agility": "Mark of grace"}
 # tabs whose icon falls back to the first item shown rather than the default icon
 ICON_FALLBACK_TO_FIRST_ITEM = {"cosmetics"}
+
+
+# ---------------------------------------------------------------- finished goods
+# Every skill tab ends with the things the skill makes, after a blank row. For
+# skills with recipes they come from the wiki recipe data (generate_data.py
+# goods_sections), grouped by the supply section they are made from. Gathering
+# skills have no recipes, so their goods are listed here, best tier last.
+def _raw_fish_order():
+    for skill, _, rules in SUPPLY_RULES:
+        if skill == "Cooking":
+            for rule in rules:
+                if rule[0] == "Raw fish":
+                    return list(rule[2])
+    return []
+
+
+GOODS_LISTS = {
+    "woodcutting": [("Logs", ["Logs", "Oak logs", "Willow logs", "Teak logs", "Maple logs", "Arctic pine logs",
+                              "Mahogany logs", "Camphor logs", "Yew logs", "Ironwood logs", "Magic logs",
+                              "Redwood logs", "Rosewood logs"]),
+                    ("Bird nests", ["Bird nest (seeds)", "Bird nest (ring)", "Bird nest (egg)", "Bird nest (empty)"])],
+    "mining": [("Ores", ["Clay", "Copper ore", "Tin ore", "Blurite ore", "Iron ore", "Silver ore", "Lead ore", "Coal",
+                         "Gold ore", "Lovakite ore", "Mithril ore", "Adamantite ore", "Nickel ore", "Runite ore",
+                         "Amethyst"]),
+               ("Gems", ["Uncut opal", "Uncut jade", "Uncut red topaz", "Uncut sapphire", "Uncut emerald",
+                         "Uncut ruby", "Uncut diamond"]),
+               ("Essence", ["Rune essence", "Pure essence", "Daeyalt essence"]),
+               ("Other", [r"re:^Sandstone \(\d+kg\)$", "Granite", "Volcanic ash"])],
+    "fishing": [("Raw fish", _raw_fish_order())],
+    "hunter": [("Chinchompas", ["Chinchompa", "Red chinchompa", "Black chinchompa"]),
+               ("Meat", ["Raw rabbit", "Raw bird meat", "Raw beast meat", "Raw wild kebbit", "Raw barb-tailed kebbit",
+                         "Raw dashing kebbit", "Raw larupia", "Raw graahk", "Raw kyatt", "Raw pyre fox",
+                         "Raw sunlight antelope", "Raw moonlight antelope"]),
+               ("Furs & feathers", [r"re:^(?!Bear|Grey wolf|Wolf)[A-Z][\w' -]* fur$", "Red feather", "Yellow feather",
+                                    "Orange feather", "Blue feather", "Stripy feather"]),
+               ("Implings", [r"re:^[A-Z]\w* impling jar$"])],
+}
+# supply sections that are really finished goods (moved to the goods area)
+GOODS_FROM_SUPPLIES = {"herblore": ["Potions"]}
+# never finished goods: failed products, and raid/minigame-only items you can't bank
+EXCLUDE_GOODS = r"(?i)^(Burnt |Corrupted |Crystal paddlefish|Paddlefish|Token|Bridge section|Pipe section|Lumber patch|"                 r"Servery |Guanic bat|Prael bat|Giral bat|Phluxia bat|Kryket bat|Murng bat|Psykk bat|Pysk fish|"                 r"Suphi fish|Leckish fish|Brawk fish|Mycil fish|Roqed fish|Kyren fish|Refined tephra|.*\(Gauntlet\)|"                 r"Blade of Saeldor|Bow of Faerdhinen|Crystal (?:shield|halberd|helm|body|legs|bow|crown)|Godsword|"                 r"Zombie (?:axe|helmet)|Belle's folly|Torva |Elemental (?:helmet|shield)|"                 r"Mind (?:helmet|shield)|Enhanced crystal key|Escape crystal|Guardian essence|Bronze key)"

@@ -11,7 +11,7 @@ Ultimate Bank Tabs builds bank tag tabs from what you own. Each combat style get
 
   Then come your special attack weapons, the right ammunition for the launchers in the tab, and your best potions and food.
 - **Movement.** Your most complete graceful set, stamina potions, teleport jewellery, diary rewards and other teleport items. It also has every teleport tablet and scroll, and the runes for teleport spells.
-- **Skills.** Prayer, Slayer, Agility, Thieving, Herblore, Crafting, Fletching, Hunter, Mining, Smithing, Fishing, Cooking, Firemaking, Woodcutting, Farming, Runecraft, Construction and Sailing. Each tab shows your best tools and skilling outfit, then the supplies you own for that skill, grouped and in level order. For example, Herblore shows each herb grimy then clean, then unfinished potions, potions and secondaries.
+- **Skills.** Prayer, Slayer, Agility, Thieving, Herblore, Crafting, Fletching, Hunter, Mining, Smithing, Fishing, Cooking, Firemaking, Woodcutting, Farming, Runecraft, Construction and Sailing. Each tab shows your best tools and skilling outfit, then the supplies you own for that skill, grouped and in level order. For example, Herblore shows each herb grimy then clean, then unfinished potions, potions and secondaries. At the bottom, after a blank row, each skill tab shows its **finished goods**: what the skill makes, grouped by what it is made from (potions, jewellery, d'hide, bows and arrows, smithed items, cooked food, runes and so on), plus logs, ores, gems, raw fish and hunter catches for the gathering skills.
 
 Only items you own appear. That means your bank, including placeholders, potion storage, and (optionally) what you are wearing and carrying. An item can appear in several tabs. Tabs with nothing in them are not created.
 
@@ -27,7 +27,7 @@ Only items you own appear. That means your bank, including placeholders, potion 
 - Turn each tab on or off.
 - **Backups per slot**: also show the next best one to three items for each pick.
 - **Count worn & carried items** (on by default): gear you are wearing without a bank placeholder still gets its slot.
-- Potions and food in combat tabs, supplies in skill tabs, a blank row between sections, and your best item as each tab's icon.
+- Potions and food in combat tabs, supplies and finished goods in skill tabs, a blank row between sections, and your best item as each tab's icon.
 - **Remove tabs when turned off**: the plugin's tabs disappear when you turn it off and come back when you turn it on.
 
 ## Notes

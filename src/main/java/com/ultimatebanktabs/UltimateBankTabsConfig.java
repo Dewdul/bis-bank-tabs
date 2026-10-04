@@ -53,21 +53,29 @@ public interface UltimateBankTabsConfig extends Config
 		return 4;
 	}
 
-	@ConfigItem(keyName = "skillSupplies", name = "Supplies in skill tabs", position = 4, section = contents,
+	@ConfigItem(keyName = "skillSupplies", name = "Supplies in skill tabs", position = 5, section = contents,
 		description = "Add the materials you own for each skill (herbs, logs, bars, seeds...) below its tools")
 	default boolean skillSupplies()
 	{
 		return true;
 	}
 
-	@ConfigItem(keyName = "gapRows", name = "Blank row between sections", position = 5, section = contents,
+	@ConfigItem(keyName = "skillGoods", name = "Finished goods in skill tabs", position = 4, section = contents,
+		description = "Add what each skill makes (potions, jewellery, bows, bars, cooked food, logs, ores...) at the"
+			+ " bottom of its tab, after a blank row")
+	default boolean skillGoods()
+	{
+		return true;
+	}
+
+	@ConfigItem(keyName = "gapRows", name = "Blank row between sections", position = 6, section = contents,
 		description = "Leave an empty row between groups in each tab")
 	default boolean gapRows()
 	{
 		return false;
 	}
 
-	@ConfigItem(keyName = "dynamicIcons", name = "Best item as tab icon", position = 6, section = contents,
+	@ConfigItem(keyName = "dynamicIcons", name = "Best item as tab icon", position = 7, section = contents,
 		description = "Use your best item for each tab's icon (your best weapon, food, bones, herb...). An icon you"
 			+ " pick with a tab's Change icon option is kept; switch this off and on to hand icons back to the plugin")
 	default boolean dynamicIcons()
@@ -75,14 +83,14 @@ public interface UltimateBankTabsConfig extends Config
 		return true;
 	}
 
-	@ConfigItem(keyName = "showReasons", name = "Show why on hover", position = 7, section = contents,
+	@ConfigItem(keyName = "showReasons", name = "Show why on hover", position = 8, section = contents,
 		description = "Hovering an item in one of these tabs shows why it is there, e.g. \"Demonbane: +60% vs demons\"")
 	default boolean showReasons()
 	{
 		return true;
 	}
 
-	@ConfigItem(keyName = "removeOnStop", name = "Remove tabs when turned off", position = 8, section = contents,
+	@ConfigItem(keyName = "removeOnStop", name = "Remove tabs when turned off", position = 9, section = contents,
 		description = "Delete the tabs this plugin made when the plugin is turned off. They come back when it is"
 			+ " turned on again")
 	default boolean removeOnStop()

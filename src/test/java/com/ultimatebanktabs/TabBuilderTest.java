@@ -342,6 +342,22 @@ public class TabBuilderTest
 	}
 
 	@Test
+	public void finishedGoodsGoLast()
+	{
+		TabBuilder.Built wc = build("woodcutting", own("Rune axe", "Logs", "Oak logs"));
+		List<TabBuilder.Section> sections = wc.getSections();
+		TabBuilder.Section last = sections.stream().filter(s -> !s.getItems().isEmpty())
+			.reduce((a, b) -> b).orElseThrow(IllegalStateException::new);
+		assertEquals("goods", last.getLayout());
+		assertEquals(Arrays.asList(id("Logs"), id("Oak logs")),
+			last.getItems().stream().map(TabBuilder.Placement::getItemId).collect(Collectors.toList()));
+
+		TabBuilder.Options off = new TabBuilder.Options();
+		off.skillGoods = false;
+		assertFalse(builder.build(tab("woodcutting"), own("Rune axe", "Logs"), off).itemIds().contains(id("Logs")));
+	}
+
+	@Test
 	public void emptyBankBuildsEmptyTabs()
 	{
 		for (TabData.Tab t : data.tabs)

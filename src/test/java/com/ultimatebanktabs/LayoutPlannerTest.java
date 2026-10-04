@@ -168,6 +168,17 @@ public class LayoutPlannerTest
 	}
 
 	@Test
+	public void finishedGoodsAfterABlankRow()
+	{
+		int[] layout = plan(s("gear", "rows", p(1, null, "a")), s("goods_logs", "goods", p(2, null, "b")),
+			s("goods_nests", "goods", p(3, null, "c")));
+		assertEquals(1, at(layout, 0, 0));
+		assertEquals("blank separator row", -1, at(layout, 1, 0));
+		assertEquals(2, at(layout, 2, 0));
+		assertEquals("later goods groups just start a new row", 3, at(layout, 3, 0));
+	}
+
+	@Test
 	public void emptyTab()
 	{
 		assertEquals(0, plan(new TabBuilder.Section("x", "x", "rows", Collections.emptyList())).length);
