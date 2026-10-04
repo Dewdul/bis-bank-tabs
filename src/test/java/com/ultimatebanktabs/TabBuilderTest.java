@@ -358,6 +358,18 @@ public class TabBuilderTest
 	}
 
 	@Test
+	public void everyUsefulBoltAndBooksAreSituational()
+	{
+		TabBuilder.Built built = build("ranged", own("Rune crossbow", "Runite bolts", "Broad bolts", "Rune kiteshield",
+			"Book of Law"));
+		Map<String, Integer> main = bySlot(section(built, "main"));
+		assertEquals(id("Rune crossbow"), (int) main.get("WEAPON"));
+		assertEquals("a real shield, not the prayer book", id("Rune kiteshield"), (int) main.get("SHIELD"));
+		assertTrue(items(section(built, "situational")).contains(id("Book of Law")));
+		assertTrue("broad bolts show beside the runite bolts", built.itemIds().containsAll(own("Runite bolts", "Broad bolts")));
+	}
+
+	@Test
 	public void emptyBankBuildsEmptyTabs()
 	{
 		for (TabData.Tab t : data.tabs)

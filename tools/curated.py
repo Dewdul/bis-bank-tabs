@@ -122,6 +122,16 @@ def combat_supplies(boosts, restores=(), brews=()):
     ])
 
 
+GOD_BOOKS = ["Book of Law", "Book of War", "Book of Darkness", "Holy book", "Unholy book", "Book of Balance"]
+
+
+def prayer_book(best):
+    """The god book for a style first; books are a situational off-hand (prayer bonus)."""
+    order = [best] + [b for b in GOD_BOOKS if b != best]
+    return first("prayer_book", [(b, "Prayer book: prayer bonus, for when you don't need a shield") for b in order],
+                 slot="SHIELD")
+
+
 def situational_common(imbued_only):
     helms = IMBUED_SLAYER_HELMS + ([] if imbued_only else SLAYER_HELMS) + \
         ["Black mask (i)"] + ([] if imbued_only else ["Black mask"])
@@ -151,7 +161,7 @@ MELEE = tab("melee", "Melee", "Abyssal whip", kind="gear", sections=[
         auto("feet", "BOOTS", "melee"),
         auto("ring", "RING", "melee"),
     ]),
-    section("situational", "Situational", "alts", situational_common(False) + [
+    section("situational", "Situational", "alts", situational_common(False) + [prayer_book("Book of War")] + [
         first("blood_fury", ["Amulet of blood fury"], slot="AMULET"),
         set_("inquisitor", [("HEAD", ["Inquisitor's great helm"]), ("BODY", ["Inquisitor's hauberk"]),
                             ("LEGS", ["Inquisitor's plateskirt"])]),
@@ -209,6 +219,20 @@ BOWS = ["Twisted bow", "Dark bow", "Corrupted dark bow", "Magic shortbow (i)", "
 CROSSBOWS = ["Zaryte crossbow", "Armadyl crossbow", "Dragon hunter crossbow", "Dragon crossbow", "Rune crossbow",
              "Karil's crossbow", "Adamant crossbow", "Mithril crossbow", "Steel crossbow", "Iron crossbow",
              "Bronze crossbow", "Blurite crossbow", "Dorgeshuun crossbow", "Hunters' crossbow"]
+
+# Enchant Crossbow Bolt order; each gem's dragon bolts first. Hover text is the bolt's effect.
+_BOLT_EFFECTS = [("Opal", "Lucky Lightning: extra damage, best against low defence"),
+                 ("Jade", "Earth's Fury: can knock the target down"),
+                 ("Pearl", "Sea Curse: extra damage, more against fiery monsters"),
+                 ("Topaz", "Down to Earth: lowers the target's Magic"),
+                 ("Sapphire", "Clear Mind: drains the target's Prayer"),
+                 ("Emerald", "Magical Poison: poisons the target"),
+                 ("Ruby", "Blood Forfeit: 20% of the target's hitpoints (best on high-HP bosses)"),
+                 ("Diamond", "Armour Piercing: ignores defence, great on tanky targets"),
+                 ("Dragonstone", "Dragon's Breath: dragonfire damage (not on dragons)"),
+                 ("Onyx", "Life Leech: heals you (not on undead)")]
+ENCHANTED_BOLTS = [(name, effect) for gem, effect in _BOLT_EFFECTS
+                   for name in ("%s dragon bolts (e)" % gem, "%s bolts (e)" % gem)]
 
 ARROWS = ["Dragon arrow", "Amethyst arrow", "Rune arrow", "Adamant arrow", "Mithril arrow", "Steel arrow",
           "Iron arrow", "Bronze arrow"]
@@ -272,7 +296,7 @@ RANGED = tab("ranged", "Ranged", "Magic shortbow", kind="gear", sections=[
         auto("feet", "BOOTS", "ranged"),
         auto("ring", "RING", "ranged"),
     ]),
-    section("situational", "Situational", "alts", situational_common(True) + [
+    section("situational", "Situational", "alts", situational_common(True) + [prayer_book("Book of Law")] + [
         set_("crystal", [("HEAD", ["Crystal helm"]), ("BODY", ["Crystal body"]), ("LEGS", ["Crystal legs"])],
              requires=["re:^Bow of Faerdhinen", "Crystal bow"]),
         set_("void", [("HEAD", ["Void ranger helm"]), ("BODY", VOID_TOP), ("LEGS", VOID_ROBE),
@@ -306,15 +330,15 @@ RANGED = tab("ranged", "Ranged", "Magic shortbow", kind="gear", sections=[
     ]),
     section("ammo", "Ammunition", "rows", [
         first("arrows", ARROWS, requires=BOWS, placed=True),
-        # enchanted bolts in gem order (sapphire comes from unique_uses.py), then plain, broad and antler bolts
-        all_("bolts_sapphire", [], requires=CROSSBOWS, placed=True),
-        first("bolts_ruby", ["Ruby dragon bolts (e)", "Ruby bolts (e)"], requires=CROSSBOWS, placed=True),
-        first("bolts_diamond", ["Diamond dragon bolts (e)", "Diamond bolts (e)"], requires=CROSSBOWS, placed=True),
-        first("bolts_dragonstone", ["Dragonstone dragon bolts (e)", "Dragonstone bolts (e)"], requires=CROSSBOWS, placed=True),
-        first("bolts_onyx", ["Onyx dragon bolts (e)", "Onyx bolts (e)"], requires=CROSSBOWS, placed=True),
-        first("bolts", ["Dragon bolts", "Runite bolts", "Adamant bolts", "Mithril bolts", "Steel bolts",
-                        "Iron bolts", "Bronze bolts"], requires=CROSSBOWS, placed=True),
-        first("broad_bolts", ["Amethyst broad bolts", "Broad bolts"], requires=CROSSBOWS, placed=True),
+        # every useful bolt you own: enchanted bolts in enchant order (dragon first), broad, plain, silver
+        all_("bolts_enchanted", ENCHANTED_BOLTS, requires=CROSSBOWS, placed=True),
+        all_("bolts_sapphire", [], requires=CROSSBOWS, placed=True),  # unique_uses.py, already covered above
+        all_("broad_bolts", [("Amethyst broad bolts", "Broad bolts: needed for turoths and kurasks (more accurate)"),
+                             ("Broad bolts", "Broad bolts: needed for turoths and kurasks")],
+             requires=CROSSBOWS, placed=True),
+        all_("bolts", ["Dragon bolts", "Runite bolts", "Adamant bolts", "Mithril bolts", "Steel bolts",
+                       "Iron bolts", "Bronze bolts"], requires=CROSSBOWS, placed=True),
+        all_("silver_bolts", [("Silver bolts", "Silver bolts: damage vampyres")], requires=CROSSBOWS, placed=True),
         first("antler_bolts", ["Sunlight antler bolts", "Moonlight antler bolts"],
               requires=["Hunters' sunlight crossbow"], placed=True),
         first("javelins", JAVELINS, requires=["Heavy ballista", "Light ballista"], placed=True),
@@ -391,7 +415,7 @@ MAGIC = tab("magic", "Magic", "Mystic air staff", kind="gear", sections=[
         auto("feet", "BOOTS", "magic"),
         auto("ring", "RING", "magic"),
     ]),
-    section("situational", "Situational", "alts", situational_common(True) + [
+    section("situational", "Situational", "alts", situational_common(True) + [prayer_book("Book of Darkness")] + [
         set_("virtus", [("HEAD", ["Virtus mask"]), ("BODY", ["Virtus robe top"]), ("LEGS", ["Virtus robe bottom"])]),
         set_("void", [("HEAD", ["Void mage helm"]), ("BODY", VOID_TOP), ("LEGS", VOID_ROBE),
                       ("GLOVES", ["Void knight gloves"])], complete=True),
@@ -1370,6 +1394,8 @@ EXCLUDE_SUPPLIES = r"(?i)^(Coins|Platinum token|Bucket|Bucket of water|Jug|Jug o
 EXCLUDE_AUTO = [
     "re:^(Vesta's|Statius's|Morrigan's|Zuriel's) ",
     "Wilderness champion amulet",
+    # god books win on prayer bonus but are situational: they get their own pick instead
+    "re:^(Holy book|Unholy book|Book of (Balance|Law|War|Darkness)|Damaged book)",
 ]
 
 # Melee weapons kept out of the damage-model picks (situational picks cover them).
