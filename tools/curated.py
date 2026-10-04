@@ -852,7 +852,8 @@ HERBS = ["Guam leaf", "Marrentill", "Tarromin", "Harralander", "Ranarr weed", "T
 
 SUPPLY_RULES = [
     ("Herblore", "herblore", [
-        ("Herbs", r"(?i)^(?:Grimy )?(?:%s)$" % "|".join(HERBS), HERBS),
+        ("Grimy herbs", r"(?i)^Grimy (?:%s)$" % "|".join(HERBS), HERBS),
+        ("Clean herbs", r"(?i)^(?:%s)$" % "|".join(HERBS), HERBS),
         ("Unfinished potions", r"\(unf\)$"),
         ("Vials", r"^(Vial|Vial of water|Vial of blood|Coconut milk)$"),
         ("Potions", r"\(\d\)$|\(\d\) ?$|potion|brew|restore|antidote|antifire|anti-venom|antipoison|mix$"),
