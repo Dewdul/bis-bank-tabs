@@ -264,6 +264,41 @@ public class TabBuilderTest
 	}
 
 	@Test
+	public void everydaySawFirstCrystalSawForTheBoost()
+	{
+		TabBuilder.Built built = build("construction", own("Crystal saw", "Saw", "Hammer"));
+		List<Integer> gear = section(built, "gear").getItems().stream().map(TabBuilder.Placement::getItemId)
+			.collect(Collectors.toList());
+		assertEquals(Arrays.asList(id("Saw"), id("Crystal saw"), id("Hammer")), gear);
+		assertEquals(id("Saw"), built.getHero());
+		assertTrue(built.reasons().get(id("Crystal saw")).contains("+3"));
+
+		TabBuilder.Built amy = build("construction", own("Crystal saw", "Saw", "Amy's saw"));
+		assertTrue("Amy's saw replaces the plain saw", amy.itemIds().contains(id("Amy's saw")));
+		assertFalse(amy.itemIds().contains(id("Saw")));
+	}
+
+	@Test
+	public void reasonsExplainEachItem()
+	{
+		TabBuilder.Options options = new TabBuilder.Options();
+		options.backups = 1;
+		TabBuilder.Built built = builder.build(tab("melee"), own(MAXED_MELEE), options);
+		Map<Integer, String> reasons = built.reasons();
+		assertEquals("Best helmet for melee stats", reasons.get(id("Torva full helm")));
+		assertEquals("Best stab weapon", build("melee", own(MAXED_MELEE)).reasons().get(id("Osmumten's fang")));
+		assertTrue(reasons.get(id("Fire cape")).startsWith("Backup: "));
+		for (TabBuilder.Section s : built.getSections())
+		{
+			for (TabBuilder.Placement p : s.getItems())
+			{
+				assertNotNull("reason for " + p.getItemId(), p.getReason());
+				assertFalse(p.getReason().isEmpty());
+			}
+		}
+	}
+
+	@Test
 	public void emptyBankBuildsEmptyTabs()
 	{
 		for (TabData.Tab t : data.tabs)
