@@ -96,19 +96,25 @@ RESTORE = [("Super restore", "Restores prayer and stats drained by attacks"), ("
            ("Prayer regeneration potion", "Restores prayer gradually over time")]
 
 ELEMENTAL_RUNES = ["Fire rune", "Water rune", "Air rune", "Earth rune"]
-COMBO_RUNES = ["Smoke rune", "Steam rune", "Mist rune", "Dust rune", "Mud rune", "Lava rune"]
+# by Runecraft level
+COMBO_RUNES = ["Mist rune", "Dust rune", "Mud rune", "Smoke rune", "Steam rune", "Lava rune"]
 RUNE_POUCH = ["Divine rune pouch", "Rune pouch"]
 
 
-def combat_supplies(boosts):
-    return section("supplies", "Supplies", "rows", boosts + [
+def combat_supplies(boosts, restores=(), brews=()):
+    """Every potion together (boosts, restores, brews, antipoison, antifire), then the food. restores and
+    brews take tab-specific unique_uses.py markers (Surge potion, Armadyl brew) so they sit by their family."""
+    return section("supplies", "Supplies", "rows", [
+        *boosts,
         all_("restore", RESTORE),
+        *restores,
         first("brew", ["Saradomin brew"]),
+        *brews,
+        all_("antipoison", ANTIPOISON),
+        all_("antifire", ANTIFIRE),
         # how many foods comes from the "Food items" setting
         first("food", FOOD, take=4),
         first("karambwan", [("Cooked karambwan", "Combo food: eat in the same tick as other food (heals 18)")]),
-        all_("antipoison", ANTIPOISON),
-        all_("antifire", ANTIFIRE),
     ])
 
 
@@ -168,18 +174,26 @@ MELEE = tab("melee", "Melee", "Abyssal whip", kind="gear", sections=[
         first("dharok", ["Dharok's greataxe"], requires=["Dharok's helm"]),
     ]),
     section("specials", "Special attacks", "rows", [
-        all_("specs", ["Dragon claws", "Burning claws", "Voidwaker", "Dragon warhammer", "Elder maul",
+        # unique_uses.py spec groups take these places: damage, then defence drains, then support
+        all_("spec_claws", []), all_("spec_big_hit", []), all_("spec_crush", []), all_("spec_crush_cheap", []),
+        all_("spec_halberd", []), all_("spec_instant", []), all_("spec_cheap", []), all_("spec_finisher", []),
+        all_("spec_aoe", []),
+        all_("spec_def_drain_pct", []), all_("spec_def_drain_dmg", []), all_("spec_demon_drain", []),
+        all_("spec_freeze", []), all_("spec_bleed", []), all_("spec_sustain", []), all_("spec_strength", []),
+        all_("spec_team_accuracy", []), all_("spectral", []),
+        # anything left over, one weapon family at a time
+        all_("specs", ["Dragon claws", "Burning claws", "Voidwaker", "Dragon warhammer", "Elder maul", "Granite maul",
                        "Bandos godsword", "Armadyl godsword", "Ancient godsword", "Saradomin godsword",
-                       "Zamorak godsword", "Crystal halberd", "Granite maul", "Dragon dagger", "Abyssal dagger",
-                       "Dragon longsword", "Dragon mace", "Barrelchest anchor", "Bone dagger", "Crimson kisten", "Dragon halberd",
-                       "Dragon scimitar", "Saradomin sword", "Saradomin's blessed sword"]),
+                       "Zamorak godsword", "Crystal halberd", "Dragon halberd", "Dragon dagger", "Abyssal dagger",
+                       "Bone dagger", "Dragon longsword", "Dragon mace", "Dragon scimitar", "Barrelchest anchor",
+                       "Crimson kisten", "Saradomin's blessed sword", "Saradomin sword"]),
     ]),
     combat_supplies([
         first("boost", ["Divine super combat potion", "Super combat potion", "Combat potion"]),
+        first("boost_att", ["Divine super attack potion", "Super attack", "Attack potion"], unless=["boost"]),
         first("boost_str", ["Divine super strength potion", "Super strength", "Strength potion"],
               unless=["boost"]),
-        first("boost_att", ["Divine super attack potion", "Super attack", "Attack potion"], unless=["boost"]),
-    ]),
+    ], restores=[all_("spec_restore", [])]),  # Surge potion (unique_uses.py)
 ])
 
 # ---------------------------------------------------------------- ranged
@@ -263,21 +277,33 @@ RANGED = tab("ranged", "Ranged", "Magic shortbow", kind="gear", sections=[
                               ("LEGS", ["Eclipse Moon tassets"])], requires=["Eclipse atlatl"]),
     ]),
     section("weapons", "Weapons", "rows", [
-        first("dragonbane", ["Dragon hunter crossbow"]),
-        first("demonbane", ["Scorching bow"]),
+        # keys match unique_uses.py groups so they replace these picks in place
+        first("dragonbane_ranged", ["Dragon hunter crossbow"]),
+        first("demonbane_ranged", ["Scorching bow"]),
         first("blowpipe", ["Blazing blowpipe", "Toxic blowpipe"]),
-        first("multi", ["Venator bow", "Black chinchompa", "Red chinchompa", "Chinchompa"]),
-        first("wilderness", ["Webweaver bow", "Craw's bow"]),
+        first("multi_bounce", ["Venator bow"]),
+        first("chinchompas", ["Black chinchompa", "Red chinchompa", "Chinchompa"]),
+        first("wilderness_ranged", ["Webweaver bow", "Craw's bow"]),
         first("karil", ["Karil's crossbow"], requires=["Karil's coif"]),
     ]),
     section("specials", "Special attacks", "rows", [
-        all_("specs", ["Zaryte crossbow", "Dragon thrownaxe", "Heavy ballista", "Light ballista", "Dragon knife",
-                       "Dark bow", "Corrupted dark bow", "Magic shortbow (i)", "Magic shortbow", "Armadyl crossbow",
-                       "Dorgeshuun crossbow", "Rune thrownaxe",
-                       "Seercull", "Magic longbow", "Magic comp bow"]),
+        # unique_uses.py spec groups take these places, one weapon family at a time (ballista (or) by the
+        # ballistae, the bows by their purpose group): crossbows, ballistae, bows, thrown, then drains
+        all_("spec_bolt", []), all_("dcb_spec", []), all_("ballista_spec", []), all_("spec_ballista", []),
+        all_("spec_ranged_multi", []), all_("msb_spec", []), all_("spec_ranged_guaranteed", []),
+        all_("powershot", []), all_("spec_ranged_cheap", []), all_("spec_tick_skip", []), all_("spec_chain", []),
+        all_("spec_ranged_heal", []), all_("spec_ranged_drain", []), all_("spec_magic_drain", []),
+        # the broad research list, then the hand-written catch-all, for anything still unplaced
+        all_("ranged_specs", []),
+        all_("specs", ["Zaryte crossbow", "Armadyl crossbow", "Dorgeshuun crossbow", "Dragon thrownaxe",
+                       "Rune thrownaxe", "Heavy ballista", "Light ballista", "Dragon knife", "Dark bow",
+                       "Corrupted dark bow", "Magic shortbow (i)", "Magic shortbow", "Magic longbow", "Magic comp bow",
+                       "Seercull"]),
     ]),
     section("ammo", "Ammunition", "rows", [
         first("arrows", ARROWS, requires=BOWS, placed=True),
+        # enchanted bolts in gem order (sapphire comes from unique_uses.py), then plain, broad and antler bolts
+        all_("bolts_sapphire", [], requires=CROSSBOWS, placed=True),
         first("bolts_ruby", ["Ruby dragon bolts (e)", "Ruby bolts (e)"], requires=CROSSBOWS, placed=True),
         first("bolts_diamond", ["Diamond dragon bolts (e)", "Diamond bolts (e)"], requires=CROSSBOWS, placed=True),
         first("bolts_dragonstone", ["Dragonstone dragon bolts (e)", "Dragonstone bolts (e)"], requires=CROSSBOWS, placed=True),
@@ -285,15 +311,15 @@ RANGED = tab("ranged", "Ranged", "Magic shortbow", kind="gear", sections=[
         first("bolts", ["Dragon bolts", "Runite bolts", "Adamant bolts", "Mithril bolts", "Steel bolts",
                         "Iron bolts", "Bronze bolts"], requires=CROSSBOWS, placed=True),
         first("broad_bolts", ["Amethyst broad bolts", "Broad bolts"], requires=CROSSBOWS, placed=True),
+        first("antler_bolts", ["Sunlight antler bolts", "Moonlight antler bolts"],
+              requires=["Hunters' sunlight crossbow"], placed=True),
         first("javelins", JAVELINS, requires=["Heavy ballista", "Light ballista"], placed=True),
         first("darts", DARTS, requires=["Toxic blowpipe", "Blazing blowpipe"], placed=True),
         first("atlatl_darts", ["Atlatl dart"], requires=["Eclipse atlatl"], placed=True),
-        first("antler_bolts", ["Sunlight antler bolts", "Moonlight antler bolts"],
-              requires=["Hunters' sunlight crossbow"], placed=True),
     ]),
     combat_supplies([
         first("boost", ["Divine bastion potion", "Divine ranging potion", "Bastion potion", "Ranging potion"]),
-    ]),
+    ], restores=[all_("spec_restore", [])], brews=[all_("armadyl_brew", [])]),  # Surge potion, Armadyl brew
 ])
 
 # ---------------------------------------------------------------- magic
@@ -336,27 +362,32 @@ MAGIC = tab("magic", "Magic", "Mystic air staff", kind="gear", sections=[
         all_("tomes", ["Tome of Fire", "Tome of Water", "Tome of Earth"], slot="SHIELD"),
     ]),
     section("weapons", "Weapons", "rows", [
+        # keys match unique_uses.py groups so they replace these picks in place
         first("ancients", ANCIENT_STAVES),
         first("standard", STANDARD_STAVES),
-        first("demonbane", ["Purging staff"]),
-        first("dragonbane", ["Dragon hunter wand"]),
-        first("wilderness", ["Accursed sceptre", "Thammaron's sceptre"]),
+        first("demonbane_magic", ["Purging staff"]),
+        first("dragonbane_magic", ["Dragon hunter wand"]),
+        first("wilderness_magic", ["Accursed sceptre", "Thammaron's sceptre"]),
         first("blue_moon_spear", ["Blue Moon spear"]),
         first("ahrim", ["Ahrim's staff"], requires=["Ahrim's hood"]),
     ]),
     section("specials", "Special attacks", "rows", [
+        # unique_uses.py spec groups take these places; the broader lists come after so their reasons win
+        all_("spec_magic_burst", []), all_("spec_magic_def_drain", []), all_("spec_prayer_restore", []),
+        all_("power_of_death", []), all_("magic_specs", []),
         all_("specs", ["Volatile Nightmare staff", "Eldritch Nightmare staff", "Accursed sceptre"]),
     ]),
     section("runes", "Runes", "rows", [
         first("pouch", RUNE_POUCH),
-        all_("runes", ["Wrath rune", "Death rune", "Blood rune", "Soul rune", "Chaos rune", "Sunfire rune",
-                       "Aether rune"] + ELEMENTAL_RUNES + COMBO_RUNES + ["Mind rune"]),
+        # elemental (sunfire is the stronger fire rune), combination by Runecraft level, then catalytic by tier
+        all_("runes", ["Sunfire rune"] + ELEMENTAL_RUNES + COMBO_RUNES +
+             ["Mind rune", "Chaos rune", "Death rune", "Blood rune", "Soul rune", "Aether rune", "Wrath rune"]),
     ]),
     combat_supplies([
         first("boost", ["Divine magic potion", "Magic potion", "Divine battlemage potion", "Battlemage potion",
                         "Forgotten brew", "Ancient brew"]),
         first("heart", ["Saturated heart", "Imbued heart"]),
-    ]),
+    ], restores=[all_("spec_restore", [])]),  # Surge potion (unique_uses.py)
 ])
 
 # ---------------------------------------------------------------- movement
@@ -387,52 +418,118 @@ TELEPORT_TABLETS = [
 MOVEMENT = tab("movement", "Movement", "Graceful boots", kind="movement", sections=[
     section("run", "Run energy", "rows", [
         graceful("graceful"),
+        all_("graceful_cape_sub", []),  # Agility cape (unique_uses.py): counts as a graceful cape
         first("energy", ENERGY),
         first("endurance", ["Ring of endurance"]),
     ]),
-    section("jewellery", "Teleport jewellery", "rows", [
-        first("glory", ["Amulet of eternal glory", "Amulet of glory (t)", "Amulet of glory"]),
-        all_("jewellery", ["Ring of dueling", "Games necklace", "Skills necklace", "Combat bracelet"]),
+    # teleport jewellery like the Crafting tab: silver (jade, red topaz), then gold in gem order
+    # (sapphire, emerald, ruby, dragonstone: ring, necklace, bracelet, amulet), then everything else
+    section("jewellery_silver", "Silver teleport jewellery", "rows", [
+        all_("jewellery_silver", ["Ring of returning", "Necklace of passage", "Burning amulet"]),
+    ]),
+    section("jewellery", "Gold teleport jewellery", "rows", [
+        all_("jewellery", ["Games necklace", "Ring of dueling", "Digsite pendant"]),
         first("wealth", ["Ring of wealth (i)", "Ring of wealth"]),
+        all_("jewellery_dragonstone", ["Skills necklace", "Combat bracelet"]),
+        first("glory", ["Amulet of eternal glory", "Amulet of glory (t)", "Amulet of glory"]),
         first("slayer_ring", ["Slayer ring (eternal)", "Slayer ring"]),
-        all_("jewellery2", ["Necklace of passage", "Digsite pendant", "Burning amulet", "Ring of returning",
-                            "Ring of the elements", "Ring of shadows", "Giantsoul amulet", "Pendant of Ates",
+    ]),
+    section("jewellery_other", "Other teleport jewellery", "rows", [
+        all_("jewellery2", ["Ring of the elements", "Ring of shadows", "Giantsoul amulet", "Pendant of Ates",
                             "Amulet of the Eye", "Camulet", "Xeric's talisman", "Drakan's medallion"]),
+        all_("teleport_jewellery_new", []),  # Sailors' amulet, Cowbell amulet (unique_uses.py)
     ]),
     section("diary", "Diary rewards", "rows", [
+        # in-game Achievement Diary order; Ghommal's hilt (combat achievements) last
         first("ardy", tiers("Ardougne cloak")),
         first("desert", tiers("Desert amulet")),
-        first("explorer", tiers("Explorer's ring")),
-        first("karamja", tiers("Karamja gloves")),
         first("fremennik", tiers("Fremennik sea boots")),
         first("kandarin", tiers("Kandarin headgear")),
+        first("karamja", tiers("Karamja gloves")),
+        first("kourend", tiers("Rada's blessing")),
+        first("explorer", tiers("Explorer's ring")),
         first("morytania", tiers("Morytania legs")),
         first("western", tiers("Western banner")),
         first("wilderness", tiers("Wilderness sword")),
-        first("kourend", tiers("Rada's blessing")),
         first("ghommal", tiers("Ghommal's hilt", 6)),
     ]),
     section("items", "Teleport items", "rows", [
         first("fairy", ["Lunar staff", "Dramen staff"]),
-        all_("items", ["Ectophial", "Royal seed pod", "Pharaoh's sceptre", "Chronicle", "Enchanted lyre",
-                       "Icy basalt", "Stony basalt", "Mythical cape"]),
+        first("ectophial", ["Ectophial"]),
+        # keys match unique_uses.py groups so every version of an item stays together
+        first("seed_pod", ["Royal seed pod", "Grand seed pod"]),
+        first("lyre", ["Enchanted lyre(i)", "Enchanted lyre"]),
+        all_("items", ["Icy basalt", "Stony basalt", "Pharaoh's sceptre"]),
+        first("skull", ["Skull sceptre (i)", "Skull sceptre"]),
+        first("chronicle", ["Chronicle"]),
         first("memoirs", ["Book of the Dead", "Kharedst's memoirs"]),
         first("crystal", ["Eternal teleport crystal", "Teleport crystal"]),
-        first("skull", ["Skull sceptre (i)", "Skull sceptre"]),
         first("quetzal", ["Perfected quetzal whistle(i)", "Perfected quetzal whistle", "Enhanced quetzal whistle",
                           "Basic quetzal whistle"]),
         first("max_cape", ["Max cape"]),
+        first("mythical", ["Mythical max cape", "Mythical cape"]),
         all_("capes", ["Achievement diary cape", "Quest point cape", "Music cape", "Construct. cape",
                        "Crafting cape", "Farming cape", "Fishing cape", "Hunter cape", "Strength cape"]),
+        all_("skill_cape_teleports", []),  # Sailing cape (unique_uses.py)
+        all_("emergency_escape", []),  # Escape crystal / Ring of life, Defence cape (unique_uses.py)
+        all_("boat_transport", []),  # Summon boat, Boat bottle (unique_uses.py)
     ]),
-    section("tablets", "Tablets & scrolls", "rows", [
-        all_("tablets", TELEPORT_TABLETS),
+    # one section per spellbook, each by Magic level (wiki Magic tablet)
+    section("tablets", "Standard tablets", "rows", [
+        all_("tablets", ["Varrock teleport (tablet)", "Lumbridge teleport (tablet)", "Falador teleport (tablet)",
+                         "Camelot teleport (tablet)", "Kourend castle teleport (tablet)", "Ardougne teleport (tablet)",
+                         "Civitas illa fortis teleport (tablet)", "Watchtower teleport (tablet)",
+                         "Teleport to boat (tablet)"]),
+    ]),
+    # Teleport to house, then the tablets redirected from it, by house-portal Construction level
+    section("house_tablets", "House tablets", "rows", [
+        all_("house_tablets", ["Teleport to house (tablet)", "Rimmington teleport", "Taverley teleport",
+                               "Pollnivneach teleport", "Hosidius teleport", "Rellekka teleport", "Aldarin teleport",
+                               "Brimhaven teleport", "Yanille teleport", "Prifddinas teleport",
+                               "Trollheim teleport (tablet)"]),
+    ]),
+    section("ancient_tablets", "Ancient tablets", "rows", [
+        all_("ancient_tablets", ["Paddewwa teleport (tablet)", "Senntisten teleport (tablet)",
+                                 "Kharyrll teleport (tablet)", "Lassar teleport (tablet)", "Dareeyak teleport (tablet)",
+                                 "Carrallanger teleport (tablet)", "Annakarl teleport (tablet)",
+                                 "Ghorrock teleport (tablet)"]),
+    ]),
+    section("lunar_tablets", "Lunar tablets", "rows", [
+        all_("lunar_tablets", ["Moonclan teleport (tablet)", "Ourania teleport (tablet)",
+                               "Waterbirth teleport (tablet)", "Barbarian teleport (tablet)",
+                               "Khazard teleport (tablet)", "Fishing guild teleport (tablet)",
+                               "Catherby teleport (tablet)", "Ice plateau teleport (tablet)"]),
+    ]),
+    section("arceuus_tablets", "Arceuus tablets", "rows", [
+        all_("arceuus_tablets", ["Arceuus library teleport (tablet)", "Draynor manor teleport (tablet)",
+                                 "Battlefront teleport (tablet)", "Mind altar teleport (tablet)",
+                                 "Salve graveyard teleport (tablet)", "Fenkenstrain's castle teleport (tablet)",
+                                 "West ardougne teleport (tablet)", "Harmony island teleport (tablet)",
+                                 "Cemetery teleport (tablet)", "Barrows teleport (tablet)",
+                                 "Ape atoll teleport (tablet)"]),
+    ]),
+    # the master scroll book, then its scrolls in the book's own order
+    section("scrolls", "Teleport scrolls", "rows", [
+        all_("scrolls", ["Master scroll book", "Nardah teleport", "Digsite teleport", "Feldip hills teleport",
+                         "Lunar isle teleport", "Mort'ton teleport", "Pest control teleport", "Piscatoris teleport",
+                         "Tai bwo wannai teleport", "Iorwerth camp teleport", "Mos le'harmless teleport",
+                         "Lumberyard teleport", "Zul-andra teleport", "Key master teleport", "Revenant cave teleport",
+                         "Watson teleport", "Guthixian temple teleport", "Spider cave teleport",
+                         "Colossal wyrm teleport scroll", "Chasm teleport scroll", "Ardeaglais teleport"]),
+    ]),
+    section("other_tablets", "Other single-use teleports", "rows", [
+        # Mokhaiotl waystone, Calcified moth, Hallowed crystal shard, Dorgesh-kaan sphere (unique_uses.py)
+        all_("consumable_teleports", []),
+        # whatever else the tablet pattern finds (Wilderness crabs, Volcanic mine...); listed ones are skipped
+        all_("other_tablets", TELEPORT_TABLETS),
     ]),
     section("runes", "Teleport runes", "rows", [
         first("pouch", RUNE_POUCH),
-        # the basic teleport runes in the order players keep them: law, fire, water, air, earth
-        all_("runes", ["Law rune", "Fire rune", "Water rune", "Air rune", "Earth rune", "Astral rune", "Soul rune",
-                       "Blood rune", "Dust rune", "Smoke rune", "Mist rune", "Lava rune", "Mud rune", "Steam rune"]),
+        # the basic teleport runes in the order players keep them: law, fire, water, air, earth;
+        # then combination runes by Runecraft level, then the other catalytic runes by tier
+        all_("runes", ["Law rune", "Fire rune", "Water rune", "Air rune", "Earth rune", "Mist rune", "Dust rune",
+                       "Mud rune", "Smoke rune", "Steam rune", "Lava rune", "Astral rune", "Blood rune",
+                       "Soul rune"]),
     ]),
 ])
 
@@ -463,56 +560,106 @@ PRAYER = tab("prayer", "Prayer", "Dragon bones", sections=[
                           ("LEGS", ["Zealot's robe bottom"]), ("BOOTS", ["Zealot's boots"])]),
     ]),
     section("bones", "Bones", "rows", [
-        # by Prayer experience, highest first
-        all_("bones", ["Superior dragon bones", "Ourg bones", "Dagannoth bones", "Hydra bones",
-                       "Frost dragon bones", "Raurg bones", "Lava dragon bones", "Fayrg bones", "Drake bones",
-                       "Dragon bones", "Wyvern bones", "Strykewyrm bones", "Wyrm bones", "Babydragon bones",
-                       "Shaikahan bones", "Zogre bones", "Wyrmling bones", "Jogre bones", "Big bones", "Bat bones",
-                       "Monkey bones", "Wolf bones", "Bones"]),
-        all_("blessed", ["re:^Blessed [\\w' -]*bones$", "Sun-kissed bones"]),
+        # by Prayer experience, lowest first (tier order, like every other tab)
+        all_("bones", ["Bones", "Wolf bones", "Monkey bones", "Bat bones", "Big bones", "Jogre bones",
+                       "Wyrmling bones", "Zogre bones", "Shaikahan bones", "Babydragon bones", "Wyrm bones",
+                       "Strykewyrm bones", "Dragon bones", "Wyvern bones", "Drake bones", "Fayrg bones",
+                       "Lava dragon bones", "Raurg bones", "Frost dragon bones", "Hydra bones", "Dagannoth bones",
+                       "Ourg bones", "Superior dragon bones"]),
+    ]),
+    section("blessed", "Blessed bones", "rows", [
+        # by blessed bone shards, lowest first; the regex keeps any blessed bones added later
+        all_("blessed", ["Blessed bones", "Blessed bat bones", "Blessed big bones", "Blessed zogre bones",
+                         "Blessed babywyrm bones", "Blessed babydragon bones", "Blessed strykewyrm bones",
+                         "Blessed wyrm bones", "Sun-kissed bones", "Blessed dragon bones", "Blessed wyvern bones",
+                         "Blessed drake bones", "Blessed fayrg bones", "Blessed lava dragon bones",
+                         "Blessed raurg bones", "Blessed frost dragon bones", "Blessed hydra bones",
+                         "Dagannoth bones (blessed)", "Blessed ourg bones", "Blessed superior dragon bones",
+                         "re:^Blessed [\\w' -]*bones$"]),
     ]),
     section("ashes", "Ashes", "rows", [
-        all_("ashes", ["Infernal ashes", "Abyssal ashes", "Malicious ashes", "Vile ashes", "Fiendish ashes"]),
+        # by Prayer experience, lowest first
+        all_("ashes", ["Fiendish ashes", "Vile ashes", "Malicious ashes", "Abyssal ashes", "Infernal ashes"]),
     ]),
     section("heads", "Ensouled heads", "rows", [
-        all_("heads", ["re:^Ensouled [\\w' -]+ head$"]),
+        # wiki Prayer XP order, which also groups them by reanimation spell; the regex keeps new heads
+        all_("heads", ["Ensouled goblin head", "Ensouled monkey head", "Ensouled imp head", "Ensouled minotaur head",
+                       "Ensouled scorpion head", "Ensouled bear head", "Ensouled unicorn head", "Ensouled dog head",
+                       "Ensouled chaos druid head", "Ensouled giant head", "Ensouled ogre head", "Ensouled elf head",
+                       "Ensouled troll head", "Ensouled horror head", "Ensouled kalphite head",
+                       "Ensouled dagannoth head", "Ensouled bloodveld head", "Ensouled tzhaar head",
+                       "Ensouled demon head", "Ensouled hellhound head", "Ensouled aviansie head",
+                       "Ensouled abyssal head", "Ensouled dragon head", "re:^Ensouled [\\w' -]+ head$"]),
     ]),
 ])
 
 SLAYER = tab("slayer", "Slayer", "Enchanted gem", sections=[
+    # empty all_(key, []) picks mark where a unique_uses.py group with that key goes
     section("gear", "Slayer gear", "rows", [
         first("helm", IMBUED_SLAYER_HELMS + SLAYER_HELMS + ["Black mask (i)", "Black mask"]),
         first("gem", ["Eternal gem", "Enchanted gem"]),
         first("ring", ["Slayer ring (eternal)", "Slayer ring"]),
-        all_("bracelets", ["Bracelet of slaughter", "Expeditious bracelet"]),
+        # silver bracelets in gem order: opal, then red topaz
+        all_("bracelets", ["Expeditious bracelet", "Bracelet of slaughter"]),
         cape("Slayer cape"),
+        all_("slayer_boost", []),
+        # loot storage
         first("herb_sack", ["Silklined herb sack", "Herb sack"]),
         first("gem_bag", ["Gem bag"]),
+        all_("seed_box", []),
         first("looting_bag", ["Looting bag"]),
+        all_("soul_bearer", []),
+        all_("chugging_barrel", []),
+        # automatic bones, ashes and ectoplasm
         first("bonecrusher", ["Bonecrusher necklace", "Bonecrusher"]),
         first("sanctifier", ["Ash sanctifier"]),
+        all_("ectoplasmator", []),
     ]),
-    section("protection", "Task items", "rows", [
+    # worn protection, head to feet
+    section("protection", "Task protection", "rows", [
         first("earmuffs", ["Earmuffs"], unless=["helm"]),
         first("nose_peg", ["Nose peg"], unless=["helm"]),
         first("face_mask", ["Facemask", "Gas mask"], unless=["helm"]),
         first("spiny", ["Spiny helmet"], unless=["helm"]),
         first("goggles", ["Reinforced goggles"], unless=["helm"]),
+        all_("venom_immunity", []),
+        first("witchwood", ["Witchwood icon"]),
         first("mirror", ["V's shield", "Mirror shield"]),
+        all_("wyvern_shield", []),
+        all_("gryphons", []),
+        first("lantern", ["Bug lantern"]),
+        all_("shayzien", []),
+        all_("desert_heat", []),
+        all_("revenants", []),
+        first("slayer_gloves", ["Slayer gloves"]),
         first("insulated", ["Insulated boots"]),
         first("wyvern_boots", ["Boots of brimstone", "Boots of stone", "Granite boots"]),
-        first("witchwood", ["Witchwood icon"]),
-        first("slayer_gloves", ["Slayer gloves"]),
-        first("rock_hammer", ["Rock thrownhammer", "Granite hammer", "Rock hammer"]),
-        first("salt", ["Bag of salt"]),
+    ]),
+    # carried tools: light, finishers, lures and access, task weapons, consumables, boss helpers
+    section("task_tools", "Task tools", "rows", [
+        all_("light_source", []),
+        first("gargoyle_finisher", ["Rock thrownhammer", "Granite hammer", "Rock hammer"]),
+        first("rockslug_finisher", ["Bag of salt"]),
         first("ice", ["Ice cooler"]),
         first("fungicide", ["Fungicide spray"]),
         first("fungicide_refill", ["Fungicide"]),
-        first("lantern", ["Bug lantern"]),
         first("explosive", ["Fishing explosive"]),
+        all_("molanisk", []),
+        all_("warped_creatures", []),
         first("rope", ["Rope"]),
+        all_("spade", []),
         first("leafbladed", ["Leaf-bladed battleaxe", "Leaf-bladed sword", "Leaf-bladed spear"]),
-        first("broad", ["Amethyst broad bolts", "Broad bolts", "Broad arrows"]),
+        all_("broad", []),  # Seeking broad arrows (unique_uses.py)
+        first("broad_ammo", ["Amethyst broad bolts", "Broad bolts", "Broad arrows"]),
+        all_("magic_dart", []),
+        all_("vampyre_ring", []),
+        # task consumables
+        all_("goading", []),
+        all_("bleed_cure", []),
+        # boss helpers
+        all_("giant_mole", []),
+        all_("dks_solo", []),
+        all_("gwd_key", []),
     ]),
     section("cannon", "Cannon", "rows", [
         first("cannon_base", ["Cannon base (or)", "Cannon base"]),
@@ -586,8 +733,9 @@ FISHING = tab("fishing", "Fishing", "Lobster pot", sections=[
                           ("BOOTS", ["Spirit angler boots", "Angler boots"])]),
     ]),
     section("bait", "Bait", "rows", [
-        all_("bait", ["Feather", "Fishing bait", "Sandworms", "Dark fishing bait", "Raw karambwanji",
-                      "Fish offcuts", "Spirit flakes", "Stripy feather"]),
+        # bait by the level it's used at, then the feathers, then Spirit flakes (an enhancer, not bait)
+        all_("bait", ["Fishing bait", "Fish offcuts", "Raw karambwanji", "Sandworms", "Dark fishing bait",
+                      "Feather", "Stripy feather", "Spirit flakes"]),
     ]),
 ])
 
@@ -597,14 +745,14 @@ HUNTER = tab("hunter", "Hunter", "Box trap", sections=[
         first("bird_snare", ["Bird snare"]),
         first("rabbit_snare", ["Rabbit snare"]),
         first("net", ["Magic butterfly net", "Butterfly net"]),
+        first("impling_jar", ["Impling jar"]),
+        first("butterfly_jar", ["Butterfly jar"]),
         first("noose", ["Noose wand"]),
         first("teasing", ["Teasing stick"]),
         first("rope", ["Rope"]),
         first("small_net", ["Small fishing net"]),
         first("knife", ["Knife"]),
         first("tinderbox", ["Tinderbox"]),
-        first("impling_jar", ["Impling jar"]),
-        first("butterfly_jar", ["Butterfly jar"]),
         first("kit", ["Huntsman's kit"]),
         first("crossbow", ["Hunters' sunlight crossbow", "Hunters' crossbow"]),
         first("spear", ["Hunter's spear"]),
@@ -639,9 +787,9 @@ AGILITY = tab("agility", "Agility", "Graceful hood", sections=[
         graceful("graceful"),
         cape("Agility cape"),
         first("energy", ENERGY),
+        first("endurance", ["Ring of endurance"]),
         first("pie", ["Summer pie"]),
         first("agility_potion", ["Agility potion"]),
-        first("endurance", ["Ring of endurance"]),
     ]),
     section("currency", "Rewards", "rows", [
         all_("currency", ["Mark of grace", "Amylase crystal", "Agility arena ticket", "Hallowed mark",
@@ -684,12 +832,21 @@ RUNECRAFT = tab("runecraft", "Runecraft", "Pure essence", sections=[
         outfit("eye_outfit", [("HEAD", ["Hat of the Eye"]), ("BODY", ["Robe top of the Eye"]),
                               ("LEGS", ["Robe bottoms of the Eye"]), ("BOOTS", ["Boots of the Eye"])]),
     ]),
-    section("altar", "Tiaras & talismans", "rows", [
-        all_("tiaras", ["Catalytic tiara", "Elemental tiara", "re:^(?!Fancy|Gold)\\w+ tiara$"]),
-        all_("talismans", ["Catalytic talisman", "Elemental talisman", "re:^(?!Ancient|Monkey)\\w+ talisman$"]),
+    # altar order; the regex keeps any tiara or talisman added later
+    section("tiaras", "Tiaras", "rows", [
+        all_("tiaras", ["Elemental tiara", "Catalytic tiara", "Air tiara", "Mind tiara", "Water tiara",
+                        "Earth tiara", "Fire tiara", "Body tiara", "Cosmic tiara", "Chaos tiara", "Astral tiara",
+                        "Nature tiara", "Law tiara", "Death tiara", "Blood tiara", "Wrath tiara",
+                        "re:^(?!Fancy|Gold)\\w+ tiara$"]),
+    ]),
+    section("talismans", "Talismans", "rows", [
+        all_("talismans", ["Elemental talisman", "Catalytic talisman", "Air talisman", "Mind talisman",
+                           "Water talisman", "Earth talisman", "Fire talisman", "Body talisman", "Cosmic talisman",
+                           "Chaos talisman", "Nature talisman", "Law talisman", "Death talisman", "Blood talisman",
+                           "Soul talisman", "Wrath talisman", "re:^(?!Ancient|Monkey)\\w+ talisman$"]),
     ]),
     section("essence", "Essence", "rows", [
-        all_("essence", ["Pure essence", "Daeyalt essence", "Rune essence"]),
+        all_("essence", ["Rune essence", "Pure essence", "Daeyalt essence"]),
     ]),
 ])
 
@@ -737,8 +894,9 @@ CRAFTING = tab("crafting", "Crafting", "Chisel", sections=[
         first("thread", ["Thread"]),
         first("costume_needle", ["Costume needle"]),
         first("pipe", ["Glassblowing pipe"]),
-        all_("moulds", ["Ring mould", "Necklace mould", "Amulet mould", "Bracelet mould", "Tiara mould",
-                        "Holy mould", "Unholy mould", "Sickle mould", "Bolt mould"]),
+        # gold moulds, then silver, each by the level of what they make
+        all_("moulds", ["Ring mould", "Necklace mould", "Bracelet mould", "Amulet mould", "Holy mould",
+                        "Unholy mould", "Sickle mould", "Bolt mould", "Tiara mould"]),
         cape("Crafting cape"),
     ]),
 ])
@@ -892,59 +1050,216 @@ SUPPLY_RULES = [
     ("Herblore", "herblore", [
         ("Grimy herbs", r"(?i)^Grimy (?:%s)$" % "|".join(HERBS), HERBS),
         ("Clean herbs", r"(?i)^(?:%s)$" % "|".join(HERBS), HERBS),
-        ("Unfinished potions", r"\(unf\)$"),
+        # coral is the Sailing herb: coral + vial of water makes the coral unfinished potions
+        ("Corals", r"(?i)^(?:Elkhorn|Pillar|Umbral) coral$", ["Elkhorn coral", "Pillar coral", "Umbral coral"]),
+        # herb (unf) in herb order, then cadantine blood, coral, coconut milk, then other half-made potions;
+        # Grym (Gauntlet) and Rejuvenation (Wintertodt) can't be banked
+        ("Unfinished potions",
+         r"\(unf\)$|^(?:Unfinished potion|Snakeweed mixture|Herb tea mix|Mixture - step [12]\(\d\))$",
+         ["Guam potion (unf)", "Marrentill potion (unf)", "Tarromin potion (unf)", "Harralander potion (unf)",
+          "Ranarr potion (unf)", "Toadflax potion (unf)", "Irit potion (unf)", "Avantoe potion (unf)",
+          "Kwuarm potion (unf)", "Huasca potion (unf)", "Snapdragon potion (unf)", "Cadantine potion (unf)",
+          "Lantadyme potion (unf)", "Dwarf weed potion (unf)", "Torstol potion (unf)",
+          "Cadantine blood potion (unf)", "Elkhorn potion (unf)", "Pillar potion (unf)", "Umbral potion (unf)",
+          "Antidote+ (unf)", "Antidote++ (unf)", "Weapon poison+ (unf)", "Weapon poison++ (unf)",
+          "Unfinished potion", "Snakeweed mixture", "Herb tea mix", "Guthix balance (unf)",
+          "Mixture - step 1(3)", "Mixture - step 2(3)", "Grym potion (unf)", "Rejuvenation potion (unf)"]),
         ("Vials", r"^(Vial|Vial of water|Vial of blood|Coconut milk)$"),
-        ("Potions", r"\(\d\)$|\(\d\) ?$|potion|brew|restore|antidote|antifire|anti-venom|antipoison|mix$"),
+        # by the Herblore level that makes them; names are the first version's in-game name, so "(3)"
+        ("Potions", r"\(\d\)$|\(\d\) ?$|potion|brew|restore|antidote|antifire|anti-venom|antipoison",
+         ["Attack potion(3)", "Antipoison(3)", "Relicym's balm(3)", "Strength potion(3)", "Serum 207 (3)",
+          "Restore potion(3)", "Energy potion(3)", "Defence potion(3)", "Agility potion(3)", "Combat potion(3)",
+          "Prayer potion(3)", "Super attack(3)", "Superantipoison(3)", "Fishing potion(3)", "Super energy(3)",
+          "Hunter potion(3)", "Super strength(3)", "Super restore(3)", "Super defence(3)", "Antidote+(3)",
+          "Antifire potion(3)", "Ranging potion(3)", "Magic potion(3)", "Stamina potion(3)", "Zamorak brew(3)",
+          "Antidote++(3)", "Bastion potion(3)", "Battlemage potion(3)", "Extended antifire(3)", "Ancient brew(3)",
+          "Anti-venom(3)", "Super combat potion(3)", "Super antifire potion(3)", "Anti-venom+(3)",
+          "Extended super antifire(3)", "Olive oil(3)", "Elder potion (3)", "Kodai potion (3)",
+          "Twisted potion (3)"]),
+        # Mastering Mixology: the three pastes, then the mixes by level
+        ("Mixology", r"^(?:Mox paste|Aga paste|Lye paste|Mammoth-might mix|Alco-augmentator|Liplack liquor|"
+                     r"Mystic mana amalgam|Marley's moonlight|Azure aura mix|Aqualux amalgam|Megalite liquid|"
+                     r"Anti-leech lotion|Mixalot)$",
+         ["Mox paste", "Aga paste", "Lye paste", "Mammoth-might mix", "Alco-augmentator", "Liplack liquor",
+          "Mystic mana amalgam", "Marley's moonlight", "Azure aura mix", "Aqualux amalgam", "Megalite liquid",
+          "Anti-leech lotion", "Mixalot"]),
+        ("Imp repellent", r"^(?:Anchovy oil|Marigolds|Rosemary|Nasturtiums|"
+                          r"(?:Red|Orange|Yellow|Blue|Purple|White|Black|Mixed|Assorted) flowers)$",
+         ["Anchovy oil", "Marigolds", "Rosemary", "Nasturtiums", "Red flowers", "Orange flowers", "Yellow flowers",
+          "Blue flowers", "Purple flowers", "White flowers", "Black flowers", "Mixed flowers", "Assorted flowers"]),
+        # the catch-all must stay last: rules after ".*" never receive items
         ("Secondaries", r".*"),
     ]),
+    # rules without an order list stay 2-tuples (supply_sections checks len(rule) > 2)
     ("Crafting", "crafting", [
         ("Uncut gems", r"(?i)^Uncut (?:%s)$" % "|".join(GEMS), GEMS),
         ("Cut gems", r"(?i)^(?:%s)$" % "|".join(GEMS), GEMS),
         ("Leather & hides", r"(?i)^(%s)$" % "|".join(re.escape(x) for x in LEATHERS), LEATHERS),
-        ("Glass", r"(?i)^(Molten glass|Bucket of sand|Soda ash|Seaweed|Giant seaweed|Sandstone \(\d+kg\))$"),
+        # inputs to output: sand, soda ash and the seaweeds, then molten glass
+        ("Glass", r"(?i)^(Molten glass|Bucket of sand|Soda ash|Seaweed|Giant seaweed|Swamp weed|Sandstone \(\d+kg\))$",
+         ["Bucket of sand", "Soda ash", "Seaweed", "Giant seaweed", "Swamp weed", "Molten glass"]),
         ("Silver jewellery", r"^(%s)$" % "|".join(re.escape(x) for x in SILVER), SILVER),
         ("Gold jewellery", r"^(%s)$" % "|".join(re.escape(x) for x in GOLD), GOLD),
         ("Battlestaves & orbs", r"(?i)^(Battlestaff|(Air|Water|Earth|Fire) orb|Unpowered orb)$"),
-        ("Spinning & weaving", r"(?i)^(Wool|Ball of wool|Flax|Bow string|Jute fibre|Linen yarn|Hemp yarn|Cotton yarn|"
-                               r"Clay|Soft clay|Unfired .*)$"),
+        # each yarn sits in the same column as the fibre it is spun from; jute is woven, not spun
+        ("Fibres", r"(?i)^(Wool|Flax|Hemp|Cotton boll|Jute fibre)$", ["Wool", "Flax", "Hemp", "Cotton boll", "Jute fibre"]),
+        ("Yarn", r"(?i)^(Ball of wool|Linen yarn|Hemp yarn|Cotton yarn)$",
+         ["Ball of wool", "Linen yarn", "Hemp yarn", "Cotton yarn"]),
+        ("Pottery", r"(?i)^(Clay|Soft clay|Unfired .*)$",
+         ["Clay", "Soft clay", "Unfired pot", "Unfired cup", "Unfired pie dish", "Unfired bowl",
+          "Unfired plant pot", "Unfired pot lid"]),
     ]),
     ("Fletching", "fletching", [
-        ("Logs", r"(?i)^(Logs|(?!Sap-treated).* logs)$"),
-        ("Bows", r"(?i)\(u\)$|^(Bow string|Crossbow string)$|stock$|limbs$"),
-        ("Arrows", r"(?i)^(Arrow shaft|Headless arrow|Feather|.* arrowtips|Broad arrowheads|"
-                   r"(Bronze|Iron|Steel|Mithril|Adamant|Rune|Amethyst|Dragon) arrow)$"),
-        ("Bolts", r"(?i)bolts? ?\(unf\)$|bolt ?tips$|^Unfinished broad bolts$|"
-                  r"^(Bronze|Blurite|Iron|Steel|Mithril|Adamant|Runite|Dragon|Silver|Broad) bolts$"),
-        ("Darts & javelins", r"(?i)dart tips?$|javelin tips$|^Javelin shaft$|^(Headless )?atlatl dart|^Atlatl dart"),
+        ("Logs", r"(?i)^(Logs|(?!Sap-treated).* logs)$",
+         ["Logs", "Oak logs", "Willow logs", "Teak logs", "Maple logs", "Mahogany logs", "Arctic pine logs", "Yew logs",
+          "Camphor logs", "Magic logs", "Ironwood logs", "Redwood logs", "Rosewood logs", "Achey tree logs",
+          "Scrapey tree logs"]),
+        ("Shortbows", r"(?i)^(Bow string|.*shortbow \(u\))$",
+         ["Bow string", "Shortbow (u)", "Oak shortbow (u)", "Willow shortbow (u)", "Maple shortbow (u)",
+          "Yew shortbow (u)", "Magic shortbow (u)"]),
+        ("Longbows", r"(?i)^.*longbow \(u\)$",
+         ["Longbow (u)", "Oak longbow (u)", "Willow longbow (u)", "Maple longbow (u)", "Yew longbow (u)",
+          "Magic longbow (u)"]),
+        ("Crossbow stocks", r"(?i)stock$",
+         ["Wooden stock", "Oak stock", "Willow stock", "Teak stock", "Maple stock", "Mahogany stock", "Yew stock",
+          "Magic stock"]),
+        ("Crossbow limbs", r"(?i)limbs$",
+         ["Bronze limbs", "Blurite limbs", "Iron limbs", "Steel limbs", "Mithril limbs", "Adamantite limbs",
+          "Runite limbs", "Dragon limbs", "Ballista limbs"]),
+        ("Crossbows", r"(?i)^(Crossbow string|.*crossbow \(u\))$",
+         ["Crossbow string", "Bronze crossbow (u)", "Blurite crossbow (u)", "Iron crossbow (u)", "Steel crossbow (u)",
+          "Mithril crossbow (u)", "Adamant crossbow (u)", "Runite crossbow (u)", "Dragon crossbow (u)"]),
+        ("Arrow shafts", r"(?i)^(Arrow shaft|Feather|Headless arrow)$",
+         ["Arrow shaft", "Feather", "Headless arrow"]),
+        ("Arrowtips", r"(?i)^(.* arrowtips|Broad arrowheads)$",
+         ["Bronze arrowtips", "Iron arrowtips", "Steel arrowtips", "Mithril arrowtips", "Adamant arrowtips",
+          "Rune arrowtips", "Amethyst arrowtips", "Dragon arrowtips", "Broad arrowheads", "Wolfbone arrowtips"]),
+        ("Arrows", r"(?i)^(Bronze|Iron|Steel|Mithril|Adamant|Rune|Amethyst|Dragon) arrow$",
+         ["Bronze arrow", "Iron arrow", "Steel arrow", "Mithril arrow", "Adamant arrow", "Rune arrow", "Amethyst arrow",
+          "Dragon arrow"]),
+        ("Unfinished bolts", r"(?i)bolts? ?\(unf\)$|^Unfinished broad bolts$",
+         ["Bronze bolts (unf)", "Blurite bolts (unf)", "Iron bolts (unf)", "Steel bolts (unf)", "Mithril bolts (unf)",
+          "Adamant bolts(unf)", "Runite bolts (unf)", "Dragon bolts (unf)", "Unfinished broad bolts",
+          "Silver bolts (unf)"]),
+        ("Bolts", r"(?i)^(Bronze|Blurite|Iron|Steel|Mithril|Adamant|Runite|Dragon|Silver|Broad) bolts$",
+         ["Bronze bolts", "Blurite bolts", "Iron bolts", "Steel bolts", "Mithril bolts", "Adamant bolts",
+          "Runite bolts", "Dragon bolts", "Broad bolts", "Silver bolts"]),
+        # the Crafting gem order, then the non-gem tips by level
+        ("Bolt tips", r"(?i)bolt ?tips$",
+         ["Opal bolt tips", "Jade bolt tips", "Topaz bolt tips", "Sapphire bolt tips", "Emerald bolt tips",
+          "Ruby bolt tips", "Diamond bolt tips", "Dragonstone bolt tips", "Onyx bolt tips", "Pearl bolt tips",
+          "Barb bolttips", "Amethyst bolt tips"]),
+        ("Dart tips", r"(?i)^(?!Atlatl ).*dart tips?$",
+         ["Bronze dart tip", "Iron dart tip", "Steel dart tip", "Mithril dart tip", "Adamant dart tip", "Rune dart tip",
+          "Amethyst dart tip", "Dragon dart tip"]),
+        ("Javelins", r"(?i)javelin tips$|^Javelin shaft$",
+         ["Javelin shaft", "Bronze javelin tips", "Iron javelin tips", "Steel javelin tips", "Mithril javelin tips",
+          "Adamant javelin tips", "Rune javelin tips", "Amethyst javelin tips", "Dragon javelin tips"]),
+        ("Atlatl darts", r"(?i)^(?:Headless )?atlatl dart",
+         ["Atlatl dart shaft", "Headless atlatl dart", "Atlatl dart tips"]),
     ]),
     ("Smithing", "smithing", [
-        ("Ores", r"(?i) ore$|^Coal$"),
+        # metal tier (Mining and smelting level), so ores line up with the bars
+        ("Ores", r"(?i) ore$|^Coal$",
+         ["Copper ore", "Tin ore", "Blurite ore", "Iron ore", "Silver ore", "Lead ore", "Coal", "Gold ore",
+          "Lovakite ore", "Mithril ore", "Adamantite ore", "Nickel ore", "Runite ore"]),
         ("Bars", r"(?i) bar$"),
     ]),
     ("Cooking", "cooking", [
-        ("Raw food", r"(?i)^Raw (?!.*\(\d\)$)|^Uncooked "),
+        # by Cooking level; then crab meat, Camdozaal offering fish, and minigame-only fish
+        ("Raw fish", r"(?i)^Raw (?:shrimps|sardine|anchovies|herring|mackerel|trout|cod|pike|salmon|slimy eel|tuna|"
+                     r"karambwan|rainbow fish|cave eel|lobster|bass|swordfish|swordtip squid|monkfish|giant krill|"
+                     r"jumbo squid|haddock|yellowfin|shark|sea turtle|halibut|anglerfish|bluefin|dark crab|manta ray|"
+                     r"marlin|red crab meat|blue crab meat|rainbow crab meat|guppy|cavefish|tetra|catfish|"
+                     r"harpoonfish|paddlefish)$",
+         ["Raw shrimps", "Raw sardine", "Raw anchovies", "Raw herring", "Raw mackerel", "Raw trout", "Raw cod",
+          "Raw pike", "Raw salmon", "Raw slimy eel", "Raw tuna", "Raw karambwan", "Raw rainbow fish",
+          "Raw cave eel", "Raw lobster", "Raw bass", "Raw swordfish", "Raw swordtip squid", "Raw monkfish",
+          "Raw giant krill", "Raw jumbo squid", "Raw haddock", "Raw yellowfin", "Raw shark", "Raw sea turtle",
+          "Raw halibut", "Raw anglerfish", "Raw bluefin", "Raw dark crab", "Raw manta ray", "Raw marlin",
+          "Raw red crab meat", "Raw blue crab meat", "Raw rainbow crab meat",
+          "Raw guppy", "Raw cavefish", "Raw tetra", "Raw catfish", "Raw harpoonfish", "Raw paddlefish"]),
+        # plain meats, then skewer/ogre meats, then hunter meats by Cooking level
+        ("Raw meat", r"(?i)^Raw (?:beef|rat meat|bear meat|yak meat|boar meat|impaler meat|ugthanki meat|chicken|"
+                     r"rabbit|mystery meat|bird meat|t-bone steak|beast meat|chompy|jubbly|oomlie|wild kebbit|"
+                     r"larupia|barb-tailed kebbit|graahk|kyatt|pyre fox|sunlight antelope|dashing kebbit|"
+                     r"moonlight antelope)$",
+         ["Raw beef", "Raw rat meat", "Raw bear meat", "Raw yak meat", "Raw boar meat", "Raw impaler meat",
+          "Raw ugthanki meat", "Raw chicken", "Raw rabbit", "Raw mystery meat", "Raw bird meat",
+          "Raw t-bone steak", "Raw beast meat", "Raw chompy", "Raw jubbly", "Raw oomlie",
+          "Raw wild kebbit", "Raw larupia", "Raw barb-tailed kebbit", "Raw graahk", "Raw kyatt", "Raw pyre fox",
+          "Raw sunlight antelope", "Raw dashing kebbit", "Raw moonlight antelope"]),
+        # pies sort by the level that bakes them
+        ("Pies", r"(?i)^(?:Raw|Uncooked) .*pie$"),
+        # everything else the old "Raw food" rule took
+        ("Other dishes", r"(?i)^Raw (?!.*\(\d\)$)|^Uncooked ",
+         ["Uncooked egg", "Uncooked stew", "Uncooked pizza", "Uncooked cake", "Uncooked curry",
+          "Raw crunchies", "Raw batta", "Raw gnomebowl", "Raw swamp paste"]),
     ]),
     ("Firemaking", "firemaking", [
-        ("Logs", r"(?i)^(Logs|.* logs)$"),
+        # every log has a level-1 pyre recipe, so order by the level that burns them
+        ("Logs", r"(?i)^(Logs|.* logs)$",
+         ["Logs", "Oak logs", "Willow logs", "Teak logs", "Arctic pine logs", "Maple logs", "Mahogany logs", "Yew logs",
+          "Camphor logs", "Magic logs", "Ironwood logs", "Redwood logs", "Rosewood logs"]),
     ]),
     ("Construction", "construction", [
-        ("Planks", r"(?i)plank$"),
-        ("Nails", r"(?i)nails$"),
+        ("Planks", r"(?i)plank$",
+         ["Plank", "Oak plank", "Teak plank", "Mahogany plank", "Camphor plank", "Ironwood plank", "Rosewood plank"]),
+        ("Nails", r"(?i)nails$",
+         ["Bronze nails", "Iron nails", "Steel nails", "Black nails", "Mithril nails", "Adamantite nails", "Rune nails",
+          "Dragon nails"]),
         ("Materials", r"(?i)^(Bolt of cloth|Limestone brick|Marble block|Gold leaf|Magic stone|Soft clay|Steel bar|"
                       r"Molten glass|Clockwork|Timber beam)$"),
     ]),
+    # one section per patch type, each by Farming level; saplings sit by their seedlings
     ("Farming", "farming", [
-        ("Seeds", r"(?i)seed$|seeds$|spore$"),
-        ("Saplings", r"(?i)sapling$|seedling$"),
+        ("Allotment seeds", r"^(?:Potato|Onion|Cabbage|Tomato|Sweetcorn|Strawberry|Watermelon|Snape grass) seed$"),
+        ("Flower seeds", r"^(?:Marigold|Rosemary|Nasturtium|Woad|Limpwurt|White lily) seed$"),
+        ("Herb seeds", r"^(?:Guam|Marrentill|Tarromin|Harralander|Ranarr|Toadflax|Irit|Avantoe|Kwuarm|Snapdragon|Huasca|"
+                       r"Cadantine|Lantadyme|Dwarf weed|Torstol) seed$|^Gout tuber$"),
+        ("Hops seeds", r"^(?:Barley|Hammerstone|Asgarnian|Jute|Yanillian|Flax|Krandorian|Wildblood|Hemp|Cotton) seed$"),
+        ("Bush seeds", r"^(?:Redberry|Cadavaberry|Dwellberry|Jangerberry|Whiteberry|Poison ivy) seed$"),
+        ("Tree seeds", r"^(?:Acorn|Willow seed|Maple seed|Yew seed|Magic seed)$"),
+        ("Fruit tree seeds", r"^(?:Apple tree|Banana tree|Orange tree|Curry tree|Pineapple|Papaya tree|Palm tree|"
+                             r"Dragonfruit tree) seed$"),
+        ("Hardwood seeds", r"^(?:Teak|Mahogany|Camphor|Ironwood|Rosewood) seed$"),
+        ("Special tree seeds", r"^(?:Calquat tree seed|Crystal acorn|Spirit seed|Celastrus seed|Redwood tree seed)$"),
+        ("Special seeds", r"(?i)seed$|seeds$|spore$|^(?:Elkhorn|Pillar|Umbral) frag$",
+         ["Seaweed spore", "Grape seed", "Mushroom spore", "Cactus seed", "Potato cactus seed", "Belladonna seed",
+          "Attas seed", "Iasor seed", "Kronos seed", "Elkhorn frag", "Pillar frag", "Umbral frag"]),
+        ("Tree saplings", r"^(?:Oak|Willow|Maple|Yew|Magic) (?:sapling|seedling)$"),
+        ("Fruit tree saplings", r"^(?:Apple|Banana|Orange|Curry|Pineapple|Papaya|Palm|Dragonfruit) (?:sapling|seedling)$"),
+        ("Hardwood saplings", r"^(?:Teak|Mahogany|Camphor|Ironwood|Rosewood) (?:sapling|seedling)$"),
+        ("Special tree saplings", r"(?i)sapling$|seedling$"),
     ]),
     ("Runecraft", "runecraft", [
         ("Runes", r"(?i) rune$"),
     ]),
+    # wood tier (normal to rosewood) and metal tier (bronze to dragon), so the plank, hull, bar, keel and
+    # nail rows line up column by column; raw materials come before what is made from them
     ("Sailing", "sailing", [
         ("Planks", r"(?i)plank$"),
-        ("Parts", r"(?i)parts$"),
-        ("Bars & sheets", r"(?i) bar$|sheet$"),
-        ("Cloth & nails", r"(?i)^(Bolt of (linen|canvas|cotton)|.* nails|.* yarn|.* fabric roll|Swamp tar)$"),
+        ("Hull parts", r"(?i)^(?!Large ).* hull parts$",
+         ["Wooden hull parts", "Oak hull parts", "Teak hull parts", "Mahogany hull parts", "Camphor hull parts",
+          "Ironwood hull parts", "Rosewood hull parts"]),
+        ("Large hull parts", r"(?i)^Large .* hull parts$",
+         ["Large wooden hull parts", "Large oak hull parts", "Large teak hull parts", "Large mahogany hull parts",
+          "Large camphor hull parts", "Large ironwood hull parts", "Large rosewood hull parts"]),
+        ("Bars & sheets", r"(?i)^(?!Lead |Cupronickel ).* bar$|sheet$",
+         ["Bronze bar", "Iron bar", "Steel bar", "Mithril bar", "Adamantite bar", "Runite bar", "Dragon metal sheet"]),
+        ("Keel parts", r"(?i)^(?!Large ).* keel parts$",
+         ["Bronze keel parts", "Iron keel parts", "Steel keel parts", "Mithril keel parts", "Adamant keel parts",
+          "Rune keel parts", "Dragon keel parts"]),
+        ("Large keel parts", r"(?i)^Large .* keel parts$",
+         ["Large bronze keel parts", "Large iron keel parts", "Large steel keel parts", "Large mithril keel parts",
+          "Large adamant keel parts", "Large rune keel parts", "Large dragon keel parts"]),
+        ("Nails", r"(?i) nails$",
+         ["Bronze nails", "Iron nails", "Steel nails", "Mithril nails", "Adamantite nails", "Rune nails", "Dragon nails"]),
+        ("Tar, lead & cupronickel", r"(?i)^(Swamp tar|Lead bar|Cupronickel bar)$",
+         ["Swamp tar", "Lead bar", "Cupronickel bar"]),
+        ("Yarn & sail cloth", r"(?i)^(Bolt of (linen|canvas|cotton)|.* yarn)$",
+         ["Linen yarn", "Hemp yarn", "Cotton yarn", "Bolt of linen", "Bolt of canvas", "Bolt of cotton"]),
+        ("Fabric rolls", r"(?i) fabric roll$", ["Ralph's fabric roll", "Gurtob's fabric roll", "Gwyna's fabric roll"]),
     ]),
 ]
 
