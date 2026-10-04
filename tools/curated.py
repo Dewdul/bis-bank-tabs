@@ -422,8 +422,9 @@ MOVEMENT = tab("movement", "Movement", "Graceful boots", kind="movement", sectio
     ]),
     section("runes", "Teleport runes", "rows", [
         first("pouch", RUNE_POUCH),
-        all_("runes", ["Law rune", "Astral rune", "Soul rune", "Blood rune"] + ELEMENTAL_RUNES +
-             ["Dust rune", "Smoke rune", "Mist rune", "Lava rune", "Mud rune", "Steam rune"]),
+        # the basic teleport runes in the order players keep them: law, fire, water, air, earth
+        all_("runes", ["Law rune", "Fire rune", "Water rune", "Air rune", "Earth rune", "Astral rune", "Soul rune",
+                       "Blood rune", "Dust rune", "Smoke rune", "Mist rune", "Lava rune", "Mud rune", "Steam rune"]),
     ]),
 ])
 
