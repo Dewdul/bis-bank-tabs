@@ -343,6 +343,40 @@ STANDARD_STAVES = ["Harmonised Nightmare staff", "Twinflame staff", "Kodai wand"
                    "Water battlestaff", "Air battlestaff", "Earth battlestaff", "Staff of fire", "Staff of water",
                    "Staff of air", "Staff of earth"]
 
+# Unenchanted jewellery for the Enchant spells, by spell: each gem's ring, necklace, amulet and
+# bracelet stay together (two gems to a row) at the bottom of the magic tab.
+ENCHANT_GEMS = [("Opal", "Lvl-1", 7), ("Sapphire", "Lvl-1", 7), ("Jade", "Lvl-2", 27), ("Emerald", "Lvl-2", 27),
+                ("Topaz", "Lvl-3", 49), ("Ruby", "Lvl-3", 49), ("Diamond", "Lvl-4", 57),
+                ("Dragonstone", "Lvl-5", 68), ("Onyx", "Lvl-6", 87), ("Zenyte", "Lvl-7", 93)]
+
+
+# Enchant Crossbow Bolt levels; each gem's bolts and dragon bolts stay together.
+ENCHANT_BOLTS = [("Opal", 4), ("Sapphire", 7), ("Jade", 14), ("Pearl", 24), ("Emerald", 27), ("Topaz", 29),
+                 ("Ruby", 49), ("Diamond", 57), ("Dragonstone", 68), ("Onyx", 87)]
+
+
+def enchanting():
+    jewellery, jewellery_groups = [], []
+    for gem, spell, level in ENCHANT_GEMS:
+        for piece in ("ring", "necklace", "amulet", "bracelet"):
+            name = "Dragon necklace" if (gem, piece) == ("Dragonstone", "necklace") else "%s %s" % (gem, piece)
+            jewellery.append((name, "Unenchanted: %s Enchant (Magic %d)" % (spell, level)))
+            jewellery_groups.append(gem)
+    bolts, bolt_groups = [], []
+    for gem, level in ENCHANT_BOLTS:
+        for name in ("%s bolts" % gem, "%s dragon bolts" % gem):
+            bolts.append((name, "Unenchanted: Enchant Crossbow Bolt (Magic %d)" % level))
+            bolt_groups.append(gem)
+    return [
+        section("enchanting", "Unenchanted jewellery", "bottom",
+                [dict(all_("enchant", jewellery), groups=jewellery_groups)]),
+        section("enchant_bolts", "Unenchanted bolts", "bottom",
+                [dict(all_("enchant_bolts", bolts), groups=bolt_groups)]),
+        section("orbs", "Orbs to charge", "bottom",
+                [all_("orbs", [("Unpowered orb", "Charge Orb at an elemental obelisk (Magic 56-66)")])]),
+    ]
+
+
 MAGIC = tab("magic", "Magic", "Mystic air staff", kind="gear", sections=[
     section("main", "Best in slot", "equipment", [
         auto("head", "HEAD", "magic"),
@@ -385,13 +419,15 @@ MAGIC = tab("magic", "Magic", "Mystic air staff", kind="gear", sections=[
         first("pouch", RUNE_POUCH),
         # elemental (sunfire is the stronger fire rune), combination by Runecraft level, then catalytic by tier
         all_("runes", ["Sunfire rune"] + ELEMENTAL_RUNES + COMBO_RUNES +
-             ["Mind rune", "Chaos rune", "Death rune", "Blood rune", "Soul rune", "Aether rune", "Wrath rune"]),
+             ["Mind rune", "Cosmic rune", "Chaos rune", "Nature rune", "Death rune", "Blood rune", "Soul rune",
+              "Aether rune", "Wrath rune"]),
     ]),
     combat_supplies([
         first("boost", ["Divine magic potion", "Magic potion", "Divine battlemage potion", "Battlemage potion",
                         "Forgotten brew", "Ancient brew"]),
         first("heart", ["Saturated heart", "Imbued heart"]),
     ], restores=[all_("spec_restore", [])]),  # Surge potion (unique_uses.py)
+    *enchanting(),
 ])
 
 # ---------------------------------------------------------------- movement

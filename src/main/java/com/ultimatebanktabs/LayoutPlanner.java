@@ -115,7 +115,8 @@ class LayoutPlanner
 		for (TabBuilder.Section s : tab.getSections())
 		{
 			String l = s.getLayout();
-			if (("rows".equals(l) || "sets".equals(l) || "columns".equals(l) || "goods".equals(l)) && !s.getItems().isEmpty())
+			if (("rows".equals(l) || "sets".equals(l) || "columns".equals(l) || "goods".equals(l) || "bottom".equals(l))
+				&& !s.getItems().isEmpty())
 			{
 				rowSections.add(s);
 			}
@@ -126,7 +127,8 @@ class LayoutPlanner
 		for (int i = 0; i < rowSections.size(); i++)
 		{
 			TabBuilder.Section s = rowSections.get(i);
-			boolean goods = "goods".equals(s.getLayout());
+			// finished goods (skill tabs) and "bottom" sections (magic tab enchanting) close the tab
+			boolean goods = "goods".equals(s.getLayout()) || "bottom".equals(s.getLayout());
 			// finished goods sit at the bottom after a blank row, whatever the gap setting
 			if (gapRows && !first || goods && !goodsStarted && !first)
 			{
@@ -145,7 +147,7 @@ class LayoutPlanner
 				i = end;
 				continue;
 			}
-			boolean sets = "sets".equals(s.getLayout());
+			boolean sets = "sets".equals(s.getLayout()) || "bottom".equals(s.getLayout());
 			int col = 0;
 			List<List<TabBuilder.Placement>> chunks = sets ? groups(s.getItems()) : Arrays.asList(s.getItems());
 			for (List<TabBuilder.Placement> chunk : chunks)

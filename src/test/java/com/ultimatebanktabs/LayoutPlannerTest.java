@@ -179,6 +179,19 @@ public class LayoutPlannerTest
 	}
 
 	@Test
+	public void bottomSectionsSeparateAndKeepGroups()
+	{
+		int[] layout = plan(s("runes", "rows", p(1, null, "r")),
+			s("enchanting", "bottom", p(10, null, "opal"), p(11, null, "opal"), p(12, null, "opal"), p(13, null, "opal"),
+				p(20, null, "sapphire"), p(21, null, "sapphire"), p(22, null, "sapphire"), p(23, null, "sapphire"),
+				p(30, null, "jade")));
+		assert at(layout, 1, 0) == -1 : "blank row before the bottom section";
+		assertEquals(10, at(layout, 2, 0));
+		assertEquals("two gems to a row", 23, at(layout, 2, 7));
+		assertEquals(30, at(layout, 3, 0));
+	}
+
+	@Test
 	public void emptyTab()
 	{
 		assertEquals(0, plan(new TabBuilder.Section("x", "x", "rows", Collections.emptyList())).length);
