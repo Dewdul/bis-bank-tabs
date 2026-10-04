@@ -44,6 +44,7 @@ import net.runelite.client.plugins.banktags.BankTagsPlugin;
 import net.runelite.client.plugins.banktags.BankTagsService;
 import net.runelite.client.plugins.banktags.TagManager;
 import net.runelite.client.plugins.banktags.tabs.LayoutManager;
+import net.runelite.client.ui.overlay.OverlayManager;
 
 @Slf4j
 @PluginDependency(BankTagsPlugin.class)
@@ -87,9 +88,17 @@ public class UltimateBankTabsPlugin extends Plugin
 	@Inject
 	private Gson gson;
 
+	@Inject
+	private OverlayManager overlayManager;
+
+	@Inject
+	private ReasonOverlay reasonOverlay;
+
 	private TabData data;
 	private TabBuilder builder;
 	private BankTagsWriter writer;
+	/** tab key -> item id -> why the item is in that tab */
+	private volatile Map<String, Map<Integer, String>> reasons = new HashMap<>();
 
 	/** canonical ids in the bank (items and placeholders) and potion storage */
 	private Set<Integer> stored = new HashSet<>();
@@ -111,6 +120,7 @@ public class UltimateBankTabsPlugin extends Plugin
 		builder = new TabBuilder(data, id -> EquipStats.of(itemManager.getItemStats(id)));
 		writer = new BankTagsWriter(configManager, tagManager, layoutManager, bankTagsService, itemManager::canonicalize);
 		writer.restore(data.tabs.stream().map(t -> t.key).collect(Collectors.toList()));
+		overlayManager.add(reasonOverlay);
 		clientThread.invokeLater(() ->
 		{
 			if (client.getGameState() == GameState.LOGGED_IN)
@@ -124,6 +134,8 @@ public class UltimateBankTabsPlugin extends Plugin
 	@Override
 	protected void shutDown()
 	{
+		overlayManager.remove(reasonOverlay);
+		reasons = new HashMap<>();
 		BankTagsWriter w = writer;
 		boolean remove = config.removeOnStop();
 		clientThread.invokeLater(() ->
@@ -401,6 +413,7 @@ public class UltimateBankTabsPlugin extends Plugin
 
 		Map<String, BankTagsWriter.Tab> tabs = new LinkedHashMap<>();
 		Map<String, String> titles = new HashMap<>();
+		Map<String, Map<Integer, String>> why = new HashMap<>();
 		for (TabData.Tab def : data.tabs)
 		{
 			titles.put(def.key, def.name);
@@ -415,14 +428,24 @@ public class UltimateBankTabsPlugin extends Plugin
 			}
 			int icon = config.dynamicIcons() && built.getHero() > 0 ? built.getHero() : def.icon;
 			tabs.put(def.key, new BankTagsWriter.Tab(built.itemIds(), LayoutPlanner.plan(built, config.gapRows()), icon));
+			why.put(def.key, built.reasons());
 		}
 		int added = writer.publish(tabs, titles);
+		reasons = why;
 		if (added > 0 && announce)
 		{
 			chat("Ultimate Bank Tabs: " + added + (added == 1 ? " new tab is" : " new tabs are")
 				+ " ready. Close and reopen your bank to see " + (added == 1 ? "it." : "them."));
 		}
 		log.debug("rebuilt {} tabs from {} owned items", tabs.size(), owned.size());
+	}
+
+	/** Why each item is in the bank tab currently open, or null when it isn't one of ours. */
+	Map<Integer, String> activeReasons()
+	{
+		String tag = bankTagsService.getActiveTag();
+		String key = tag == null || writer == null ? null : writer.keyOf(tag);
+		return key == null ? null : reasons.get(key);
 	}
 
 	private void chat(String message)

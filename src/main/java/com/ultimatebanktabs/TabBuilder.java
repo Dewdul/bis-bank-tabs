@@ -39,6 +39,8 @@ class TabBuilder
 		String slot;
 		/** the pick (or set) this item came from; alt layout keeps a group together */
 		String group;
+		/** why the item is in the tab, shown when hovering it in the bank */
+		String reason;
 	}
 
 	@Value
@@ -57,6 +59,20 @@ class TabBuilder
 		List<Section> sections;
 		/** best item to use as the tab icon, or -1 */
 		int hero;
+
+		/** item id -> why it is in the tab */
+		Map<Integer, String> reasons()
+		{
+			Map<Integer, String> reasons = new HashMap<>();
+			for (Section s : sections)
+			{
+				for (Placement p : s.items)
+				{
+					reasons.putIfAbsent(p.itemId, p.reason);
+				}
+			}
+			return reasons;
+		}
 
 		Set<Integer> itemIds()
 		{
@@ -112,6 +128,7 @@ class TabBuilder
 			// ammo depends on the launcher picked in the same section, so it goes last
 			List<TabData.Pick> picks = new ArrayList<>(def.picks);
 			picks.sort(Comparator.comparing(p -> "ammo".equals(p.mode)));
+			ctx.sectionTitle = def.title;
 			for (TabData.Pick pick : picks)
 			{
 				List<Placement> got = resolve(pick, ctx);
@@ -137,6 +154,7 @@ class TabBuilder
 		final Set<Integer> placed = new LinkedHashSet<>();
 		/** pick key -> every item the pick settled on, including ones placed earlier */
 		final Map<String, List<Integer>> resolved = new HashMap<>();
+		String sectionTitle;
 
 		Context(Set<Integer> owned, Options options)
 		{
@@ -168,19 +186,28 @@ class TabBuilder
 		switch (pick.mode)
 		{
 			case "first":
-				chosen.addAll(firstOwned(pick.entries, ctx, 1 + ctx.options.backups));
+			{
+				List<List<Integer>> got = ownedEntries(pick.entries, ctx, 1 + ctx.options.backups);
+				for (int i = 0; i < got.size(); i++)
+				{
+					boolean best = i == 0;
+					chosen.addAll(got.get(i));
+					add(out, got.get(i), pick.slot, pick.key, ctx,
+						id -> best ? entryReason(pick, id, ctx) : backupOf(entryReason(pick, id, ctx)));
+				}
 				if (chosen.isEmpty() && pick.fallback != null)
 				{
 					chosen.addAll(fallbackWeapon(pick.fallback, ctx));
+					add(out, chosen, pick.slot, pick.key, ctx, id -> "Best " + pick.fallback + " weapon you own");
 				}
-				add(out, chosen, pick.slot, pick.key, ctx);
 				break;
+			}
 			case "all":
 				for (List<Integer> entry : pick.entries)
 				{
 					chosen.addAll(ownedOf(entry, ctx));
 				}
-				add(out, chosen, pick.slot, pick.key, ctx);
+				add(out, chosen, pick.slot, pick.key, ctx, id -> entryReason(pick, id, ctx));
 				break;
 			case "auto":
 				chosen.addAll(firstOwned(pick.entries, ctx, 1 + ctx.options.backups));
@@ -189,15 +216,17 @@ class TabBuilder
 					chosen.addAll(bestBy(slotCandidates(pick.slot, ctx), id -> Scoring.armour(pick.profile, stats.apply(id)),
 						1 + ctx.options.backups));
 				}
-				add(out, chosen, pick.slot, pick.key, ctx);
+				add(out, chosen, pick.slot, pick.key, ctx, id -> ranked(chosen, id,
+					pick.label != null ? pick.label : "Best " + slotName(pick.slot) + " for " + pick.profile + " stats"));
 				break;
 			case "weapon":
 				chosen.addAll(bestMeleeWeapons(pick.style, ctx));
-				add(out, chosen, "WEAPON", pick.key, ctx);
+				add(out, chosen, "WEAPON", pick.key, ctx, id -> ranked(chosen, id,
+					"any".equals(pick.style) ? "Best melee weapon for damage" : "Best " + pick.style + " weapon"));
 				break;
 			case "ammo":
 				chosen.addAll(ammoFor(pick.launcher, ctx));
-				add(out, chosen, pick.slot, pick.key, ctx);
+				add(out, chosen, pick.slot, pick.key, ctx, id -> ranked(chosen, id, "Best ammo for your best weapon"));
 				break;
 			case "set":
 			{
@@ -210,10 +239,11 @@ class TabBuilder
 				{
 					break;
 				}
+				String reason = pick.label != null ? pick.label : ctx.sectionTitle;
 				for (int i = 0; i < pieces.size(); i++)
 				{
 					chosen.addAll(pieces.get(i));
-					add(out, pieces.get(i), pick.pieces.get(i).slot, pick.key, ctx);
+					add(out, pieces.get(i), pick.pieces.get(i).slot, pick.key, ctx, id -> reason);
 				}
 				break;
 			}
@@ -227,14 +257,74 @@ class TabBuilder
 		return out;
 	}
 
-	private void add(List<Placement> out, Collection<Integer> ids, String slot, String group, Context ctx)
+	private static void add(List<Placement> out, Collection<Integer> ids, String slot, String group, Context ctx,
+		IntFunction<String> reason)
 	{
 		for (int id : ids)
 		{
 			if (ctx.placed.add(id))
 			{
-				out.add(new Placement(id, slot, group));
+				out.add(new Placement(id, slot, group, reason.apply(id)));
 			}
+		}
+	}
+
+	/** The curated reason for the entry holding this item, else the pick label, else the section title. */
+	private static String entryReason(TabData.Pick pick, int id, Context ctx)
+	{
+		for (int i = 0; i < pick.entries.size(); i++)
+		{
+			if (pick.entries.get(i).contains(id))
+			{
+				if (i < pick.reasons.size() && pick.reasons.get(i) != null && !pick.reasons.get(i).isEmpty())
+				{
+					return pick.reasons.get(i);
+				}
+				break;
+			}
+		}
+		return pick.label != null ? pick.label : ctx.sectionTitle;
+	}
+
+	private static String ranked(List<Integer> chosen, int id, String reason)
+	{
+		return chosen.indexOf(id) > 0 ? backupOf(reason) : reason;
+	}
+
+	private static String backupOf(String reason)
+	{
+		return reason == null || reason.isEmpty() ? "Backup"
+			: "Backup: " + reason.substring(0, 1).toLowerCase() + reason.substring(1);
+	}
+
+	static String slotName(String slot)
+	{
+		switch (slot == null ? "" : slot)
+		{
+			case "HEAD":
+				return "helmet";
+			case "CAPE":
+				return "cape";
+			case "AMULET":
+				return "amulet";
+			case "AMMO":
+				return "ammo slot item";
+			case "WEAPON":
+				return "weapon";
+			case "BODY":
+				return "body";
+			case "SHIELD":
+				return "shield";
+			case "LEGS":
+				return "legs";
+			case "GLOVES":
+				return "gloves";
+			case "BOOTS":
+				return "boots";
+			case "RING":
+				return "ring";
+			default:
+				return "item";
 		}
 	}
 
@@ -255,20 +345,27 @@ class TabBuilder
 	private static List<Integer> firstOwned(List<List<Integer>> entries, Context ctx, int count)
 	{
 		List<Integer> ids = new ArrayList<>();
-		int taken = 0;
+		ownedEntries(entries, ctx, count).forEach(ids::addAll);
+		return ids;
+	}
+
+	/** The owned items of each of the first {@code count} entries that have any. */
+	private static List<List<Integer>> ownedEntries(List<List<Integer>> entries, Context ctx, int count)
+	{
+		List<List<Integer>> out = new ArrayList<>();
 		for (List<Integer> entry : entries)
 		{
 			List<Integer> got = ownedOf(entry, ctx);
 			if (!got.isEmpty())
 			{
-				ids.addAll(got);
-				if (++taken >= count)
+				out.add(got);
+				if (out.size() >= count)
 				{
 					break;
 				}
 			}
 		}
-		return ids;
+		return out;
 	}
 
 	private List<Integer> slotCandidates(String slot, Context ctx)
@@ -398,8 +495,11 @@ class TabBuilder
 			{
 				ids = bestBy(slotCandidates(piece.slot, ctx), id -> Scoring.armour(pick.profile, stats.apply(id)), 1);
 			}
+			boolean fromOutfit = best != null && !firstOwned(piece.entries, ctx, 1).isEmpty();
+			String reason = fromOutfit ? (pick.label != null ? pick.label : "Your most complete outfit")
+				: "Lightest weight-reducing " + slotName(piece.slot);
 			chosen.addAll(ids);
-			add(out, ids, piece.slot, pick.key, ctx);
+			add(out, ids, piece.slot, pick.key, ctx, id -> reason);
 		}
 	}
 }

@@ -66,7 +66,14 @@ public interface UltimateBankTabsConfig extends Config
 		return true;
 	}
 
-	@ConfigItem(keyName = "removeOnStop", name = "Remove tabs when turned off", position = 6, section = contents,
+	@ConfigItem(keyName = "showReasons", name = "Show why on hover", position = 6, section = contents,
+		description = "Hovering an item in one of these tabs shows why it is there, e.g. \"Demonbane: +60% vs demons\"")
+	default boolean showReasons()
+	{
+		return true;
+	}
+
+	@ConfigItem(keyName = "removeOnStop", name = "Remove tabs when turned off", position = 7, section = contents,
 		description = "Delete the tabs this plugin made when the plugin is turned off. They come back when it is"
 			+ " turned on again")
 	default boolean removeOnStop()

@@ -13,7 +13,7 @@ public class LayoutPlannerTest
 
 	private static TabBuilder.Placement p(int id, String slot, String group)
 	{
-		return new TabBuilder.Placement(id, slot, group);
+		return new TabBuilder.Placement(id, slot, group, null);
 	}
 
 	private static TabBuilder.Section s(String key, String layout, TabBuilder.Placement... items)

@@ -64,6 +64,9 @@ class TabData
 		boolean complete;
 		/** requirements must already be in the tab rather than merely owned */
 		boolean requiresPlaced;
+		/** hover text: one per entry (may be shorter than entries), else the label */
+		List<String> reasons = Collections.emptyList();
+		String label;
 		List<String> unless = Collections.emptyList();
 		List<Integer> requires = Collections.emptyList();
 		List<List<Integer>> entries = Collections.emptyList();

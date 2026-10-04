@@ -421,6 +421,15 @@ MOVEMENT = tab("movement", "Movement", "Graceful boots", kind="movement", sectio
 # ---------------------------------------------------------------- skills
 
 
+# The everyday saw comes first; the crystal saw's +3 boost burns charges that
+# need recharging, so it is a situational pick for builds just above your level.
+SAWS = [
+    first("saw", [("Amy's saw", "Everyday saw: equipable, nothing to recharge"),
+                  ("Saw", "Everyday saw: nothing to recharge")]),
+    first("crystal_saw", [("Crystal saw", "+3 invisible Construction boost when you need it (uses charges)")]),
+]
+
+
 def cape(skill_cape):
     return first("cape", [skill_cape])
 
@@ -738,7 +747,7 @@ HERBLORE = tab("herblore", "Herblore", "Pestle and mortar", sections=[
 
 CONSTRUCTION = tab("construction", "Construction", "Saw", sections=[
     section("gear", "Tools", "rows", [
-        first("saw", ["Crystal saw", "Amy's saw", "Saw"]),
+        *SAWS,
         first("hammer", ["Imcando hammer", "Hammer"]),
         first("plank_sack", ["Plank sack"]),
         cape("Construct. cape"),
@@ -752,7 +761,7 @@ CONSTRUCTION = tab("construction", "Construction", "Saw", sections=[
 SAILING = tab("sailing", "Sailing", "Rope", sections=[
     section("gear", "Gear", "rows", [
         first("hammer", ["Imcando hammer", "Hammer"]),
-        first("saw", ["Crystal saw", "Amy's saw", "Saw"]),
+        *SAWS,
         cape("Sailing cape"),
     ]),
     section("outfit", "Outfit", "rows", [

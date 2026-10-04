@@ -129,8 +129,14 @@ class Resolver:
         """Resolve an ordered list of entry names to id lists, expanding each with
         RuneLite variation ids that don't belong to another entry in the list.
         With split_regex, every page a regex matches becomes its own entry."""
+        return [ids for ids, _ in self.entries_with_reasons(names, split_regex)]
+
+    def entries_with_reasons(self, names, split_regex=False):
+        """As entries(), for names that may be (name, hover reason) pairs;
+        returns (ids, reason or None) per entry."""
         seen, unique = set(), []
         for n in names:
+            n, why = n if isinstance(n, tuple) else (n, None)
             if split_regex and n.startswith("re:"):
                 expanded = self.entry_pages(n)
             else:
@@ -138,8 +144,8 @@ class Resolver:
             for e in expanded:
                 if e.lower() not in seen:
                     seen.add(e.lower())
-                    unique.append(e)
-        base = [self.base_ids(n) for n in unique]
+                    unique.append((e, why))
+        base = [self.base_ids(n) for n, _ in unique]
         claimed = {i for ids in base for i in ids}
         out = []
         for ids in base:
@@ -149,7 +155,7 @@ class Resolver:
                     if v not in claimed and v not in ids and v not in extra and self._same_family(i, v):
                         extra.append(v)
             out.append(ids + extra)
-        return out
+        return list(zip(out, [why for _, why in unique]))
 
     def _same_family(self, a, b):
         """Only borrow a variation id when it isn't a separately listed wiki item
@@ -159,7 +165,7 @@ class Resolver:
         return pb is None or pb == self.wiki.id_page.get(a)
 
     def flat(self, names):
-        return sorted({i for ids in self.entries(names) for i in ids})
+        return sorted({i for ids in self.entries([n[0] if isinstance(n, tuple) else n for n in names]) for i in ids})
 
 
 def build_pick(res, pick):
@@ -167,8 +173,16 @@ def build_pick(res, pick):
     for k in ("slot", "profile", "style", "launcher", "fallback", "complete", "unless"):
         if pick.get(k):
             out[k] = pick[k]
+    if pick.get("why"):
+        out["label"] = pick["why"]
     if pick.get("entries"):
-        out["entries"] = res.entries(pick["entries"], split_regex=pick["mode"] == "all")
+        resolved = res.entries_with_reasons(pick["entries"], split_regex=pick["mode"] == "all")
+        out["entries"] = [ids for ids, _ in resolved]
+        reasons = [why or "" for _, why in resolved]
+        while reasons and not reasons[-1]:
+            reasons.pop()
+        if reasons:
+            out["reasons"] = reasons
     if pick.get("requires"):
         out["requires"] = res.flat(pick["requires"])
         if pick.get("placed"):
