@@ -88,7 +88,10 @@ ANTIPOISON = [("Extended anti-venom+", "Strongest, longest-lasting venom and poi
               ("Anti-venom", "Cures venom and poison, then protects against venom"),
               ("Antidote++", "Cures poison, long poison immunity"), ("Antidote+", "Cures poison, poison immunity"),
               ("Superantipoison", "Cures poison, short poison immunity"), ("Antipoison", "Cures poison")]
-ANTIFIRE = ["Extended super antifire", "Super antifire potion", "Extended antifire", "Antifire potion"]
+ANTIFIRE = [("Extended super antifire", "Full dragonfire immunity for 6 minutes"),
+            ("Super antifire potion", "Full dragonfire immunity for 3 minutes"),
+            ("Extended antifire", "Partial dragonfire protection for 12 minutes"),
+            ("Antifire potion", "Partial dragonfire protection for 6 minutes")]
 RESTORE = [("Super restore", "Restores prayer and stats drained by attacks"), ("Prayer potion", "Restores prayer"),
            ("Prayer regeneration potion", "Restores prayer gradually over time")]
 
@@ -105,7 +108,7 @@ def combat_supplies(boosts):
         first("food", FOOD, take=4),
         first("karambwan", [("Cooked karambwan", "Combo food: eat in the same tick as other food (heals 18)")]),
         all_("antipoison", ANTIPOISON),
-        first("antifire", ANTIFIRE),
+        all_("antifire", ANTIFIRE),
     ])
 
 
