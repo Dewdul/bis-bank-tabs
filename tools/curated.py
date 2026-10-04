@@ -18,6 +18,7 @@ Pick modes (see PickResolver.java for the runtime side):
   set    - a group of slot pieces; "complete" sets need every piece owned
   ammo   - best owned ammo for the launcher chosen by another pick
 """
+import re
 
 SLOTS = ("HEAD", "CAPE", "AMULET", "AMMO", "WEAPON", "BODY", "SHIELD", "LEGS", "GLOVES", "BOOTS", "RING")
 
@@ -840,6 +841,11 @@ LAUNCHER_AMMO.update({c: "bolt" for c in CROSSBOWS if c != "Hunters' crossbow"})
 # ".*" rule is a catch-all that only takes items this skill uses more than any
 # other skill. Items matching EXCLUDE_SUPPLIES and untradeable quest items are
 # dropped. An order list sorts by position (grimy herb before its clean herb).
+LEATHERS = ["Leather", "Hard leather", "Snakeskin", "Cured yak-hide", "Suqah leather", "Green dragon leather",
+            "Blue dragon leather", "Red dragon leather", "Black dragon leather", "Hueycoatl hide"]
+SILVER = ["Silver bar", "Opal amulet (u)", "Jade amulet (u)", "Topaz amulet (u)", "Unstrung symbol", "Unstrung emblem"]
+GOLD = ["Gold bar", "Gold amulet (u)", "Sapphire amulet (u)", "Emerald amulet (u)", "Ruby amulet (u)",
+        "Diamond amulet (u)", "Dragonstone amulet (u)", "Onyx amulet (u)", "Zenyte amulet (u)"]
 GEMS = ["Opal", "Jade", "Red topaz", "Sapphire", "Emerald", "Ruby", "Diamond", "Dragonstone", "Onyx", "Zenyte"]
 HERBS = ["Guam leaf", "Marrentill", "Tarromin", "Harralander", "Ranarr weed", "Toadflax", "Irit leaf", "Avantoe",
          "Kwuarm", "Huasca", "Snapdragon", "Cadantine", "Lantadyme", "Dwarf weed", "Torstol"]
@@ -855,10 +861,10 @@ SUPPLY_RULES = [
     ("Crafting", "crafting", [
         ("Uncut gems", r"(?i)^Uncut (?:%s)$" % "|".join(GEMS), GEMS),
         ("Cut gems", r"(?i)^(?:%s)$" % "|".join(GEMS), GEMS),
-        ("Leather & hides", r"(?i)^(Cowhide|Leather|Hard leather|Snakeskin|Snake hide|Cured yak-hide|Yak-hide|"
-                            r".* dragonhide|.* dragon leather|Hueycoatl hide|Suqah hide|Suqah leather)$"),
+        ("Leather & hides", r"(?i)^(%s)$" % "|".join(re.escape(x) for x in LEATHERS), LEATHERS),
         ("Glass", r"(?i)^(Molten glass|Bucket of sand|Soda ash|Seaweed|Giant seaweed|Sandstone \(\d+kg\))$"),
-        ("Jewellery", r"^(Gold|Silver) bar$|amulet \(u\)$"),
+        ("Silver jewellery", r"^(%s)$" % "|".join(re.escape(x) for x in SILVER), SILVER),
+        ("Gold jewellery", r"^(%s)$" % "|".join(re.escape(x) for x in GOLD), GOLD),
         ("Battlestaves & orbs", r"(?i)^(Battlestaff|(Air|Water|Earth|Fire) orb|Unpowered orb)$"),
         ("Spinning & weaving", r"(?i)^(Wool|Ball of wool|Flax|Bow string|Jute fibre|Linen yarn|Hemp yarn|Cotton yarn|"
                                r"Clay|Soft clay|Unfired .*)$"),
