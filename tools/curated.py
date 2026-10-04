@@ -545,7 +545,7 @@ MINING = tab("mining", "Mining", "Rune pickaxe", sections=[
         first("varrock", tiers("Varrock armour")),
         first("gem_bag", ["Gem bag"]),
         first("coal_bag", ["Coal bag"]),
-        first("hammer", ["Imcando hammer", "Hammer"]),
+        first("hammer", ["Imcando hammer", "Hammer"], why="Motherlode Mine: repairs the broken water wheel struts"),
         cape("Mining cape"),
     ]),
     section("outfit", "Outfit", "rows", [
