@@ -19,6 +19,8 @@ class TabData
 	int version;
 	String generated;
 	List<Integer> excludeAuto = Collections.emptyList();
+	/** never in a best-in-slot set, but allowed in situational picks (god books, Ardougne cloaks...) */
+	List<Integer> situationalOnly = Collections.emptyList();
 	List<Integer> excludeMeleeWeapon = Collections.emptyList();
 	Map<String, Double> meleeMultiplier = Collections.emptyMap();
 	List<Integer> doubleAccuracy = Collections.emptyList();
@@ -64,7 +66,7 @@ class TabData
 	static class Pick
 	{
 		String key;
-		/** first, all, auto, weapon, ammo, set, outfit */
+		/** first, all, auto, weapon, ammo, set, outfit, prayerset */
 		String mode;
 		String slot;
 		String profile;
@@ -86,6 +88,8 @@ class TabData
 		List<String> groups = Collections.emptyList();
 		String label;
 		List<String> unless = Collections.emptyList();
+		/** "prayerset" picks: the slots to fill */
+		List<String> slots = Collections.emptyList();
 		List<Integer> requires = Collections.emptyList();
 		List<List<Integer>> entries = Collections.emptyList();
 		List<Piece> pieces = Collections.emptyList();

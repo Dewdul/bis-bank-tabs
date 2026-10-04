@@ -186,7 +186,7 @@ class Resolver:
 def build_pick(res, pick):
     out = {"key": pick["key"], "mode": pick["mode"]}
     for k in ("slot", "profile", "style", "launcher", "fallback", "complete", "unless", "take", "groups", "repeat",
-              "one"):
+              "one", "slots"):
         if pick.get(k):
             out[k] = pick[k]
     if pick.get("why"):
@@ -556,6 +556,7 @@ def main():
         "generated": date.today().isoformat(),
         "source": "OSRS Wiki (oldschool.runescape.wiki), CC BY-NC-SA 3.0",
         "excludeAuto": every.flat(curated.EXCLUDE_AUTO),
+        "situationalOnly": every.flat(curated.SITUATIONAL_ONLY),
         "excludeMeleeWeapon": every.flat(curated.EXCLUDE_MELEE_WEAPON),
         "meleeMultiplier": {str(i): m for name, m in curated.MELEE_WEAPON_MULTIPLIER.items() for i in res.flat([name])},
         "doubleAccuracy": res.flat(curated.MELEE_DOUBLE_ACCURACY),

@@ -38,12 +38,19 @@ final class Scoring
 		this(Collections.emptyMap(), Collections.emptySet());
 	}
 
+	static double armour(String profile, EquipStats s)
+	{
+		return armour(profile, s, "any");
+	}
+
 	/**
 	 * How good an armour piece is for a style; zero or less means "not useful".
 	 * Strength bonuses outweigh accuracy because max hit scales linearly while
-	 * hit chance saturates against most targets.
+	 * hit chance saturates against most targets. Prayer bonus is situational, so
+	 * it never counts. Melee accuracy follows the main weapon's attack style
+	 * ("stab", "slash", "crush"), or averages the three ("any").
 	 */
-	static double armour(String profile, EquipStats s)
+	static double armour(String profile, EquipStats s, String meleeStyle)
 	{
 		if (s == null)
 		{
@@ -53,13 +60,14 @@ final class Scoring
 		switch (profile)
 		{
 			case MELEE:
-				score = 3 * s.getStr() + (s.getStab() + s.getSlash() + s.getCrush()) / 3.0 + 0.3 * s.getPrayer();
+				score = 3 * s.getStr() + ("any".equals(meleeStyle)
+					? (s.getStab() + s.getSlash() + s.getCrush()) / 3.0 : styleBonus(s, meleeStyle));
 				break;
 			case RANGED:
-				score = 3 * s.getRstr() + s.getRanged() + 0.3 * s.getPrayer();
+				score = 3 * s.getRstr() + s.getRanged();
 				break;
 			case MAGIC:
-				score = 4 * s.getMdmg() + s.getMagic() + 0.3 * s.getPrayer();
+				score = 4 * s.getMdmg() + s.getMagic();
 				break;
 			case WEIGHT:
 				return -s.getWeight();

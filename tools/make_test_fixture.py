@@ -46,7 +46,7 @@ ITEMS = [
     "Dragon axe", "Rune axe", "Crystal axe", "Lumberjack hat", "Lumberjack top", "Grimy ranarr weed", "Ranarr weed",
     "Ranarr potion (unf)", "Snape grass", "Prayer potion", "Logs", "Oak logs", "Knife", "Tinderbox", "Saw",
     "Crystal saw", "Amy's saw", "Hammer", "Silverlight", "Emberlight", "Guam leaf", "Eye of newt", "Irit leaf",
-    "Rune crossbow", "Runite bolts", "Broad bolts", "Book of Law",
+    "Rune crossbow", "Runite bolts", "Broad bolts", "Book of Law", "Ardougne cloak 4", "Cape of Legends",
 ]
 STAT_FIELDS = ["stab_attack_bonus", "slash_attack_bonus", "crush_attack_bonus", "range_attack_bonus",
                "magic_attack_bonus", "strength_bonus", "ranged_strength_bonus", "magic_damage_bonus", "prayer_bonus"]

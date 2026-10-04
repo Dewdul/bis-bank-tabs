@@ -119,6 +119,7 @@ class TabBuilder
 	private final IntFunction<EquipStats> stats;
 	private final Scoring scoring;
 	private final Set<Integer> excludeAuto;
+	private final Set<Integer> situationalOnly;
 	private final Set<Integer> excludeMeleeWeapon;
 	private final Map<Integer, String> launcherAmmo = new HashMap<>();
 
@@ -127,6 +128,7 @@ class TabBuilder
 		this.data = data;
 		this.stats = stats;
 		this.excludeAuto = new HashSet<>(data.excludeAuto);
+		this.situationalOnly = new HashSet<>(data.situationalOnly);
 		this.excludeMeleeWeapon = new HashSet<>(data.excludeMeleeWeapon);
 		Map<Integer, Double> multipliers = new HashMap<>();
 		data.meleeMultiplier.forEach((id, m) -> multipliers.put(Integer.parseInt(id), m));
@@ -153,9 +155,9 @@ class TabBuilder
 				continue;
 			}
 			List<Placement> items = new ArrayList<>();
-			// ammo depends on the launcher picked in the same section, so it goes last
+			// the weapon goes first (armour follows its attack style) and ammo last (it follows the launcher)
 			List<TabData.Pick> picks = new ArrayList<>(def.picks);
-			picks.sort(Comparator.comparing(p -> "ammo".equals(p.mode)));
+			picks.sort(Comparator.comparing(p -> "weapon".equals(p.mode) ? 0 : "ammo".equals(p.mode) ? 2 : 1));
 			ctx.sectionTitle = def.title;
 			for (TabData.Pick pick : picks)
 			{
@@ -194,6 +196,8 @@ class TabBuilder
 		/** pick key -> every item the pick settled on, including ones placed earlier */
 		final Map<String, List<Integer>> resolved = new HashMap<>();
 		String sectionTitle;
+		/** attack style of the main melee weapon; melee armour accuracy follows it */
+		String meleeStyle = "any";
 
 		Context(Set<Integer> owned, Options options)
 		{
@@ -273,14 +277,18 @@ class TabBuilder
 				chosen.addAll(firstOwned(pick.entries, ctx, 1 + ctx.options.backups));
 				if (chosen.isEmpty())
 				{
-					chosen.addAll(bestBy(slotCandidates(pick.slot, ctx), id -> Scoring.armour(pick.profile, stats.apply(id)),
-						1 + ctx.options.backups));
+					chosen.addAll(bestBy(slotCandidates(pick.slot, ctx),
+						id -> Scoring.armour(pick.profile, stats.apply(id), ctx.meleeStyle), 1 + ctx.options.backups));
 				}
 				add(out, chosen, pick.slot, pick.key, ctx, id -> ranked(chosen, id,
 					pick.label != null ? pick.label : "Best " + slotName(pick.slot) + " for " + pick.profile + " stats"));
 				break;
 			case "weapon":
 				chosen.addAll(bestMeleeWeapons(pick.style, ctx));
+				if ("any".equals(pick.style) && !chosen.isEmpty())
+				{
+					ctx.meleeStyle = mainStyle(stats.apply(chosen.get(0)));
+				}
 				add(out, chosen, "WEAPON", pick.key, ctx, id -> ranked(chosen, id,
 					"any".equals(pick.style) ? "Best melee weapon for damage" : "Best " + pick.style + " weapon"));
 				break;
@@ -310,6 +318,9 @@ class TabBuilder
 			}
 			case "outfit":
 				outfit(pick, ctx, out, chosen);
+				break;
+			case "prayerset":
+				prayerSet(pick, ctx, out, chosen);
 				break;
 			default:
 				break;
@@ -448,7 +459,7 @@ class TabBuilder
 		for (int id : ctx.owned)
 		{
 			EquipStats s = stats.apply(id);
-			if (s != null && s.getSlot() == idx && !excludeAuto.contains(id))
+			if (s != null && s.getSlot() == idx && !excludeAuto.contains(id) && !situationalOnly.contains(id))
 			{
 				ids.add(id);
 			}
@@ -523,17 +534,48 @@ class TabBuilder
 		{
 			return firstOwned(data.ammoClasses.getOrDefault(cls, Collections.emptyList()), ctx, 1 + ctx.options.backups);
 		}
-		// crystal bows, blowpipes and the like load their own ammo: a prayer blessing goes there
-		List<Integer> blessings = new ArrayList<>();
-		for (int id : slotCandidates("AMMO", ctx))
+		// crystal bows, blowpipes and the like load their own ammo (a blessing is a situational pick)
+		return Collections.emptyList();
+	}
+
+	/**
+	 * Prayer bonus is situational: for each slot the owned item with the most
+	 * prayer (ties to the better one for the tab's style), kept out of the main set.
+	 */
+	private void prayerSet(TabData.Pick pick, Context ctx, List<Placement> out, List<Integer> chosen)
+	{
+		for (String slot : pick.slots)
 		{
-			EquipStats s = stats.apply(id);
-			if (s.getRanged() == 0 && s.getRstr() == 0)
+			int idx = EquipmentInventorySlot.valueOf(slot).getSlotIdx();
+			List<Integer> candidates = new ArrayList<>();
+			for (int id : ctx.owned)
 			{
-				blessings.add(id);
+				EquipStats s = stats.apply(id);
+				if (s != null && s.getSlot() == idx && s.getPrayer() > 0 && !excludeAuto.contains(id))
+				{
+					candidates.add(id);
+				}
 			}
+			List<Integer> best = bestBy(candidates, id -> stats.apply(id).getPrayer() * 100.0
+				+ Math.max(0, Scoring.armour(pick.profile, stats.apply(id), ctx.meleeStyle)), 1);
+			if (best.isEmpty() || ctx.placed.contains(best.get(0)))
+			{
+				continue;
+			}
+			int prayer = stats.apply(best.get(0)).getPrayer();
+			chosen.addAll(best);
+			add(out, best, slot, pick.key, ctx, id -> "Prayer gear (situational): +" + prayer + " prayer");
 		}
-		return bestBy(blessings, id -> stats.apply(id).getPrayer(), 1);
+	}
+
+	private static String mainStyle(EquipStats s)
+	{
+		if (s == null)
+		{
+			return "any";
+		}
+		int best = s.bestMelee();
+		return s.getSlash() == best ? "slash" : s.getStab() == best ? "stab" : "crush";
 	}
 
 	/**

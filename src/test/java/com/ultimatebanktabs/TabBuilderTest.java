@@ -15,6 +15,7 @@ import java.util.stream.Collectors;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -107,7 +108,8 @@ public class TabBuilderTest
 		assertEquals(id("Torva full helm"), (int) main.get("HEAD"));
 		assertEquals(id("Infernal cape"), (int) main.get("CAPE"));
 		assertEquals(id("Amulet of rancour"), (int) main.get("AMULET"));
-		assertEquals(id("Rada's blessing 4"), (int) main.get("AMMO"));
+		assertNull("prayer bonus is situational: no blessing in the main set", main.get("AMMO"));
+		assertTrue(items(section(built, "situational")).contains(id("Rada's blessing 4")));
 		assertEquals(id("Scythe of Vitur"), (int) main.get("WEAPON"));
 		assertEquals(id("Torva platebody"), (int) main.get("BODY"));
 		assertEquals(id("Avernic defender"), (int) main.get("SHIELD"));
@@ -210,11 +212,12 @@ public class TabBuilderTest
 	}
 
 	@Test
-	public void crystalBowTakesABlessing()
+	public void crystalBowLeavesTheAmmoSlotToSituationalBlessings()
 	{
 		TabBuilder.Built built = build("ranged", own("Bow of Faerdhinen (c)", "Dragon arrow", "Holy blessing"));
 		Map<String, Integer> main = bySlot(section(built, "main"));
-		assertEquals(id("Holy blessing"), (int) main.get("AMMO"));
+		assertNull(main.get("AMMO"));
+		assertTrue(items(section(built, "situational")).contains(id("Holy blessing")));
 	}
 
 	@Test
@@ -367,6 +370,18 @@ public class TabBuilderTest
 		assertEquals("a real shield, not the prayer book", id("Rune kiteshield"), (int) main.get("SHIELD"));
 		assertTrue(items(section(built, "situational")).contains(id("Book of Law")));
 		assertTrue("broad bolts show beside the runite bolts", built.itemIds().containsAll(own("Runite bolts", "Broad bolts")));
+	}
+
+	@Test
+	public void prayerGearIsSituationalNotBestInSlot()
+	{
+		TabBuilder.Built built = build("melee", own("Abyssal whip", "Ardougne cloak 4", "Cape of Legends"));
+		Map<String, Integer> main = bySlot(section(built, "main"));
+		assertEquals("a teleport cape with prayer is not the best melee cape", id("Cape of Legends"),
+			(int) main.get("CAPE"));
+		assertTrue("but it is the situational prayer cape", items(section(built, "situational"))
+			.contains(id("Ardougne cloak 4")));
+		assertTrue(built.reasons().get(id("Ardougne cloak 4")).contains("+6 prayer"));
 	}
 
 	@Test

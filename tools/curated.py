@@ -122,14 +122,12 @@ def combat_supplies(boosts, restores=(), brews=()):
     ])
 
 
-GOD_BOOKS = ["Book of Law", "Book of War", "Book of Darkness", "Holy book", "Unholy book", "Book of Balance"]
-
-
-def prayer_book(best):
-    """The god book for a style first; books are a situational off-hand (prayer bonus)."""
-    order = [best] + [b for b in GOD_BOOKS if b != best]
-    return first("prayer_book", [(b, "Prayer book: prayer bonus, for when you don't need a shield") for b in order],
-                 slot="SHIELD")
+def prayer_gear(profile):
+    """Prayer bonus is situational: the highest-prayer item for every armour slot
+    (blessings, god books, Ardougne cloak...), ties going to the better item for
+    the tab's style, lined up beside the best-in-slot set."""
+    return dict(key="prayer_gear", mode="prayerset", profile=profile, entries=[],
+                slots=["HEAD", "CAPE", "AMULET", "AMMO", "BODY", "SHIELD", "LEGS", "GLOVES", "BOOTS", "RING"])
 
 
 def situational_common(imbued_only):
@@ -161,7 +159,7 @@ MELEE = tab("melee", "Melee", "Abyssal whip", kind="gear", sections=[
         auto("feet", "BOOTS", "melee"),
         auto("ring", "RING", "melee"),
     ]),
-    section("situational", "Situational", "alts", situational_common(False) + [prayer_book("Book of War")] + [
+    section("situational", "Situational", "alts", situational_common(False) + [prayer_gear("melee")] + [
         first("blood_fury", ["Amulet of blood fury"], slot="AMULET"),
         set_("inquisitor", [("HEAD", ["Inquisitor's great helm"]), ("BODY", ["Inquisitor's hauberk"]),
                             ("LEGS", ["Inquisitor's plateskirt"])]),
@@ -296,7 +294,7 @@ RANGED = tab("ranged", "Ranged", "Magic shortbow", kind="gear", sections=[
         auto("feet", "BOOTS", "ranged"),
         auto("ring", "RING", "ranged"),
     ]),
-    section("situational", "Situational", "alts", situational_common(True) + [prayer_book("Book of Law")] + [
+    section("situational", "Situational", "alts", situational_common(True) + [prayer_gear("ranged")] + [
         set_("crystal", [("HEAD", ["Crystal helm"]), ("BODY", ["Crystal body"]), ("LEGS", ["Crystal legs"])],
              requires=["re:^Bow of Faerdhinen", "Crystal bow"]),
         set_("void", [("HEAD", ["Void ranger helm"]), ("BODY", VOID_TOP), ("LEGS", VOID_ROBE),
@@ -415,7 +413,7 @@ MAGIC = tab("magic", "Magic", "Mystic air staff", kind="gear", sections=[
         auto("feet", "BOOTS", "magic"),
         auto("ring", "RING", "magic"),
     ]),
-    section("situational", "Situational", "alts", situational_common(True) + [prayer_book("Book of Darkness")] + [
+    section("situational", "Situational", "alts", situational_common(True) + [prayer_gear("magic")] + [
         set_("virtus", [("HEAD", ["Virtus mask"]), ("BODY", ["Virtus robe top"]), ("LEGS", ["Virtus robe bottom"])]),
         set_("void", [("HEAD", ["Void mage helm"]), ("BODY", VOID_TOP), ("LEGS", VOID_ROBE),
                       ("GLOVES", ["Void knight gloves"])], complete=True),
@@ -1394,8 +1392,13 @@ EXCLUDE_SUPPLIES = r"(?i)^(Coins|Platinum token|Bucket|Bucket of water|Jug|Jug o
 EXCLUDE_AUTO = [
     "re:^(Vesta's|Statius's|Morrigan's|Zuriel's) ",
     "Wilderness champion amulet",
-    # god books win on prayer bonus but are situational: they get their own pick instead
+]
+
+# Never in a best-in-slot set, but fine in situational picks such as the prayer gear set:
+# god books and blessings win on prayer bonus, and Ardougne cloaks are teleports.
+SITUATIONAL_ONLY = [
     "re:^(Holy book|Unholy book|Book of (Balance|Law|War|Darkness)|Damaged book)",
+    r"re:^Ardougne (cloak \d|max cape)",
 ]
 
 # Melee weapons kept out of the damage-model picks (situational picks cover them).
