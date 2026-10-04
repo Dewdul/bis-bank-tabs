@@ -434,7 +434,7 @@ def main():
 
     tabs = []
     for t in curated.TABS:
-        icon = res.base_ids(t["icon"])
+        icon = res.base_ids(curated.DEFAULT_ICONS.get(t["key"], t["icon"]))
         tab = {"key": t["key"], "name": t["name"], "kind": t["kind"], "icon": icon[0] if icon else 0,
                "sections": [dict({"key": s["key"], "title": s["title"], "layout": s["layout"],
                                   "picks": [build_pick(res, p) for p in s["picks"]]},
@@ -452,6 +452,11 @@ def main():
     for t in tabs:
         elsewhere |= curated_ids(t)
     tabs.append(cosmetics_tab(wiki, res, elsewhere))
+    for t in tabs:
+        if t["key"] in curated.TAB_ICONS:
+            t["iconEntries"] = res.entries(curated.TAB_ICONS[t["key"]])
+            # owning none of them falls back to the default icon, not to whatever comes first
+            t["iconStrict"] = t["key"] not in curated.ICON_FALLBACK_TO_FIRST_ITEM
 
     launcher_ammo = {}
     for name, cls in curated.LAUNCHER_AMMO.items():

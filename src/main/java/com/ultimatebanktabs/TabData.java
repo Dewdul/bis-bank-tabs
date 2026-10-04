@@ -32,6 +32,10 @@ class TabData
 		String name;
 		String kind;
 		int icon;
+		/** the icon is the first of these the player owns (most iconic first) */
+		List<List<Integer>> iconEntries = Collections.emptyList();
+		/** owning none of iconEntries means the default icon rather than the first item shown */
+		boolean iconStrict;
 		List<Section> sections = Collections.emptyList();
 
 		boolean isGear()

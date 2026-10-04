@@ -68,7 +68,8 @@ public interface UltimateBankTabsConfig extends Config
 	}
 
 	@ConfigItem(keyName = "dynamicIcons", name = "Best item as tab icon", position = 6, section = contents,
-		description = "Use your best item for each tab's icon (your best weapon, axe, pickaxe...)")
+		description = "Use your best item for each tab's icon (your best weapon, food, bones, herb...). An icon you"
+			+ " pick with a tab's Change icon option is kept; switch this off and on to hand icons back to the plugin")
 	default boolean dynamicIcons()
 	{
 		return true;

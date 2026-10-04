@@ -33,7 +33,11 @@ Only items you own appear. That means your bank, including placeholders, potion 
 ## Notes
 
 - The tabs are normal Bank Tags tabs (the core **Bank Tags** plugin must be on). Their contents are worked out from your bank each time, so the plugin never writes tags onto your items, and your own tabs and tags are left alone. If one of your tabs already uses a name such as *melee*, the plugin's tab is called *melee bis* instead.
-- Delete one of the plugin's tabs in the bank and it stays off. Turn it back on in the settings.
+- The tab menu options work on the plugin's tabs too:
+  - **Rename** keeps the tab working under its new name.
+  - **Change icon** keeps your pick. Switch *Best item as tab icon* off and on to give icons back to the plugin.
+  - **Disable layout** keeps the tab in plain bank order until you choose *Enable layout*.
+  - **Delete** switches that tab off. Turn it back on in the settings.
 - You can drag items around in a tab. Your arrangement stays until the tab's contents change.
 - A brand-new tab shows up the next time you open the bank.
 

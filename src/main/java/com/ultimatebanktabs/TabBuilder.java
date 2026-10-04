@@ -168,7 +168,16 @@ class TabBuilder
 				.map(p -> p.groups).orElse(Collections.emptyList());
 			sections.add(new Section(def.key, def.title, def.layout, items, columns));
 		}
-		if (hero == -1)
+		if (!tab.iconEntries.isEmpty())
+		{
+			List<Integer> iconic = firstOwned(tab.iconEntries, ctx, 1);
+			hero = !iconic.isEmpty() ? iconic.get(0) : tab.iconStrict ? -1 : hero;
+		}
+		else if (hero == -1)
+		{
+			hero = sections.stream().flatMap(s -> s.items.stream()).map(Placement::getItemId).findFirst().orElse(-1);
+		}
+		if (hero == -1 && !tab.iconStrict && !tab.iconEntries.isEmpty())
 		{
 			hero = sections.stream().flatMap(s -> s.items.stream()).map(Placement::getItemId).findFirst().orElse(-1);
 		}

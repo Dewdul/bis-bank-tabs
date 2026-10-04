@@ -1368,3 +1368,51 @@ COSMETIC_SLOT_WORDS = {
     "gauntlets", "vambraces", "bracers", "cape", "cloak", "kiteshield", "sq shield", "shield", "amulet",
     "necklace", "scarf", "stole", "crozier", "staff", "sword", "wand", "outfit", "set",
 }
+
+
+# ---------------------------------------------------------------- tab icons
+# Each tab's icon is the first of these the player owns (most iconic first); the
+# combat tabs use their best weapon instead. Tabs not listed use their first item.
+RAW_FISH = ["Raw anglerfish", "Raw dark crab", "Raw manta ray", "Raw sea turtle", "Raw shark", "Raw monkfish",
+            "Raw swordfish", "Raw lobster", "Raw bass", "Raw tuna", "Raw salmon", "Raw trout", "Raw shrimps"]
+TAB_ICONS = {
+    "movement": ["Amulet of eternal glory", "Amulet of glory", "Ring of dueling", "Games necklace", "Royal seed pod",
+                 "Graceful boots", "Stamina potion", "Law rune"],
+    "prayer": ["Superior dragon bones", "Ourg bones", "Dagannoth bones", "Hydra bones", "Frost dragon bones",
+               "Raurg bones", "Lava dragon bones", "Fayrg bones", "Drake bones", "Dragon bones", "Wyvern bones",
+               "Babydragon bones", "Big bones", "Bones", "Infernal ashes", "Abyssal ashes", "Malicious ashes",
+               "Vile ashes", "Fiendish ashes", "Prayer cape"],
+    "slayer": IMBUED_SLAYER_HELMS + SLAYER_HELMS + ["Black mask (i)", "Black mask", "Eternal gem", "Enchanted gem"],
+    "agility": ["Graceful hood", "Agility cape", "Mark of grace", "Stamina potion"],
+    "thieving": ["Rogue mask", "Thieving cape", "Lockpick", "Dodgy necklace", "Gloves of silence"],
+    "herblore": [h for herb in reversed(HERBS) for h in (herb, "Grimy " + herb[0].lower() + herb[1:])]
+    + ["Pestle and mortar"],
+    "crafting": [g for gem in reversed(GEMS) for g in (gem, "Uncut " + gem.lower())]
+    + ["Black dragon leather", "Red dragon leather", "Blue dragon leather", "Green dragon leather", "Needle", "Chisel"],
+    "fletching": ["Magic longbow (u)", "Magic shortbow (u)", "Yew longbow (u)", "Yew shortbow (u)",
+                  "Maple longbow (u)", "Dragon arrowtips", "Amethyst arrowtips", "Rune arrowtips", "Magic logs",
+                  "Yew logs", "Fletching knife", "Knife"],
+    "hunter": ["Box trap", "Bird snare", "Magic butterfly net", "Butterfly net", "Hunter cape"],
+    "smithing": ["Runite bar", "Adamantite bar", "Mithril bar", "Steel bar", "Iron bar", "Bronze bar", "Runite ore",
+                 "Adamantite ore", "Mithril ore", "Coal", "Iron ore", "Imcando hammer", "Hammer"],
+    "fishing": ["Lobster pot"],
+    "cooking": [f for f, _ in FOOD] + RAW_FISH + ["Cooking gauntlets"],
+    "firemaking": ["Redwood logs", "Magic logs", "Yew logs", "Mahogany logs", "Maple logs", "Teak logs",
+                   "Willow logs", "Oak logs", "Logs", "Tinderbox"],
+    # always a seed: your best tree or herb seed, else any seed you have
+    "farming": ["Magic seed", "Yew seed", "Torstol seed", "Snapdragon seed", "Ranarr seed", "Maple seed",
+                "Dwarf weed seed", "Lantadyme seed", "Cadantine seed", "Kwuarm seed", "Avantoe seed", "Irit seed",
+                "Toadflax seed", "Willow seed", "Acorn", "re:^(?!.*\().* seed$"],
+    "runecraft": ["Rune essence"],
+    "construction": ["Mahogany plank", "Teak plank", "Oak plank", "Plank", "Saw", "Hammer"],
+    "sailing": ["Gwyna's fabric roll", "Gurtob's fabric roll", "Ralph's fabric roll"],
+    "cosmetics": ["Red partyhat", "Blue partyhat", "Purple partyhat", "Green partyhat", "Yellow partyhat",
+                  "White partyhat", "Santa hat", "Red halloween mask", "Blue halloween mask", "Green halloween mask"],
+}
+# what the icon falls back to when the player owns none of the above
+DEFAULT_ICONS = {"cooking": "Shark", "herblore": "Ranarr weed", "crafting": "Uncut diamond", "fletching": "Yew longbow (u)",
+                 "smithing": "Steel bar", "firemaking": "Logs", "prayer": "Dragon bones", "fishing": "Lobster pot",
+                 "construction": "Oak plank", "farming": "Ranarr seed", "runecraft": "Rune essence",
+                 "sailing": "Gwyna's fabric roll"}
+# tabs whose icon falls back to the first item shown rather than the default icon
+ICON_FALLBACK_TO_FIRST_ITEM = {"cosmetics"}

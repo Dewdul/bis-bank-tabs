@@ -35,6 +35,10 @@ class BankTagsWriter
 	private static final String TAG_TABS = "tagtabs";
 	private static final String ICON_PREFIX = "icon_";
 	private static final String NAME_PREFIX = "tagName_";
+	/** an icon the player picked with "Change icon": the plugin stops replacing it */
+	static final String CUSTOM_ICON_PREFIX = "customIcon_";
+	/** the player chose "Disable layout": the tab shows its items in bank order until they enable it again */
+	static final String LAYOUT_OFF_PREFIX = "layoutOff_";
 
 	private final ConfigManager configManager;
 	private final TagManager tagManager;
@@ -133,12 +137,15 @@ class BankTagsWriter
 					tagTabs.add(name);
 					added++;
 				}
-				String icon = String.valueOf(tab.icon);
+				String custom = configManager.getConfiguration(UltimateBankTabsConfig.GROUP, CUSTOM_ICON_PREFIX + key);
+				String icon = custom != null ? custom : String.valueOf(tab.icon);
 				if (!icon.equals(configManager.getConfiguration(BANKTAGS_GROUP, ICON_PREFIX + name)))
 				{
 					configManager.setConfiguration(BANKTAGS_GROUP, ICON_PREFIX + name, icon);
 				}
-				if (!Arrays.equals(written.get(name), tab.layout) || layoutManager.loadLayout(name) == null)
+				boolean layoutOff = Boolean.parseBoolean(
+					configManager.getConfiguration(UltimateBankTabsConfig.GROUP, LAYOUT_OFF_PREFIX + key));
+				if (!layoutOff && (!Arrays.equals(written.get(name), tab.layout) || layoutManager.loadLayout(name) == null))
 				{
 					layoutManager.saveLayout(new Layout(name, tab.layout));
 					written.put(name, tab.layout);
@@ -206,28 +213,75 @@ class BankTagsWriter
 	}
 
 	/**
-	 * The player deleted or renamed one of our tabs in the bank: stop managing it
-	 * and forget its name so it isn't recreated.
+	 * The player edited the tab list in the bank. A rename (one of our tags gone
+	 * and exactly one new tag added) moves the tab to its new name; a deletion
+	 * stops managing that tab and forgets its name so it isn't recreated.
 	 *
-	 * @return the tab keys that were dropped
+	 * @return the tab keys that were deleted (not renamed)
 	 */
-	List<String> onTagTabsEdited(String csv)
+	List<String> onTagTabsEdited(String oldCsv, String newCsv)
 	{
-		Set<String> present = new HashSet<>(Text.fromCSV(Objects.toString(csv, "")));
-		List<String> gone = new ArrayList<>();
-		for (Map.Entry<String, String> e : new ArrayList<>(names.entrySet()))
+		List<String> before = Text.fromCSV(Objects.toString(oldCsv, ""));
+		Set<String> present = new HashSet<>(Text.fromCSV(Objects.toString(newCsv, "")));
+		List<String> added = new ArrayList<>(present);
+		added.removeAll(before);
+		added.removeAll(names.values());
+		List<Map.Entry<String, String>> removed = new ArrayList<>();
+		for (Map.Entry<String, String> e : names.entrySet())
 		{
 			if (!present.contains(e.getValue()))
 			{
-				gone.add(e.getKey());
-				tagManager.unregisterTag(e.getValue());
-				members.remove(e.getValue());
-				written.remove(e.getValue());
-				names.remove(e.getKey());
-				configManager.unsetConfiguration(UltimateBankTabsConfig.GROUP, NAME_PREFIX + e.getKey());
+				removed.add(e);
 			}
 		}
+		if (removed.size() == 1 && added.size() == 1)
+		{
+			rename(removed.get(0).getKey(), removed.get(0).getValue(), added.get(0));
+			return new ArrayList<>();
+		}
+		List<String> gone = new ArrayList<>();
+		for (Map.Entry<String, String> e : removed)
+		{
+			gone.add(e.getKey());
+			tagManager.unregisterTag(e.getValue());
+			members.remove(e.getValue());
+			written.remove(e.getValue());
+			names.remove(e.getKey());
+			configManager.unsetConfiguration(UltimateBankTabsConfig.GROUP, NAME_PREFIX + e.getKey());
+		}
 		return gone;
+	}
+
+	/** Bank Tags already moved the icon and layout to the new name; follow it. */
+	private void rename(String key, String oldName, String newName)
+	{
+		names.put(key, newName);
+		configManager.setConfiguration(UltimateBankTabsConfig.GROUP, NAME_PREFIX + key, newName);
+		tagManager.unregisterTag(oldName);
+		Set<Integer> items = members.remove(oldName);
+		if (items != null)
+		{
+			members.put(newName, items);
+		}
+		int[] layout = written.remove(oldName);
+		if (layout != null)
+		{
+			written.put(newName, layout);
+		}
+		register(newName);
+		log.debug("tab {} renamed {} -> {}", key, oldName, newName);
+	}
+
+	/** The player re-enabled layout mode: lay the tab out again on the next publish. */
+	void forgetLayout(String name)
+	{
+		written.remove(name);
+	}
+
+	/** Whether the tab list currently holds this tag. */
+	boolean listed(String name)
+	{
+		return Text.fromCSV(Objects.toString(configManager.getConfiguration(BANKTAGS_GROUP, TAG_TABS), "")).contains(name);
 	}
 
 	private void drop(String key, List<String> tagTabs)

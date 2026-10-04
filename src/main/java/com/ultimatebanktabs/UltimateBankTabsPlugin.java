@@ -246,19 +246,67 @@ public class UltimateBankTabsPlugin extends Plugin
 		if (UltimateBankTabsConfig.GROUP.equals(event.getGroup()) && !event.getKey().startsWith("tagName_")
 			&& !OWNED_KEY.equals(event.getKey()))
 		{
+			if ("dynamicIcons".equals(event.getKey()))
+			{
+				// toggling automatic icons hands every tab's icon back to the plugin
+				data.tabs.forEach(t -> configManager.unsetConfiguration(UltimateBankTabsConfig.GROUP,
+					BankTagsWriter.CUSTOM_ICON_PREFIX + t.key));
+			}
 			dirty = true;
 		}
-		else if (BankTagsWriter.BANKTAGS_GROUP.equals(event.getGroup()) && "tagtabs".equals(event.getKey())
-			&& writer != null && !writer.isWriting())
+		else if (BankTagsWriter.BANKTAGS_GROUP.equals(event.getGroup()) && writer != null && !writer.isWriting())
 		{
-			clientThread.invokeLater(() -> tabsEdited(event.getNewValue()));
+			bankTagsEdited(event);
 		}
 	}
 
-	/** The player deleted one of our tabs from the bank: switch that tab off rather than recreating it. */
-	private void tabsEdited(String csv)
+	/** The player used a tab's own menu (Change icon, Disable/Enable layout, Rename, Delete) on one of ours. */
+	private void bankTagsEdited(ConfigChanged event)
 	{
-		List<String> gone = writer.onTagTabsEdited(csv);
+		String key = event.getKey();
+		if ("tagtabs".equals(key))
+		{
+			clientThread.invokeLater(() -> tabsEdited(event.getOldValue(), event.getNewValue()));
+			return;
+		}
+		String tag = key.startsWith("icon_") ? key.substring("icon_".length())
+			: key.startsWith("layout_") ? key.substring("layout_".length()) : null;
+		String tabKey = tag == null ? null : writer.keyOf(tag);
+		if (tabKey == null)
+		{
+			return;
+		}
+		if (key.startsWith("icon_") && event.getNewValue() != null)
+		{
+			// Change icon: keep the player's pick from now on
+			configManager.setConfiguration(UltimateBankTabsConfig.GROUP, BankTagsWriter.CUSTOM_ICON_PREFIX + tabKey,
+				event.getNewValue());
+		}
+		else if (key.startsWith("layout_") && event.getNewValue() == null)
+		{
+			// Disable layout - unless the tab is being renamed or deleted, which also drops its layout
+			clientThread.invokeLater(() ->
+			{
+				if (writer.listed(tag) && layoutManager.loadLayout(tag) == null)
+				{
+					configManager.setConfiguration(UltimateBankTabsConfig.GROUP,
+						BankTagsWriter.LAYOUT_OFF_PREFIX + tabKey, true);
+				}
+			});
+		}
+		else if (key.startsWith("layout_") && event.getOldValue() == null)
+		{
+			// Enable layout: lay the tab out again
+			configManager.unsetConfiguration(UltimateBankTabsConfig.GROUP, BankTagsWriter.LAYOUT_OFF_PREFIX + tabKey);
+			writer.forgetLayout(tag);
+			dirty = true;
+		}
+	}
+
+	/** The player renamed or deleted tabs; a deleted tab of ours is switched off rather than recreated. */
+	private void tabsEdited(String oldCsv, String newCsv)
+	{
+		List<String> gone = writer.onTagTabsEdited(oldCsv, newCsv);
 		for (String key : gone)
 		{
 			configManager.setConfiguration(UltimateBankTabsConfig.GROUP, UltimateBankTabsConfig.TAB_PREFIX + key, false);
