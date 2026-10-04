@@ -239,8 +239,9 @@ public class TabBuilderTest
 	{
 		TabBuilder.Built built = build("movement", own("Graceful hood", "Graceful cape", "Graceful top", "Graceful legs",
 			"Graceful gloves", "Graceful boots", "Graceful hood (Arceuus)", "Graceful top (Arceuus)", "Stamina potion",
-			"Ring of dueling", "Amulet of glory", "Varrock teleport (tablet)", "Law rune"));
+			"Ring of dueling", "Amulet of glory", "Varrock teleport (tablet)", "Law rune", "Boots of lightness"));
 		Set<Integer> run = items(section(built, "run"));
+		assertTrue("weight-reducing boots sit beside graceful", run.contains(id("Boots of lightness")));
 		assertTrue(run.containsAll(own("Graceful hood", "Graceful cape", "Graceful top", "Graceful legs",
 			"Graceful gloves", "Graceful boots", "Stamina potion")));
 		assertFalse(built.itemIds().contains(id("Graceful hood (Arceuus)")));

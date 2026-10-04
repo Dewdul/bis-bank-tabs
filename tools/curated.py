@@ -409,6 +409,16 @@ def graceful(key):
                 variants=[[dict(slot=s, entries=[n + c]) for s, n in GRACEFUL_PIECES] for c in GRACEFUL_SETS])
 
 
+# Weight-reducing gear beside the graceful outfit (worn weights from the wiki).
+def weight_reducing():
+    return [
+        first("light_boots", [("Boots of lightness", "Weight-reducing boots: -4.5 kg when worn")]),
+        first("light_gloves", [("Penance gloves", "Weight-reducing gloves: -4.5 kg when worn")]),
+        first("light_cape", [("Spottier cape", "Weight-reducing cape: -4.5 kg when worn"),
+                             ("Spotted cape", "Weight-reducing cape: -2.3 kg when worn")]),
+    ]
+
+
 ENERGY = ["Stamina potion", "Super energy", "Energy potion"]
 
 TELEPORT_TABLETS = [
@@ -422,6 +432,7 @@ TELEPORT_TABLETS = [
 MOVEMENT = tab("movement", "Movement", "Graceful boots", kind="movement", sections=[
     section("run", "Run energy", "rows", [
         graceful("graceful"),
+        *weight_reducing(),
         all_("graceful_cape_sub", []),  # Agility cape (unique_uses.py): counts as a graceful cape
         first("energy", ENERGY),
         first("endurance", ["Ring of endurance"]),
@@ -789,6 +800,7 @@ THIEVING = tab("thieving", "Thieving", "Lockpick", sections=[
 AGILITY = tab("agility", "Agility", "Graceful hood", sections=[
     section("gear", "Gear", "rows", [
         graceful("graceful"),
+        *weight_reducing(),
         cape("Agility cape"),
         first("energy", ENERGY),
         first("endurance", ["Ring of endurance"]),
