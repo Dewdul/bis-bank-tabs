@@ -116,6 +116,21 @@ public class LayoutPlannerTest
 	}
 
 	@Test
+	public void outfitsDoNotStraddleRows()
+	{
+		TabBuilder.Placement[] items = {
+			p(1, null, "a"), p(2, null, "a"), p(3, null, "a"), p(4, null, "a"), p(5, null, "a"),
+			p(6, null, "b"), p(7, null, "b"), p(8, null, "b"), p(9, null, "b"),
+			p(10, null, "c"),
+		};
+		int[] layout = plan(s("cosmetics", "sets", items));
+		assertEquals(5, at(layout, 0, 4));
+		assertEquals("set b moves to a fresh row", -1, at(layout, 0, 5));
+		assertEquals(6, at(layout, 1, 0));
+		assertEquals("a lone item packs in after", 10, at(layout, 1, 4));
+	}
+
+	@Test
 	public void emptyTab()
 	{
 		assertEquals(0, plan(new TabBuilder.Section("x", "x", "rows", Collections.emptyList())).length);

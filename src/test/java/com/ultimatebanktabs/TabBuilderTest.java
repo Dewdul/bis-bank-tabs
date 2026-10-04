@@ -306,6 +306,18 @@ public class TabBuilderTest
 	}
 
 	@Test
+	public void cosmeticsSkipWhatOtherTabsShow()
+	{
+		Set<Integer> owned = own("Graceful hood", "Graceful cape", "Graceful top", "Graceful legs", "Graceful gloves",
+			"Graceful boots", "Graceful hood (Arceuus)", "Graceful top (Arceuus)", "Chef's hat");
+		TabBuilder.Options options = new TabBuilder.Options();
+		options.shownElsewhere = build("movement", owned).itemIds();
+		TabBuilder.Built cosmetics = builder.build(tab("cosmetics"), owned, options);
+		assertTrue(cosmetics.itemIds().containsAll(own("Graceful hood (Arceuus)", "Graceful top (Arceuus)", "Chef's hat")));
+		assertFalse("the colour movement uses isn't repeated", cosmetics.itemIds().contains(id("Graceful hood")));
+	}
+
+	@Test
 	public void emptyBankBuildsEmptyTabs()
 	{
 		for (TabData.Tab t : data.tabs)
