@@ -1372,18 +1372,16 @@ COSMETIC_SLOT_WORDS = {
 
 # ---------------------------------------------------------------- tab icons
 # Each tab's icon is the first of these the player owns (most iconic first); the
-# combat tabs use their best weapon instead. Tabs not listed use their first item.
+# combat tabs use their best weapon instead. Tabs not listed (movement: your graceful) use their first item.
 RAW_FISH = ["Raw anglerfish", "Raw dark crab", "Raw manta ray", "Raw sea turtle", "Raw shark", "Raw monkfish",
             "Raw swordfish", "Raw lobster", "Raw bass", "Raw tuna", "Raw salmon", "Raw trout", "Raw shrimps"]
 TAB_ICONS = {
-    "movement": ["Amulet of eternal glory", "Amulet of glory", "Ring of dueling", "Games necklace", "Royal seed pod",
-                 "Graceful boots", "Stamina potion", "Law rune"],
     "prayer": ["Superior dragon bones", "Ourg bones", "Dagannoth bones", "Hydra bones", "Frost dragon bones",
                "Raurg bones", "Lava dragon bones", "Fayrg bones", "Drake bones", "Dragon bones", "Wyvern bones",
                "Babydragon bones", "Big bones", "Bones", "Infernal ashes", "Abyssal ashes", "Malicious ashes",
                "Vile ashes", "Fiendish ashes", "Prayer cape"],
     "slayer": IMBUED_SLAYER_HELMS + SLAYER_HELMS + ["Black mask (i)", "Black mask", "Eternal gem", "Enchanted gem"],
-    "agility": ["Graceful hood", "Agility cape", "Mark of grace", "Stamina potion"],
+    "agility": ["Mark of grace"],
     "thieving": ["Rogue mask", "Thieving cape", "Lockpick", "Dodgy necklace", "Gloves of silence"],
     "herblore": [h for herb in reversed(HERBS) for h in (herb, "Grimy " + herb[0].lower() + herb[1:])]
     + ["Pestle and mortar"],
@@ -1413,6 +1411,7 @@ TAB_ICONS = {
 DEFAULT_ICONS = {"cooking": "Shark", "herblore": "Ranarr weed", "crafting": "Uncut diamond", "fletching": "Yew longbow (u)",
                  "smithing": "Steel bar", "firemaking": "Logs", "prayer": "Dragon bones", "fishing": "Lobster pot",
                  "construction": "Oak plank", "farming": "Ranarr seed", "runecraft": "Rune essence",
-                 "sailing": "Gwyna's fabric roll"}
+                 "sailing": "Gwyna's fabric roll",
+                 "agility": "Mark of grace"}
 # tabs whose icon falls back to the first item shown rather than the default icon
 ICON_FALLBACK_TO_FIRST_ITEM = {"cosmetics"}
