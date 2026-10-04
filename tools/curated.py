@@ -801,9 +801,15 @@ TABS = [MELEE, RANGED, MAGIC, MOVEMENT, PRAYER, SLAYER, AGILITY, THIEVING, HERBL
 # mechanics...). Each group becomes a pick in the fitting section of its tab and
 # replaces a hand-written pick with the same key.
 
+# research groups that are consumables, not weapons, even though they have no slot
+UNIQUE_SUPPLIES = ("spec_restore", "armadyl_brew")
+
+
 def _unique_section(tab, group):
     key = tab["key"]
     if key in ("melee", "ranged", "magic"):
+        if group["group"] in UNIQUE_SUPPLIES:
+            return "supplies", "Supplies", "rows"
         if group.get("special"):
             return "specials", "Special attacks", "rows"
         if group.get("pieces"):
