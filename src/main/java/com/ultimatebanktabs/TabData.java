@@ -62,6 +62,8 @@ class TabData
 		String launcher;
 		String fallback;
 		boolean complete;
+		/** "first" picks: how many owned entries to show (0 = just the best); "food" follows the setting */
+		int take;
 		/** requirements must already be in the tab rather than merely owned */
 		boolean requiresPlaced;
 		/** hover text: one per entry (may be shorter than entries), else the label */

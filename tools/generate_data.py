@@ -170,7 +170,7 @@ class Resolver:
 
 def build_pick(res, pick):
     out = {"key": pick["key"], "mode": pick["mode"]}
-    for k in ("slot", "profile", "style", "launcher", "fallback", "complete", "unless"):
+    for k in ("slot", "profile", "style", "launcher", "fallback", "complete", "unless", "take"):
         if pick.get(k):
             out[k] = pick[k]
     if pick.get("why"):

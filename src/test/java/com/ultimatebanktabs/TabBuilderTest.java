@@ -140,8 +140,15 @@ public class TabBuilderTest
 			"Inquisitor's hauberk", "Inquisitor's plateskirt")));
 
 		Set<Integer> supplies = items(section(built, "supplies"));
-		assertTrue(supplies.containsAll(own("Super combat potion", "Saradomin brew", "Super restore", "Anglerfish")));
-		assertFalse("only the best food", supplies.contains(id("Shark")));
+		assertTrue(supplies.containsAll(own("Super combat potion", "Saradomin brew", "Super restore", "Anglerfish",
+			"Shark")));
+		assertEquals("Heals 20", built.reasons().get(id("Shark")));
+
+		TabBuilder.Options oneFood = new TabBuilder.Options();
+		oneFood.foodCount = 1;
+		Set<Integer> fewer = builder.build(tab("melee"), own(MAXED_MELEE), oneFood).itemIds();
+		assertTrue(fewer.contains(id("Anglerfish")));
+		assertFalse("food setting caps the count", fewer.contains(id("Shark")));
 	}
 
 	@Test

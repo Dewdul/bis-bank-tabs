@@ -29,6 +29,8 @@ class TabBuilder
 		int backups;
 		boolean skillSupplies = true;
 		boolean combatSupplies = true;
+		/** how many foods the combat tabs show */
+		int foodCount = 4;
 	}
 
 	@Value
@@ -187,10 +189,12 @@ class TabBuilder
 		{
 			case "first":
 			{
-				List<List<Integer>> got = ownedEntries(pick.entries, ctx, 1 + ctx.options.backups);
+				// a pick that shows several on purpose (top foods) doesn't call the extras backups
+				int take = "food".equals(pick.key) ? ctx.options.foodCount : pick.take;
+				List<List<Integer>> got = ownedEntries(pick.entries, ctx, take > 0 ? take : 1 + ctx.options.backups);
 				for (int i = 0; i < got.size(); i++)
 				{
-					boolean best = i == 0;
+					boolean best = i == 0 || take > 0;
 					chosen.addAll(got.get(i));
 					add(out, got.get(i), pick.slot, pick.key, ctx,
 						id -> best ? entryReason(pick, id, ctx) : backupOf(entryReason(pick, id, ctx)));

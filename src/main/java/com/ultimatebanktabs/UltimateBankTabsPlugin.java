@@ -410,6 +410,7 @@ public class UltimateBankTabsPlugin extends Plugin
 		options.backups = config.backups();
 		options.skillSupplies = config.skillSupplies();
 		options.combatSupplies = config.combatSupplies();
+		options.foodCount = config.foodCount();
 
 		Map<String, BankTagsWriter.Tab> tabs = new LinkedHashMap<>();
 		Map<String, String> titles = new HashMap<>();
