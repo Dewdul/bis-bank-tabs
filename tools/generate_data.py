@@ -32,7 +32,7 @@ OUT = ROOT / "src/main/resources/com/ultimatebanktabs/tabs.json"
 VARIATIONS_URL = "https://raw.githubusercontent.com/runelite/runelite/master/runelite-client/src/main/resources/item_variations.json"
 
 # Pages that are never real bank items (minigame/arena loadouts, betas, leagues echoes...)
-SKIP_PAGE = re.compile(r"Last Man Standing|\(beta\)|unobtainable|\(Deadman|\(deadman\)|\(nz\)|\(bh\)|^Echo |"
+SKIP_PAGE = re.compile(r"Last Man Standing|\(beta\)|unobtainable|\(Deadman|\(deadman\)|\(nz\)|\(bh\)|^Echo (?!boots|crystal)|"
                        r"interface item|animation item|\(The Gauntlet\)|Emir's Arena|\(Leagues|Clue scroll|"
                        r"\(discontinued\)|note$|"
                        r"^(?:Corrupted|Crystal) (?:body|helm|legs|bow|halberd|staff) \((?:basic|attuned|perfected)\)$")
@@ -202,7 +202,13 @@ def build_pick(res, pick):
         if pick.get("placed"):
             out["requiresPlaced"] = True
     if pick.get("pieces"):
-        out["pieces"] = [{"slot": p["slot"], "entries": res.entries(p["entries"])} for p in pick["pieces"]]
+        out["pieces"] = []
+        for p in pick["pieces"]:
+            resolved = res.entries_with_reasons(p["entries"])
+            piece = {"slot": p["slot"], "entries": [ids for ids, _ in resolved]}
+            if any(why for _, why in resolved):
+                piece["reasons"] = [why or "" for _, why in resolved]
+            out["pieces"].append(piece)
     if pick.get("variants"):
         out["variants"] = [[{"slot": p["slot"], "entries": res.entries(p["entries"])} for p in v]
                            for v in pick["variants"]]

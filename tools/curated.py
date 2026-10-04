@@ -799,6 +799,8 @@ def _unique_section(tab, group):
     if key in ("melee", "ranged", "magic"):
         if group.get("special"):
             return "specials", "Special attacks", "rows"
+        if group.get("pieces"):
+            return "situational", "Situational", "alts"
         if group["slot"] in (None, "WEAPON"):
             return "weapons", "Weapons", "rows"
         if group["slot"] == "AMMO" and key == "ranged":
@@ -809,20 +811,43 @@ def _unique_section(tab, group):
     return group.get("section", "gear"), "Gear", "rows"
 
 
+def _unique_pick(g):
+    if g.get("pieces"):
+        pick = set_(g["group"], [(pc["slot"], [tuple(i) for i in pc["items"]]) for pc in g["pieces"]], why=g["label"])
+    else:
+        maker = first if g["mode"] == "best" else all_
+        pick = maker(g["group"], [tuple(i) for i in g["items"]], slot=g["slot"], why=g["label"])
+    return pick
+
+
 def apply_unique(tabs, groups):
     by_key = {t["key"]: t for t in tabs}
     for g in groups:
         tab = by_key[g["tab"]]
-        sec_key, title, layout = _unique_section(tab, g)
-        maker = first if g["mode"] == "best" else all_
-        pick = maker(g["group"], [tuple(i) for i in g["items"]], slot=g["slot"], why=g["label"])
+        pick = _unique_pick(g)
+        replaced = False
         for s in tab["sections"]:
-            s["picks"] = [p for p in s["picks"] if p["key"] != g["group"]]
+            for i, old in enumerate(s["picks"]):
+                if old["key"] == g["group"] and not replaced:
+                    # keep the hand-written conditions (unless / requires) of the pick it replaces
+                    for k in ("unless", "requires", "placed", "take"):
+                        if k in old and k not in pick:
+                            pick[k] = old[k]
+                    s["picks"][i] = pick
+                    replaced = True
+        if replaced:
+            continue
+        sec_key, title, layout = _unique_section(tab, g)
         section_ = next((s for s in tab["sections"] if s["key"] == sec_key), None)
         if section_ is None:
             section_ = section(sec_key, title, layout, [])
             tab["sections"].append(section_)
         section_["picks"].append(pick)
+    # the catch-all special attack list goes after the researched specials so their reasons win
+    for tab in tabs:
+        for s in tab["sections"]:
+            generic = [p for p in s["picks"] if p["key"] == "specs"]
+            s["picks"] = [p for p in s["picks"] if p["key"] != "specs"] + generic
 
 
 try:

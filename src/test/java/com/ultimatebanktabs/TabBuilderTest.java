@@ -313,7 +313,9 @@ public class TabBuilderTest
 		TabBuilder.Options options = new TabBuilder.Options();
 		options.shownElsewhere = build("movement", owned).itemIds();
 		TabBuilder.Built cosmetics = builder.build(tab("cosmetics"), owned, options);
-		assertTrue(cosmetics.itemIds().containsAll(own("Graceful hood (Arceuus)", "Graceful top (Arceuus)", "Chef's hat")));
+		assertTrue(cosmetics.itemIds().containsAll(own("Graceful hood (Arceuus)", "Graceful top (Arceuus)")));
+		assertFalse("the chef's hat opens the Cooking Guild, so it lives in the cooking tab",
+			cosmetics.itemIds().contains(id("Chef's hat")));
 		assertFalse("the colour movement uses isn't repeated", cosmetics.itemIds().contains(id("Graceful hood")));
 	}
 

@@ -252,11 +252,12 @@ class TabBuilder
 				{
 					break;
 				}
-				String reason = pick.label != null ? pick.label : ctx.sectionTitle;
+				String fallback = pick.label != null ? pick.label : ctx.sectionTitle;
 				for (int i = 0; i < pieces.size(); i++)
 				{
+					TabData.Piece piece = pick.pieces.get(i);
 					chosen.addAll(pieces.get(i));
-					add(out, pieces.get(i), pick.pieces.get(i).slot, pick.key, ctx, id -> reason);
+					add(out, pieces.get(i), piece.slot, pick.key, ctx, id -> pieceReason(piece, id, fallback));
 				}
 				break;
 			}
@@ -297,6 +298,18 @@ class TabBuilder
 			}
 		}
 		return pick.label != null ? pick.label : ctx.sectionTitle;
+	}
+
+	private static String pieceReason(TabData.Piece piece, int id, String fallback)
+	{
+		for (int i = 0; i < piece.entries.size() && i < piece.reasons.size(); i++)
+		{
+			if (piece.entries.get(i).contains(id) && !piece.reasons.get(i).isEmpty())
+			{
+				return piece.reasons.get(i);
+			}
+		}
+		return fallback;
 	}
 
 	private static String ranked(List<Integer> chosen, int id, String reason)

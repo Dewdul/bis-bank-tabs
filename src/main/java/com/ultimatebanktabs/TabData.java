@@ -88,6 +88,7 @@ class TabData
 	{
 		String slot;
 		List<List<Integer>> entries = Collections.emptyList();
+		List<String> reasons = Collections.emptyList();
 	}
 
 	static TabData load(Gson gson)
