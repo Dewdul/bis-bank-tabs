@@ -231,7 +231,8 @@ public class UltimateBankTabsPlugin extends Plugin
 	@Subscribe
 	public void onConfigChanged(ConfigChanged event)
 	{
-		if (UltimateBankTabsConfig.GROUP.equals(event.getGroup()) && !event.getKey().startsWith("tagName_"))
+		if (UltimateBankTabsConfig.GROUP.equals(event.getGroup()) && !event.getKey().startsWith("tagName_")
+			&& !OWNED_KEY.equals(event.getKey()))
 		{
 			dirty = true;
 		}
