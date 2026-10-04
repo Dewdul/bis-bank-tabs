@@ -26,8 +26,9 @@ import java.util.TreeMap;
  * alternatives column so its pieces line up with the slots they replace.
  * Everything else follows in row sections, each starting on a fresh row. A
  * "sets" section (cosmetics) also keeps each outfit on one row when it fits,
- * and "columns" sections (herblore) give each herb the same column in every
- * row: grimy, clean, unfinished, secondary and potion line up vertically.
+ * and runs of "columns" sections (herblore) go in bands of eight herbs: a row
+ * each of grimy herbs, clean herbs, secondaries, unfinished potions and
+ * potions, with every herb in the same column down its band.
  */
 class LayoutPlanner
 {
@@ -120,8 +121,9 @@ class LayoutPlanner
 		}
 		List<String> columns = activeColumns(rowSections);
 		boolean first = !block;
-		for (TabBuilder.Section s : rowSections)
+		for (int i = 0; i < rowSections.size(); i++)
 		{
+			TabBuilder.Section s = rowSections.get(i);
 			if (gapRows && !first)
 			{
 				row++;
@@ -129,7 +131,13 @@ class LayoutPlanner
 			first = false;
 			if ("columns".equals(s.getLayout()))
 			{
-				row = placeColumns(s.getItems(), columns, row);
+				int end = i;
+				while (end + 1 < rowSections.size() && "columns".equals(rowSections.get(end + 1).getLayout()))
+				{
+					end++;
+				}
+				row = placeBands(rowSections.subList(i, end + 1), columns, row, gapRows);
+				i = end;
 				continue;
 			}
 			boolean sets = "sets".equals(s.getLayout());
@@ -193,20 +201,47 @@ class LayoutPlanner
 		return active;
 	}
 
-	/** Place a columns section at its items' column positions; returns the next free row. */
-	private int placeColumns(List<TabBuilder.Placement> items, List<String> columns, int row)
+	/**
+	 * Lay a run of columns sections out in bands of {@link #WIDTH} columns: for the
+	 * first eight herbs a row per section (grimy, clean, secondary...), then the
+	 * same rows for the next eight. Rows with nothing in a band are skipped.
+	 * Returns the next free row.
+	 */
+	private int placeBands(List<TabBuilder.Section> sections, List<String> columns, int row, boolean gapRows)
 	{
-		int rows = (columns.size() + WIDTH - 1) / WIDTH;
+		int bands = (columns.size() + WIDTH - 1) / WIDTH;
 		List<TabBuilder.Placement> extra = new ArrayList<>();
-		for (TabBuilder.Placement p : items)
+		for (int band = 0; band < bands; band++)
 		{
-			int idx = columns.indexOf(p.getGroup());
-			if (idx < 0 || !put(row + idx / WIDTH, idx % WIDTH, p.getItemId()))
+			if (band > 0 && gapRows)
 			{
-				extra.add(p);
+				row++;
+			}
+			for (TabBuilder.Section s : sections)
+			{
+				boolean used = false;
+				for (TabBuilder.Placement p : s.getItems())
+				{
+					int idx = columns.indexOf(p.getGroup());
+					if (idx / WIDTH != band)
+					{
+						continue;
+					}
+					if (put(row, idx % WIDTH, p.getItemId()))
+					{
+						used = true;
+					}
+					else
+					{
+						extra.add(p);
+					}
+				}
+				if (used)
+				{
+					row++;
+				}
 			}
 		}
-		row += Math.max(rows, 1);
 		int col = 0;
 		for (TabBuilder.Placement p : extra)
 		{

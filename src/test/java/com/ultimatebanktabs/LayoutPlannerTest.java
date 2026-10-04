@@ -145,6 +145,29 @@ public class LayoutPlannerTest
 	}
 
 	@Test
+	public void columnsGoInBandsOfEight()
+	{
+		List<String> herbs = Arrays.asList("h0", "h1", "h2", "h3", "h4", "h5", "h6", "h7", "h8", "h9");
+		TabBuilder.Placement[] clean = new TabBuilder.Placement[10];
+		TabBuilder.Placement[] secondary = new TabBuilder.Placement[10];
+		for (int i = 0; i < 10; i++)
+		{
+			clean[i] = p(100 + i, null, "h" + i);
+			secondary[i] = p(200 + i, null, "h" + i);
+		}
+		int[] layout = plan(
+			new TabBuilder.Section("clean", "Clean", "columns", Arrays.asList(clean), herbs),
+			new TabBuilder.Section("sec", "Secondaries", "columns", Arrays.asList(secondary), herbs),
+			s("after", "rows", p(999, null, "x")));
+		assertEquals("herbs 1-8", 107, at(layout, 0, 7));
+		assertEquals("their secondaries right below", 207, at(layout, 1, 7));
+		assertEquals("next band of herbs", 108, at(layout, 2, 0));
+		assertEquals(209, at(layout, 3, 1));
+		assertEquals(-1, at(layout, 3, 2));
+		assertEquals(999, at(layout, 4, 0));
+	}
+
+	@Test
 	public void emptyTab()
 	{
 		assertEquals(0, plan(new TabBuilder.Section("x", "x", "rows", Collections.emptyList())).length);

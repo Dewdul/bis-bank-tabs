@@ -331,10 +331,11 @@ public class TabBuilderTest
 		assertEquals(id("Guam leaf"), layout[w]);
 		assertEquals(id("Ranarr weed"), layout[w + 1]);
 		assertEquals(id("Irit leaf"), layout[w + 2]);
-		assertEquals(id("Ranarr potion (unf)"), layout[2 * w + 1]);
-		assertEquals("eye of newt under guam", id("Eye of newt"), layout[3 * w]);
-		assertEquals(id("Snape grass"), layout[3 * w + 1]);
-		assertEquals("and under irit", id("Eye of newt"), layout[3 * w + 2]);
+		// band rows: grimy, clean, secondary, unfinished, potion
+		assertEquals("eye of newt right under guam", id("Eye of newt"), layout[2 * w]);
+		assertEquals(id("Snape grass"), layout[2 * w + 1]);
+		assertEquals("and under irit", id("Eye of newt"), layout[2 * w + 2]);
+		assertEquals(id("Ranarr potion (unf)"), layout[3 * w + 1]);
 		assertEquals(id("Prayer potion"), layout[4 * w + 1]);
 		assertTrue(herb.reasons().get(id("Eye of newt")).contains("super attack"));
 	}
