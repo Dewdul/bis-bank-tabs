@@ -83,8 +83,11 @@ FOOD = [("Marlin", "Heals 24"), ("Cooked moonlight antelope", "Heals 14, then 12
         ("Haddock", "Heals 18"), ("Monkfish", "Heals 16"), ("Swordfish", "Heals 14"), ("Bass", "Heals 13"),
         ("Lobster", "Heals 12"), ("Tuna", "Heals 10"), ("Salmon", "Heals 9"), ("Trout", "Heals 7")]
 
-ANTIPOISON = ["Extended anti-venom+", "Anti-venom+", "Anti-venom", "Antidote++", "Antidote+",
-              "Superantipoison", "Antipoison"]
+ANTIPOISON = [("Extended anti-venom+", "Strongest, longest-lasting venom and poison protection"),
+              ("Anti-venom+", "Cures venom and poison, then protects against both"),
+              ("Anti-venom", "Cures venom and poison, then protects against venom"),
+              ("Antidote++", "Cures poison, long poison immunity"), ("Antidote+", "Cures poison, poison immunity"),
+              ("Superantipoison", "Cures poison, short poison immunity"), ("Antipoison", "Cures poison")]
 ANTIFIRE = ["Extended super antifire", "Super antifire potion", "Extended antifire", "Antifire potion"]
 RESTORE = [("Super restore", "Restores prayer and stats drained by attacks"), ("Prayer potion", "Restores prayer"),
            ("Prayer regeneration potion", "Restores prayer gradually over time")]
@@ -101,7 +104,7 @@ def combat_supplies(boosts):
         # how many foods comes from the "Food items" setting
         first("food", FOOD, take=4),
         first("karambwan", [("Cooked karambwan", "Combo food: eat in the same tick as other food (heals 18)")]),
-        first("antipoison", ANTIPOISON),
+        all_("antipoison", ANTIPOISON),
         first("antifire", ANTIFIRE),
     ])
 
