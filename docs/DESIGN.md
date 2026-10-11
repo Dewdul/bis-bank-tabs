@@ -48,12 +48,19 @@ Started 2026-10-04. The request was an "ultimate bank plugin" that does three th
   - **Shields.** When the task needs a shield, two-handed weapons are left out, unless they are all the player has. A shield is needed when the task requires it, or when it is dragonfire protection and the player has no super antifire. With a two-handed weapon, a shield that isn't needed goes beside the block.
   - **Helmet and salve.** The slayer helmet goes in its slot, or keeps the cell when the best-in-slot pick already put it there. On undead, the salve goes on only if it beats the helmet, because their bonuses don't stack: the (ei), or the (e) on melee. The helmet then gives way to the best helmet for stats.
   - **Weapon and ammo.** The bane comes from the style tab's pick, so a stab, slash or crush row can't hide it. Its category order holds, and on Krystilia tasks every task counts as Wilderness. A launcher swapped in takes ammo that fits it.
+  - **Prayer gear.** The style's prayer set is drawn as its own equipment screen beside the setup, the same as on the combat tabs.
   - **Task slot gear.** A needed piece takes the slot. A suggested one keeps a slot that already holds one of its choices (with the task's reason), or fills an empty slot when it isn't another style's gear. Otherwise it goes beside.
   - **Below the block:**
     - the task's tools, required first;
     - its potions, then that style's supplies, food and combat runes;
     - the general Slayer sections, without repeating anything the block shows.
   - **Layout.** A block that comes and goes with the task leaves the player's arrangement where it was (`LayoutMerger`).
+
+## Food
+
+- **Live heals.** The `food` pick ranks the player's foods by the HP one eat heals them now. That number comes from RuneLite's `ItemStatChangesService` (`@PluginDependency(ItemStatPlugin.class)`), which holds the data behind the Item Stats tooltips. It counts plain food (`FoodBase`) and food combos with no stat drain, so a jug of wine, brews and random foods are out. Anglerfish follow the player's Hitpoints level, and a food missing from `tabs.json` still counts.
+- **Wiki fallback.** The wiki list (`curated.FOOD`) gives each food's page versions, its hover note, any heal that follows a few seconds later, and the HP per inventory slot used to break ties. Its own heal numbers rank the foods only when RuneLite has none (in tests, or a food RuneLite doesn't know).
+- **How many.** Six by default (the "Food items" setting, 1-8). RuneLite saves defaults, so a stored 4 is moved to 6 once (`sixFoods`).
 
 ## Ownership
 

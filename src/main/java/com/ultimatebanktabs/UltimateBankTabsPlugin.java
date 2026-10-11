@@ -58,11 +58,19 @@ import net.runelite.client.plugins.banktags.BankTagsService;
 import net.runelite.client.plugins.banktags.TagManager;
 import net.runelite.client.plugins.banktags.tabs.LayoutManager;
 import net.runelite.client.plugins.banktags.tabs.TabManager;
+import net.runelite.client.plugins.itemstats.Combo;
+import net.runelite.client.plugins.itemstats.Effect;
+import net.runelite.client.plugins.itemstats.FoodBase;
+import net.runelite.client.plugins.itemstats.ItemStatChangesService;
+import net.runelite.client.plugins.itemstats.ItemStatPlugin;
+import net.runelite.client.plugins.itemstats.StatChange;
+import net.runelite.client.plugins.itemstats.stats.Stats;
 import net.runelite.client.ui.overlay.OverlayManager;
 import net.runelite.client.util.Text;
 
 @Slf4j
 @PluginDependency(BankTagsPlugin.class)
+@PluginDependency(ItemStatPlugin.class)
 @PluginDescriptor(
 	name = "No Brain Bank Tabs",
 	description = "Automatic bank tag tabs with your best-in-slot gear for each combat style, movement and every skill,"
@@ -79,8 +87,10 @@ public class UltimateBankTabsPlugin extends Plugin
 	private static final String RESTORE_KEY = "restoreTabs";
 	/** the player agreed with the bank open: the takeover waits for the next bank open */
 	private static final String REPLACE_PENDING_KEY = "replacePending";
+	/** the food count default went from 4 to 6 */
+	private static final String SIX_FOODS_KEY = "sixFoods";
 	private static final Set<String> INTERNAL_KEYS = new HashSet<>(Arrays.asList(OWNED_KEY, ACCEPTED_KEY, REPLACED_KEY,
-		REPLACE_PENDING_KEY));
+		REPLACE_PENDING_KEY, SIX_FOODS_KEY));
 	private static final Type SAVED_TABS = new TypeToken<List<BankTagsWriter.SavedTab>>()
 	{
 	}.getType();
@@ -134,6 +144,12 @@ public class UltimateBankTabsPlugin extends Plugin
 	@Inject
 	private TabManager tabManager;
 
+	@Inject
+	private ItemStatChangesService itemStatChanges;
+
+	/** item id -> HP one eat heals the player, for this rebuild */
+	private final Map<Integer, Integer> healCache = new HashMap<>();
+
 	private TabData data;
 	private TabBuilder builder;
 	private BankTagsWriter writer;
@@ -166,7 +182,16 @@ public class UltimateBankTabsPlugin extends Plugin
 	protected void startUp()
 	{
 		data = TabData.load(gson);
-		builder = new TabBuilder(data, id -> EquipStats.of(itemManager.getItemStats(id)));
+		// six foods became the default: a stored four is the old default (RuneLite saves defaults), not a choice
+		if (configManager.getConfiguration(UltimateBankTabsConfig.GROUP, SIX_FOODS_KEY) == null)
+		{
+			if (config.foodCount() == 4)
+			{
+				configManager.setConfiguration(UltimateBankTabsConfig.GROUP, "foodCount", 6);
+			}
+			configManager.setConfiguration(UltimateBankTabsConfig.GROUP, SIX_FOODS_KEY, true);
+		}
+		builder = new TabBuilder(data, id -> EquipStats.of(itemManager.getItemStats(id)), this::heals);
 		writer = new BankTagsWriter(configManager, tagManager, layoutManager, bankTagsService, itemManager::canonicalize);
 		writer.restore(data.tabs.stream().map(t -> t.key).collect(Collectors.toList()));
 		// what Bank Tags holds now (the bank may be open); BANKMAIN_INIT refreshes it on every bank open
@@ -811,9 +836,43 @@ public class UltimateBankTabsPlugin extends Plugin
 	}
 
 	/** @param announce tell the player when new tabs need the bank reopened */
+	/**
+	 * HP one eat of the item heals the player now, from RuneLite's item stats (the Item Stats tooltips):
+	 * anglerfish follows their Hitpoints, and new foods count as soon as RuneLite knows them. 0 for what
+	 * isn't plain food. Client thread.
+	 */
+	private int heals(int itemId)
+	{
+		return healCache.computeIfAbsent(itemId, id ->
+		{
+			Effect effect = itemStatChanges.getItemStatChanges(id);
+			if (!(effect instanceof FoodBase) && !(effect instanceof Combo))
+			{
+				// potions, brews and the random or special ones
+				return 0;
+			}
+			int hp = 0;
+			for (StatChange change : effect.calculate(client).getStatChanges())
+			{
+				if (change.getStat() == Stats.HITPOINTS)
+				{
+					hp = change.getTheoretical();
+				}
+				else if (change.getTheoretical() < 0)
+				{
+					// drains a stat on the way (jug of wine): not a food to bring
+					return 0;
+				}
+			}
+			return Math.max(hp, 0);
+		});
+	}
+
 	private void rebuild(boolean announce)
 	{
 		dirty = false;
+		// Hitpoints may have levelled since: anglerfish heal more
+		healCache.clear();
 		if (!accepted || client.getGameState() != GameState.LOGGED_IN || stored.isEmpty() && potions.isEmpty())
 		{
 			// nothing known about this account yet: keep whatever tabs exist

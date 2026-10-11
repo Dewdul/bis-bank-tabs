@@ -12,7 +12,9 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.function.IntFunction;
+import java.util.function.IntUnaryOperator;
 import java.util.function.ToDoubleFunction;
 import java.util.stream.Collectors;
 import lombok.Value;
@@ -34,7 +36,7 @@ class TabBuilder
 		boolean combatSupplies = true;
 		boolean blightedSupplies = true;
 		/** how many foods the combat tabs show */
-		int foodCount = 4;
+		int foodCount = 6;
 		/** items other tabs already show; the cosmetics tab leaves them out */
 		Set<Integer> shownElsewhere = Collections.emptySet();
 		/** the player's current slayer task: the Slayer tab leads with its setup */
@@ -143,11 +145,19 @@ class TabBuilder
 	private final Set<Integer> situationalOnly;
 	private final Set<Integer> excludeMeleeWeapon;
 	private final Map<Integer, String> launcherAmmo = new HashMap<>();
+	/** HP one eat of an item heals the player now (0 for what isn't food), or -1 without live numbers */
+	private final IntUnaryOperator heals;
 
 	TabBuilder(TabData data, IntFunction<EquipStats> stats)
 	{
+		this(data, stats, id -> -1);
+	}
+
+	TabBuilder(TabData data, IntFunction<EquipStats> stats, IntUnaryOperator heals)
+	{
 		this.data = data;
 		this.stats = stats;
+		this.heals = heals;
 		this.excludeAuto = new HashSet<>(data.excludeAuto);
 		this.situationalOnly = new HashSet<>(data.situationalOnly);
 		this.excludeMeleeWeapon = new HashSet<>(data.excludeMeleeWeapon);
@@ -460,6 +470,8 @@ class TabBuilder
 		{
 			alts.add(new Placement(p.getItemId(), p.getSlot(), "task_" + p.getSlot(), p.getReason()));
 		}
+		// the style's prayer gear, drawn as its own equipment screen beside the setup as on the combat tabs
+		alts.addAll(byGroup.getOrDefault("prayer_gear", Collections.emptyList()));
 		out.add(new Section("ontask_main", "Task setup", "equipment", claim(block, ctx)));
 		out.add(new Section("ontask_alts", "Task alternatives", "alts", claim(alts, ctx)));
 		List<Placement> tools = new ArrayList<>();
@@ -811,14 +823,16 @@ class TabBuilder
 			case "first":
 			{
 				// a pick that shows several on purpose (top foods) doesn't call the extras backups
-				int take = "food".equals(pick.key) ? ctx.options.foodCount : pick.take;
-				List<List<Integer>> got = ownedEntries(pick.entries, ctx, take > 0 ? take : 1 + ctx.options.backups);
+				boolean food = "food".equals(pick.key);
+				int take = food ? ctx.options.foodCount : pick.take;
+				List<List<Integer>> got = food ? foods(pick, ctx, take)
+					: ownedEntries(pick.entries, ctx, take > 0 ? take : 1 + ctx.options.backups);
 				for (int i = 0; i < got.size(); i++)
 				{
 					boolean best = i == 0 || take > 0;
 					chosen.addAll(got.get(i));
-					add(out, got.get(i), pick.slot, pick.key, ctx,
-						id -> best ? entryReason(pick, id, ctx) : backupOf(entryReason(pick, id, ctx)));
+					add(out, got.get(i), pick.slot, pick.key, ctx, id -> food ? foodReason(pick, id, ctx)
+						: best ? entryReason(pick, id, ctx) : backupOf(entryReason(pick, id, ctx)));
 				}
 				if (chosen.isEmpty() && pick.fallback != null)
 				{
@@ -940,6 +954,64 @@ class TabBuilder
 			}
 		}
 		return pick.label != null ? pick.label : ctx.sectionTitle;
+	}
+
+	/**
+	 * The player's best foods, each with its owned versions: by what one eat heals them now (RuneLite's
+	 * item stats, so anglerfish follows their Hitpoints and a food no list names still counts) plus any heal
+	 * that follows a few seconds later, then by HP per inventory slot, then the list's order. Without live
+	 * numbers the wiki's decide.
+	 */
+	private List<List<Integer>> foods(TabData.Pick pick, Context ctx, int take)
+	{
+		List<List<Integer>> foods = new ArrayList<>();
+		List<double[]> keys = new ArrayList<>();
+		Set<Integer> listed = new HashSet<>();
+		for (int i = 0; i < pick.entries.size(); i++)
+		{
+			listed.addAll(pick.entries.get(i));
+			List<Integer> got = ownedOf(pick.entries.get(i), ctx);
+			if (got.isEmpty())
+			{
+				continue;
+			}
+			// the wiki's [HP per eat, HP a few seconds later, HP per inventory slot]
+			List<Double> wiki = i < pick.heals.size() ? pick.heals.get(i) : Collections.emptyList();
+			int live = got.stream().mapToInt(heals::applyAsInt).max().orElse(0);
+			double eat = (live > 0 ? live : at(wiki, 0)) + at(wiki, 1);
+			foods.add(got);
+			keys.add(new double[]{eat, Math.max(eat, at(wiki, 2)), i});
+		}
+		for (int id : new TreeSet<>(ctx.owned))
+		{
+			int live = listed.contains(id) ? 0 : heals.applyAsInt(id);
+			if (live > 0)
+			{
+				foods.add(Collections.singletonList(id));
+				keys.add(new double[]{live, live, pick.entries.size() + id});
+			}
+		}
+		List<Integer> order = new ArrayList<>();
+		for (int i = 0; i < foods.size(); i++)
+		{
+			order.add(i);
+		}
+		order.sort(Comparator.<Integer>comparingDouble(i -> -keys.get(i)[0])
+			.thenComparingDouble(i -> -keys.get(i)[1]).thenComparingDouble(i -> keys.get(i)[2]));
+		return order.stream().limit(take).map(foods::get).collect(Collectors.toList());
+	}
+
+	private static double at(List<Double> values, int i)
+	{
+		return i < values.size() && values.get(i) != null ? values.get(i) : 0;
+	}
+
+	/** A listed food's own note; one the list doesn't know says what it heals. */
+	private String foodReason(TabData.Pick pick, int id, Context ctx)
+	{
+		int live = heals.applyAsInt(id);
+		boolean listed = pick.entries.stream().anyMatch(e -> e.contains(id));
+		return listed || live <= 0 ? entryReason(pick, id, ctx) : "Heals " + live;
 	}
 
 	private static String pieceReason(TabData.Piece piece, int id, String fallback)

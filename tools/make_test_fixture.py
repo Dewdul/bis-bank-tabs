@@ -70,6 +70,8 @@ ITEMS = [
     "Black slayer helmet (i)", "Facemask", "Trident of the swamp", "Dragon hunter crossbow", "Rune arrow",
     "Anti-dragon shield", "Broad arrows", "Dragon dagger", "Salve amulet", "Sunspear", "Mith grapple",
     "Dragonfire ward", "Super antifire potion", "Leaf-bladed sword",
+    # foods ranked by what they heal
+    "Potato with cheese", "Lobster",
 ]
 STAT_FIELDS = ["stab_attack_bonus", "slash_attack_bonus", "crush_attack_bonus", "range_attack_bonus",
                "magic_attack_bonus", "strength_bonus", "ranged_strength_bonus", "magic_damage_bonus", "prayer_bonus"]

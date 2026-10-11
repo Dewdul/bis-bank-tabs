@@ -46,11 +46,11 @@ public interface UltimateBankTabsConfig extends Config
 	}
 
 	@ConfigItem(keyName = "foodCount", name = "Food items", position = 3, section = contents,
-		description = "How many of your best foods the melee, ranged and magic tabs show")
-	@Range(min = 1, max = 6)
+		description = "How many of your best foods the melee, ranged and magic tabs and the slayer task show")
+	@Range(min = 1, max = 8)
 	default int foodCount()
 	{
-		return 4;
+		return 6;
 	}
 
 	@ConfigItem(keyName = "skillSupplies", name = "Supplies in skill tabs", position = 6, section = contents,

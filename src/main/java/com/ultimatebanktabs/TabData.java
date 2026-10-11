@@ -130,6 +130,8 @@ class TabData
 		List<List<Integer>> entries = Collections.emptyList();
 		List<Piece> pieces = Collections.emptyList();
 		List<List<Piece>> variants = Collections.emptyList();
+		/** "food": per entry the wiki's [HP per eat, HP a few seconds later, HP per inventory slot] */
+		List<List<Double>> heals = Collections.emptyList();
 	}
 
 	static class Piece

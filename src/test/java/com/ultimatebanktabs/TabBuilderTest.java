@@ -686,6 +686,33 @@ public class TabBuilderTest
 	}
 
 	@Test
+	public void foodsRankByWhatTheyHealNow()
+	{
+		Map<Integer, Integer> live = new HashMap<>();
+		live.put(id("Shark"), 20);
+		live.put(id("Lobster"), 12);
+		live.put(id("Potato with cheese"), 16);
+		TabBuilder withHeals = new TabBuilder(data, STATS::get, i -> live.getOrDefault(i, 0));
+		TabBuilder.Built melee = withHeals.build(tab("melee"),
+			own("Abyssal whip", "Lobster", "Potato with cheese", "Shark"), new TabBuilder.Options());
+		assertEquals(Arrays.asList(id("Shark"), id("Potato with cheese"), id("Lobster")),
+			section(melee, "supplies_food").getItems().stream().map(TabBuilder.Placement::getItemId)
+				.collect(Collectors.toList()));
+		assertTrue(melee.reasons().get(id("Potato with cheese")).contains("16"));
+	}
+
+	@Test
+	public void theTaskSetupHasItsPrayerGear()
+	{
+		TabBuilder.Built built = slayerOnTask("basilisks", "Abyssal whip", "Mirror shield", "Ardougne cloak 4",
+			"Holy blessing");
+		assertTrue(items(section(built, "ontask_alts")).contains(id("Ardougne cloak 4")));
+		int[] layout = LayoutPlanner.plan(built, false);
+		int cloak = Arrays.stream(layout).boxed().collect(Collectors.toList()).indexOf(id("Ardougne cloak 4"));
+		assertEquals("the cloak sits in the cape row of its own equipment screen", 1, cloak / LayoutPlanner.WIDTH);
+	}
+
+	@Test
 	public void blightedSuppliesSitApartBelowTheSupplies()
 	{
 		Set<Integer> owned = own("Tumeken's shadow", "Super restore", "Shark", "Blighted super restore",

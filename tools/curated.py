@@ -121,7 +121,7 @@ def combat_supplies(boosts, restores=(), brews=()):
         ]),
         section("supplies_food", "Food", "rows", [
             # how many foods comes from the "Food items" setting
-            first("food", FOOD, take=4),
+            first("food", FOOD, take=6),
             first("karambwan", [("Cooked karambwan", "Combo food: eat in the same tick as other food (heals 18)")]),
         ]),
     ]
