@@ -58,6 +58,8 @@ ITEMS = [
     "Penance gloves", "Spottier cape", "Agility cape", "Graceful cape (Arceuus)", "Ring of endurance",
     "Spirit angler headband", "Spirit angler top", "Angler hat", "Angler top", "Angler waders", "Angler boots",
     "Rogue mask", "Rogue gloves", "Gloves of silence", "Thieving cape", "Max cape",
+    # mining rewards
+    "Golden nugget", "Stardust",
 ]
 STAT_FIELDS = ["stab_attack_bonus", "slash_attack_bonus", "crush_attack_bonus", "range_attack_bonus",
                "magic_attack_bonus", "strength_bonus", "ranged_strength_bonus", "magic_damage_bonus", "prayer_bonus"]

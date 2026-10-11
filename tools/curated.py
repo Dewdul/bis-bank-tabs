@@ -913,6 +913,24 @@ MINING = tab("mining", "Mining", "Rune pickaxe", sections=[
         first("coal_bag", ["Coal bag"]),
         first("hammer", ["Imcando hammer", "Hammer"], why="Motherlode Mine: repairs the broken water wheel struts"),
     ]),
+    # each activity's currency, then what it buys or drops (wiki): Motherlode Mine, Mining Guild, Shooting Stars
+    # (the three shops share the gem and clay packs), Camdozaal, Volcanic Mine
+    section("currency", "Rewards", "rows", [
+        all_("currency", [
+            ("Golden nugget", "Motherlode Mine currency: prospector kit, coal and gem bags"),
+            ("Unidentified minerals", "Mining Guild currency: expert mining gloves, gem and clay packs"),
+            ("Stardust", "Shooting Stars currency: celestial ring, star fragment"),
+            ("Star fragment", "Bought with stardust: turns a prospector piece gold"),
+            ("Bag full of gems", "Opens into 40 noted uncut gems"),
+            ("Soft clay pack", "Opens into 100 noted soft clay"),
+            ("Barronite shards", "Camdozaal currency: buffs, vault, mace restore, Imcando hammer repair"),
+            ("Barronite head", "Barronite mace part: Ramarno restores the mace for 1,500 shards"),
+            ("Barronite handle", "Barronite mace part: Ramarno restores the mace for 1,500 shards"),
+            ("Barronite guard", "Barronite mace part: Ramarno restores the mace for 1,500 shards"),
+            ("Ore pack (Volcanic Mine)", "Volcanic Mine reward: ores, 1/100 broken dragon pickaxe"),
+            ("Dragon pickaxe (broken)", "Nurmof repairs it into a dragon pickaxe"),
+        ]),
+    ]),
 ])
 
 ANGLER = "Angler outfit: bonus Fishing XP, +2.5% with all 4 (spirit and plain pieces mix)"
@@ -1701,11 +1719,12 @@ GOODS_LISTS = {
                     ("Bird nests", ["Bird nest (seeds)", "Bird nest (ring)", "Bird nest (egg)", "Bird nest (empty)"])],
     "mining": [("Ores", ["Clay", "Copper ore", "Tin ore", "Blurite ore", "Iron ore", "Silver ore", "Lead ore", "Coal",
                          "Gold ore", "Lovakite ore", "Mithril ore", "Adamantite ore", "Nickel ore", "Runite ore",
-                         "Amethyst"]),
+                         "Amethyst", "Infernal shale"]),
                ("Gems", ["Uncut opal", "Uncut jade", "Uncut red topaz", "Uncut sapphire", "Uncut emerald",
                          "Uncut ruby", "Uncut diamond"]),
-               ("Essence", ["Rune essence", "Pure essence", "Daeyalt essence"]),
-               ("Other", [r"re:^Sandstone \(\d+kg\)$", "Granite", "Volcanic ash"])],
+               ("Essence", ["Rune essence", "Pure essence", "Daeyalt shard", "Daeyalt essence"]),
+               ("Other", [r"re:^Sandstone \(\d+kg\)$", "Granite", "Volcanic ash", "Volcanic sulphur",
+                          "Calcified deposit", "Barronite deposit", "Rubium geode", "Rubium splinters"])],
     "fishing": [("Raw fish", _raw_fish_order())],
     "hunter": [("Chinchompas", ["Chinchompa", "Red chinchompa", "Black chinchompa"]),
                ("Meat", ["Raw rabbit", "Raw bird meat", "Raw beast meat", "Raw wild kebbit", "Raw barb-tailed kebbit",

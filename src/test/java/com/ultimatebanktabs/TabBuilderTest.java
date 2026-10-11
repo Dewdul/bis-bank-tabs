@@ -300,6 +300,14 @@ public class TabBuilderTest
 	}
 
 	@Test
+	public void miningRewardsHaveTheirOwnRow()
+	{
+		TabBuilder.Built built = build("mining", own("Golden nugget", "Stardust"));
+		assertEquals(own("Golden nugget", "Stardust"), items(section(built, "currency")));
+		assertTrue(built.reasons().get(id("Golden nugget")).startsWith("Motherlode Mine currency"));
+	}
+
+	@Test
 	public void thievingGetsAnEquipmentBlock()
 	{
 		TabBuilder.Built built = build("thieving", own("Rogue mask", "Rogue gloves", "Gloves of silence",
