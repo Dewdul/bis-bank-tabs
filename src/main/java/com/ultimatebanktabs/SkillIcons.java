@@ -66,7 +66,7 @@ class SkillIcons
 	}
 
 	/**
-	 * @param sprites  tag name -> sprite to show; other tabs keep (or get back) their item icon
+	 * @param sprites  standardized tag name -> sprite to show; other tabs keep (or get back) their item icon
 	 * @param itemIcon tag name -> the item icon to give back to a tab that no longer gets a sprite
 	 */
 	void paint(Map<String, Integer> sprites, ToIntFunction<String> itemIcon)
@@ -86,7 +86,7 @@ class SkillIcons
 				continue;
 			}
 			String tag = Text.removeTags(icon.getName());
-			Integer sprite = sprites.get(tag);
+			Integer sprite = sprites.get(Text.standardize(tag));
 			int[] size = sprite == null ? null : size(sprite);
 			if (size == null)
 			{

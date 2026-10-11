@@ -10,9 +10,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.function.IntUnaryOperator;
+import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.client.config.ConfigManager;
+import net.runelite.client.game.ItemVariationMapping;
+import net.runelite.client.plugins.banktags.BankTag;
 import net.runelite.client.plugins.banktags.BankTagsService;
 import net.runelite.client.plugins.banktags.TagManager;
 import net.runelite.client.plugins.banktags.tabs.Layout;
@@ -41,6 +45,8 @@ class BankTagsWriter
 	static final String LAYOUT_OFF_PREFIX = "layoutOff_";
 	/** the layout last planned for a tab, so a restart can tell the player's moves from the plan */
 	static final String PLANNED_PREFIX = "planned_";
+	/** where items that left a rearranged tab were, so they go back there when they return */
+	static final String HOME_PREFIX = "home_";
 
 	private final ConfigManager configManager;
 	private final TagManager tagManager;
@@ -54,6 +60,8 @@ class BankTagsWriter
 	private final Map<String, Set<Integer>> members = new HashMap<>();
 	/** tag name -> the layout last planned for it (before keeping the player's moves) */
 	private final Map<String, int[]> written = new HashMap<>();
+	/** tab key -> variant group -> the cell an item had when it left the tab */
+	private final Map<String, Map<Integer, Integer>> homes = new HashMap<>();
 	/** the player's replaced tabs: never reused as names for ours */
 	private final Set<String> reserved = new HashSet<>();
 	private boolean writing;
@@ -80,9 +88,21 @@ class BankTagsWriter
 		return names.values();
 	}
 
+	/** Bank Tags compares tag names standardized (a renamed tab may keep its capitals in the tab list). */
 	String keyOf(String tag)
 	{
-		return names.entrySet().stream().filter(e -> e.getValue().equals(tag)).map(Map.Entry::getKey).findFirst().orElse(null);
+		return tag == null ? null : names.entrySet().stream().filter(e -> same(e.getValue(), tag)).map(Map.Entry::getKey)
+			.findFirst().orElse(null);
+	}
+
+	private static boolean same(String a, String b)
+	{
+		return a != null && b != null && Text.standardize(a).equals(Text.standardize(b));
+	}
+
+	private static String iconKey(String name)
+	{
+		return ICON_PREFIX + Text.standardize(name);
 	}
 
 	String tagOf(String key)
@@ -106,6 +126,7 @@ class BankTagsWriter
 				{
 					written.put(name, planned);
 				}
+				homes.put(key, parseHomes(configManager.getConfiguration(UltimateBankTabsConfig.GROUP, HOME_PREFIX + key)));
 			}
 		}
 	}
@@ -114,10 +135,12 @@ class BankTagsWriter
 	 * Make the bank show exactly these tabs (in this order for new ones).
 	 *
 	 * @param tabs   tab key -> what to show; tabs missing here are removed
+	 * @param hidden tabs that are on but have nothing to show for this account: out of the tab list,
+	 *               but their name and layout are kept for when they fill again
 	 * @param titles tab key -> display name used to name a new tag
 	 * @return how many tabs were newly added to the tab list
 	 */
-	int publish(Map<String, Tab> tabs, Map<String, String> titles)
+	int publish(Map<String, Tab> tabs, Set<String> hidden, Map<String, String> titles)
 	{
 		writing = true;
 		try
@@ -128,7 +151,11 @@ class BankTagsWriter
 
 			for (String key : new ArrayList<>(names.keySet()))
 			{
-				if (!tabs.containsKey(key))
+				if (hidden.contains(key))
+				{
+					hide(key, tagTabs);
+				}
+				else if (!tabs.containsKey(key))
 				{
 					drop(key, tagTabs);
 				}
@@ -148,16 +175,17 @@ class BankTagsWriter
 					register(name);
 				}
 				members.put(name, tab.items);
-				if (!tagTabs.contains(name))
+				final String tag = name;
+				if (tagTabs.stream().noneMatch(t -> same(t, tag)))
 				{
 					tagTabs.add(name);
 					added++;
 				}
 				String custom = configManager.getConfiguration(UltimateBankTabsConfig.GROUP, CUSTOM_ICON_PREFIX + key);
 				String icon = custom != null ? custom : String.valueOf(tab.icon);
-				if (!icon.equals(configManager.getConfiguration(BANKTAGS_GROUP, ICON_PREFIX + name)))
+				if (!icon.equals(configManager.getConfiguration(BANKTAGS_GROUP, iconKey(name))))
 				{
-					configManager.setConfiguration(BANKTAGS_GROUP, ICON_PREFIX + name, icon);
+					configManager.setConfiguration(BANKTAGS_GROUP, iconKey(name), icon);
 				}
 				boolean layoutOff = Boolean.parseBoolean(
 					configManager.getConfiguration(UltimateBankTabsConfig.GROUP, LAYOUT_OFF_PREFIX + key));
@@ -165,13 +193,19 @@ class BankTagsWriter
 				if (!layoutOff && (!Arrays.equals(written.get(name), tab.layout) || saved == null))
 				{
 					// keep the player's own arrangement; only a new best in slot takes its cell back
+					Map<Integer, Integer> home = homes.computeIfAbsent(key, k -> new HashMap<>());
+					String homeBefore = joinHomes(home);
 					int[] next = LayoutMerger.next(saved == null ? null : saved.getLayout(), written.get(name),
-						tab.layout, tab.bis);
+						tab.layout, tab.bis, ItemVariationMapping::map, home);
 					layoutManager.saveLayout(new Layout(name, next));
 					written.put(name, tab.layout);
 					configManager.setConfiguration(UltimateBankTabsConfig.GROUP, PLANNED_PREFIX + key,
 						joinLayout(tab.layout));
-					if (name.equals(bankTagsService.getActiveTag()))
+					if (!joinHomes(home).equals(homeBefore))
+					{
+						setOrUnset(HOME_PREFIX + key, joinHomes(home));
+					}
+					if (same(name, bankTagsService.getActiveTag()))
 					{
 						bankTagsService.openBankTag(name, BankTagsService.OPTION_ALLOW_MODIFICATIONS);
 					}
@@ -202,12 +236,12 @@ class BankTagsWriter
 			for (String key : new ArrayList<>(names.keySet()))
 			{
 				String name = names.get(key);
-				if (name.equals(bankTagsService.getActiveTag()))
+				if (same(name, bankTagsService.getActiveTag()))
 				{
 					bankTagsService.closeBankTag();
 				}
-				tagTabs.remove(name);
-				configManager.unsetConfiguration(BANKTAGS_GROUP, ICON_PREFIX + name);
+				tagTabs.removeIf(t -> same(t, name));
+				configManager.unsetConfiguration(BANKTAGS_GROUP, iconKey(name));
 				layoutManager.removeLayout(name);
 			}
 			if (!tagTabs.equals(before))
@@ -251,13 +285,13 @@ class BankTagsWriter
 			for (String name : others)
 			{
 				Layout layout = layoutManager.loadLayout(name);
-				saved.add(new SavedTab(name, configManager.getConfiguration(BANKTAGS_GROUP, ICON_PREFIX + name),
+				saved.add(new SavedTab(name, configManager.getConfiguration(BANKTAGS_GROUP, iconKey(name)),
 					layout == null ? null : layout.getLayout()));
-				if (name.equals(bankTagsService.getActiveTag()))
+				if (same(name, bankTagsService.getActiveTag()))
 				{
 					bankTagsService.closeBankTag();
 				}
-				configManager.unsetConfiguration(BANKTAGS_GROUP, ICON_PREFIX + name);
+				configManager.unsetConfiguration(BANKTAGS_GROUP, iconKey(name));
 				layoutManager.removeLayout(name);
 			}
 			configManager.setConfiguration(BANKTAGS_GROUP, TAG_TABS, Text.toCSV(new ArrayList<>(names.values())));
@@ -281,14 +315,14 @@ class BankTagsWriter
 			List<String> before = new ArrayList<>(tagTabs);
 			for (SavedTab tab : saved)
 			{
-				if (tab.name == null || tagTabs.contains(tab.name))
+				if (tab.name == null || tagTabs.stream().anyMatch(t -> same(t, tab.name)))
 				{
 					continue;
 				}
 				tagTabs.add(tab.name);
-				if (tab.icon != null && configManager.getConfiguration(BANKTAGS_GROUP, ICON_PREFIX + tab.name) == null)
+				if (tab.icon != null && configManager.getConfiguration(BANKTAGS_GROUP, iconKey(tab.name)) == null)
 				{
-					configManager.setConfiguration(BANKTAGS_GROUP, ICON_PREFIX + tab.name, tab.icon);
+					configManager.setConfiguration(BANKTAGS_GROUP, iconKey(tab.name), tab.icon);
 				}
 				if (tab.layout != null && layoutManager.loadLayout(tab.name) == null)
 				{
@@ -317,7 +351,7 @@ class BankTagsWriter
 	{
 		for (String name : names.values())
 		{
-			tagManager.unregisterTag(name);
+			unregister(name);
 		}
 		names.clear();
 		members.clear();
@@ -355,7 +389,7 @@ class BankTagsWriter
 		for (Map.Entry<String, String> e : removed)
 		{
 			gone.add(e.getKey());
-			tagManager.unregisterTag(e.getValue());
+			unregister(e.getValue());
 			members.remove(e.getValue());
 			written.remove(e.getValue());
 			names.remove(e.getKey());
@@ -369,7 +403,7 @@ class BankTagsWriter
 	{
 		names.put(key, newName);
 		configManager.setConfiguration(UltimateBankTabsConfig.GROUP, NAME_PREFIX + key, newName);
-		tagManager.unregisterTag(oldName);
+		unregister(oldName);
 		Set<Integer> items = members.remove(oldName);
 		if (items != null)
 		{
@@ -387,12 +421,53 @@ class BankTagsWriter
 	/** The player re-enabled layout mode: lay the tab out from the plan again on the next publish. */
 	void forgetLayout(String name)
 	{
-		written.remove(name);
 		String key = keyOf(name);
 		if (key != null)
 		{
+			written.remove(names.get(key));
+			homes.remove(key);
 			configManager.unsetConfiguration(UltimateBankTabsConfig.GROUP, PLANNED_PREFIX + key);
+			configManager.unsetConfiguration(UltimateBankTabsConfig.GROUP, HOME_PREFIX + key);
 		}
+	}
+
+	private void setOrUnset(String key, String value)
+	{
+		if (value.isEmpty())
+		{
+			configManager.unsetConfiguration(UltimateBankTabsConfig.GROUP, key);
+		}
+		else
+		{
+			configManager.setConfiguration(UltimateBankTabsConfig.GROUP, key, value);
+		}
+	}
+
+	private static String joinHomes(Map<Integer, Integer> home)
+	{
+		return new TreeMap<>(home).entrySet().stream().map(e -> e.getKey() + ":" + e.getValue())
+			.collect(Collectors.joining(","));
+	}
+
+	private static Map<Integer, Integer> parseHomes(String csv)
+	{
+		Map<Integer, Integer> home = new HashMap<>();
+		if (csv != null)
+		{
+			for (String pair : csv.split(","))
+			{
+				String[] kv = pair.split(":");
+				try
+				{
+					home.put(Integer.parseInt(kv[0].trim()), Integer.parseInt(kv[1].trim()));
+				}
+				catch (NumberFormatException | ArrayIndexOutOfBoundsException ignored)
+				{
+					// skip junk
+				}
+			}
+		}
+		return home;
 	}
 
 	private static String joinLayout(int[] layout)
@@ -428,7 +503,20 @@ class BankTagsWriter
 	/** Whether the tab list currently holds this tag. */
 	boolean listed(String name)
 	{
-		return Text.fromCSV(Objects.toString(configManager.getConfiguration(BANKTAGS_GROUP, TAG_TABS), "")).contains(name);
+		return Text.fromCSV(Objects.toString(configManager.getConfiguration(BANKTAGS_GROUP, TAG_TABS), "")).stream()
+			.anyMatch(t -> same(t, name));
+	}
+
+	/** On but empty for this account: leave the tab list, keep everything else for when it fills again. */
+	private void hide(String key, List<String> tagTabs)
+	{
+		String name = names.get(key);
+		if (same(name, bankTagsService.getActiveTag()))
+		{
+			bankTagsService.closeBankTag();
+		}
+		tagTabs.removeIf(t -> same(t, name));
+		members.put(name, new HashSet<>());
 	}
 
 	private void drop(String key, List<String> tagTabs)
@@ -436,25 +524,39 @@ class BankTagsWriter
 		String name = names.remove(key);
 		configManager.unsetConfiguration(UltimateBankTabsConfig.GROUP, NAME_PREFIX + key);
 		configManager.unsetConfiguration(UltimateBankTabsConfig.GROUP, PLANNED_PREFIX + key);
-		if (name.equals(bankTagsService.getActiveTag()))
+		configManager.unsetConfiguration(UltimateBankTabsConfig.GROUP, HOME_PREFIX + key);
+		homes.remove(key);
+		if (same(name, bankTagsService.getActiveTag()))
 		{
 			bankTagsService.closeBankTag();
 		}
-		tagTabs.remove(name);
-		configManager.unsetConfiguration(BANKTAGS_GROUP, ICON_PREFIX + name);
+		tagTabs.removeIf(t -> same(t, name));
+		configManager.unsetConfiguration(BANKTAGS_GROUP, iconKey(name));
 		layoutManager.removeLayout(name);
-		tagManager.unregisterTag(name);
+		unregister(name);
 		members.remove(name);
 		written.remove(name);
 	}
 
 	private void register(String name)
 	{
-		tagManager.registerTag(name, itemId ->
+		BankTag tag = itemId ->
 		{
 			Set<Integer> items = members.get(name);
 			return items != null && items.contains(canonicalize.applyAsInt(itemId));
-		});
+		};
+		tagManager.registerTag(name, tag);
+		if (!Text.standardize(name).equals(name))
+		{
+			// a renamed tab keeps its capitals; Bank Tags may look it up standardized
+			tagManager.registerTag(Text.standardize(name), tag);
+		}
+	}
+
+	private void unregister(String name)
+	{
+		tagManager.unregisterTag(name);
+		tagManager.unregisterTag(Text.standardize(name));
 	}
 
 	/** First of "melee", "melee bis", "melee (auto)", "melee (auto 2)"... that the player isn't using. */
@@ -468,7 +570,8 @@ class BankTagsWriter
 		}
 		for (String name : candidates)
 		{
-			if (!tagTabs.contains(name) && !names.containsValue(name) && !reserved.contains(name)
+			if (tagTabs.stream().noneMatch(t -> same(t, name)) && names.values().stream().noneMatch(n -> same(n, name))
+				&& reserved.stream().noneMatch(r -> same(r, name))
 				&& tagManager.getItemsForTag(name).isEmpty())
 			{
 				return name;

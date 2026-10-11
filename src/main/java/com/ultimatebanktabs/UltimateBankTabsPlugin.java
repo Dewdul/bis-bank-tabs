@@ -27,7 +27,9 @@ import net.runelite.api.GameState;
 import net.runelite.api.Item;
 import net.runelite.api.ItemContainer;
 import net.runelite.api.ScriptID;
+import net.runelite.api.MenuEntry;
 import net.runelite.api.events.BeforeRender;
+import net.runelite.api.events.MenuEntryAdded;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.GameTick;
 import net.runelite.api.events.ItemContainerChanged;
@@ -55,6 +57,7 @@ import net.runelite.client.plugins.banktags.BankTagsService;
 import net.runelite.client.plugins.banktags.TagManager;
 import net.runelite.client.plugins.banktags.tabs.LayoutManager;
 import net.runelite.client.ui.overlay.OverlayManager;
+import net.runelite.client.util.Text;
 
 @Slf4j
 @PluginDependency(BankTagsPlugin.class)
@@ -437,6 +440,27 @@ public class UltimateBankTabsPlugin extends Plugin
 		}
 	}
 
+	/**
+	 * Bank Tags' Remove-tag can't take an item out of these tabs (the plugin decides what they hold), but it
+	 * does take it out of the layout, after which Bank Tags drops it in the first empty cell for good.
+	 */
+	@Subscribe(priority = -1)
+	public void onMenuEntryAdded(MenuEntryAdded event)
+	{
+		if (writer == null || !event.getOption().startsWith("Remove-tag")
+			|| writer.keyOf(bankTagsService.getActiveTag()) == null)
+		{
+			return;
+		}
+		for (MenuEntry entry : client.getMenu().getMenuEntries())
+		{
+			if (entry.getOption().startsWith("Remove-tag"))
+			{
+				client.getMenu().removeMenuEntry(entry);
+			}
+		}
+	}
+
 	/** Bank Tags rebuilds and scrolls its tab widgets at will, so skill icons go back on before every frame. */
 	@Subscribe
 	public void onBeforeRender(BeforeRender event)
@@ -452,7 +476,7 @@ public class UltimateBankTabsPlugin extends Plugin
 		try
 		{
 			return Integer.parseInt(Objects.toString(
-				configManager.getConfiguration(BankTagsWriter.BANKTAGS_GROUP, "icon_" + tag), ""));
+				configManager.getConfiguration(BankTagsWriter.BANKTAGS_GROUP, "icon_" + Text.standardize(tag)), ""));
 		}
 		catch (NumberFormatException e)
 		{
@@ -695,6 +719,7 @@ public class UltimateBankTabsPlugin extends Plugin
 		Map<String, BankTagsWriter.Tab> tabs = new LinkedHashMap<>();
 		Map<String, String> titles = new HashMap<>();
 		Map<String, Map<Integer, String>> why = new HashMap<>();
+		Set<String> hidden = new HashSet<>();
 		Set<Integer> shown = new HashSet<>();
 		for (TabData.Tab def : data.tabs)
 		{
@@ -708,6 +733,8 @@ public class UltimateBankTabsPlugin extends Plugin
 			shown.addAll(built.itemIds());
 			if (built.isEmpty())
 			{
+				// nothing for this account (yet): hide the tab but keep its layout
+				hidden.add(def.key);
 				continue;
 			}
 			// the item icon also stands under a skill icon, for when Bank Tags draws the tab without us
@@ -716,7 +743,7 @@ public class UltimateBankTabsPlugin extends Plugin
 				LayoutPlanner.bisPositions(built)));
 			why.put(def.key, built.reasons());
 		}
-		int added = writer.publish(tabs, titles);
+		int added = writer.publish(tabs, hidden, titles);
 		reasons = why;
 		Map<String, Integer> sprites = new HashMap<>();
 		if (config.tabIcons() == UltimateBankTabsConfig.IconStyle.SKILL)
@@ -728,7 +755,7 @@ public class UltimateBankTabsPlugin extends Plugin
 				if (tag != null && sprite != null && configManager.getConfiguration(UltimateBankTabsConfig.GROUP,
 					BankTagsWriter.CUSTOM_ICON_PREFIX + key) == null)
 				{
-					sprites.put(tag, sprite);
+					sprites.put(Text.standardize(tag), sprite);
 				}
 			}
 		}

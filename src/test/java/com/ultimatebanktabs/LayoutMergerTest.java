@@ -2,11 +2,14 @@ package com.ultimatebanktabs;
 
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertSame;
+import static org.junit.Assert.assertTrue;
 import org.junit.Test;
 
 public class LayoutMergerTest
@@ -118,6 +121,93 @@ public class LayoutMergerTest
 		int[] next = LayoutMerger.next(saved, previous, planned, BIS);
 		assertEquals(11, next[HEAD]);
 		assertEquals("their item moves to the first free cell below the gear", ROW5 + 1, pos(next, 99));
+	}
+
+	/** 3853/3855 are two charge states of one item, 4716/4880 two degrade states of another */
+	private static int family(int id)
+	{
+		return id == 3855 ? 3853 : id == 4880 ? 4716 : id;
+	}
+
+	private static int[] next(int[] saved, int[] previous, int[] planned, Set<Integer> bis, Map<Integer, Integer> home)
+	{
+		return LayoutMerger.next(saved, previous, planned, bis, LayoutMergerTest::family, home);
+	}
+
+	@Test
+	public void anotherChargeKeepsTheirCell()
+	{
+		int[] previous = layout(ROW5 + 2, HEAD, 10, ROW5, 3853, ROW5 + 1, 31);
+		int[] saved = layout(ROW5 + 8, HEAD, 10, ROW5 + 1, 31, ROW5 + 7, 3853);
+		int[] planned = layout(ROW5 + 2, HEAD, 10, ROW5, 3855, ROW5 + 1, 31);
+		int[] next = next(saved, previous, planned, BIS, new HashMap<>());
+		assertEquals("the used necklace stays where they put it", 3855, next[ROW5 + 7]);
+		assertEquals(-1, pos(next, 3853));
+		assertEquals(E, next[ROW5]);
+	}
+
+	@Test
+	public void aDegradingBestInSlotIsNotANewBest()
+	{
+		int[] previous = layout(ROW5 + 1, HEAD, 4716, ROW5, 30);
+		// they put a potion in the helmet cell and the helmet further down
+		int[] saved = layout(ROW5 + 4, HEAD, 30, ROW5 + 3, 4716);
+		int[] planned = layout(ROW5 + 1, HEAD, 4880, ROW5, 30);
+		int[] next = next(saved, previous, planned, BIS, new HashMap<>());
+		assertEquals("their potion keeps the helmet cell", 30, next[HEAD]);
+		assertEquals("the degraded helmet stays where they put it", 4880, next[ROW5 + 3]);
+	}
+
+	@Test
+	public void aNewItemGoesBesideItsNeighbourNotIntoTheNextSection()
+	{
+		int[] previous = new int[ROW5 + W + 2];
+		Arrays.fill(previous, E);
+		for (int c = 0; c < W; c++)
+		{
+			previous[ROW5 + c] = 30 + c;
+		}
+		previous[ROW5 + W] = 40;
+		previous[ROW5 + W + 1] = 41;
+		int[] saved = previous.clone();
+		saved[ROW5] = 31;
+		saved[ROW5 + 1] = 30;
+		// a ninth potion pushes the food a row down
+		int[] planned = new int[ROW5 + 2 * W + 2];
+		Arrays.fill(planned, E);
+		System.arraycopy(previous, ROW5, planned, ROW5, W);
+		planned[ROW5 + W] = 38;
+		planned[ROW5 + 2 * W] = 40;
+		planned[ROW5 + 2 * W + 1] = 41;
+		int[] next = next(saved, previous, planned, Collections.emptySet(), new HashMap<>());
+		assertEquals("their swap stays", 31, next[ROW5]);
+		assertEquals("the potion opens a row under the potions", 38, next[ROW5 + W]);
+		assertEquals("the food moves down with it", 40, next[ROW5 + 2 * W]);
+		assertEquals(41, next[ROW5 + 2 * W + 1]);
+	}
+
+	@Test
+	public void anItemThatLeavesAndComesBackGoesHome()
+	{
+		Map<Integer, Integer> home = new HashMap<>();
+		int[] plan1 = layout(ROW5 + 2, HEAD, 10, ROW5, 30, ROW5 + 1, 31);
+		int[] saved = layout(ROW5 + 6, HEAD, 10, ROW5, 30, ROW5 + 5, 31);
+		int[] plan2 = layout(ROW5 + 1, HEAD, 10, ROW5, 30);
+		int[] gone = next(saved, plan1, plan2, BIS, home);
+		assertEquals(-1, pos(gone, 31));
+		int[] back = next(gone, plan2, plan1, BIS, home);
+		assertEquals("it returns to the cell they gave it", ROW5 + 5, pos(back, 31));
+		assertTrue(home.isEmpty());
+	}
+
+	@Test
+	public void anItemThePlanShowsTwiceGetsBothCopies()
+	{
+		int[] previous = layout(ROW5 + 2, ROW5, 60, ROW5 + 1, 61);
+		int[] saved = layout(ROW5 + 2, ROW5, 61, ROW5 + 1, 60);
+		int[] planned = layout(ROW5 + 4, ROW5, 60, ROW5 + 1, 61, ROW5 + 2, 50, ROW5 + 3, 50);
+		int[] next = next(saved, previous, planned, Collections.emptySet(), new HashMap<>());
+		assertEquals(2, Arrays.stream(next).filter(id -> id == 50).count());
 	}
 
 	@Test

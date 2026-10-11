@@ -11,13 +11,18 @@ Started 2026-10-04. The request was an "ultimate bank plugin" that does three th
   - **Untouched tab** (saved layout equals the last plan, ignoring trailing gaps): the new plan as it is.
   - **Rearranged tab:**
     - The player's layout is the base.
-    - Items the plugin no longer shows become gaps.
+    - A charge, dose or degrade step is the same item and takes the old id's cell. Variants are matched with `ItemVariationMapping.map`, the mapping Bank Tags itself uses.
+    - Items the plugin no longer shows become gaps. Their cell is remembered per tab (`home_<key>`), and an item that comes back goes there if the cell is free.
     - Items the player tagged in themselves stay.
-    - A new best-in-slot item takes its equipment-block cell back, and anything it pushes out is placed again.
-    - Other new items go to their planned cell if it is free, else the next free cell outside the equipment block.
+    - A new best-in-slot item (a different variant group) takes its equipment-block cell back, and anything it pushes out is placed again.
+    - Other new items go beside their plan neighbour, wherever the player put it: the same column shifted by that neighbour's row drift, else beside it, else a new row under it. Items the plan shows twice (herb secondaries) get both copies.
+    - **Known limits:** layout settings (blank rows, backups) don't re-space a rearranged tab, so Disable then Enable layout resets it. Layouts are global in Bank Tags while ownership is per account, so an alt account rearranges the shared tabs around its own items; home cells bring the main's items back when you switch back.
   - **Reset:** Disable then Enable layout clears the last plan, which restarts the tab from the plan.
   - An open tab that changes is reopened with `BankTagsService.openBankTag`.
 - **Tag names avoid collisions.** A name is skipped if it is in `tagtabs` but not owned by this plugin, or if any item carries it as a tag. The fallbacks are "x bis", "x (auto)" and "x (auto N)". The chosen name is stored in `ultimatebanktabs.tagName_<key>`.
+- **Empty tabs are hidden, not deleted.** A tab that is on but has nothing for this account leaves `tagtabs` but keeps its name, layout and plan, so it comes back as it was.
+- **Remove-tag is hidden on the plugin's tabs.** It can't change what they hold, and Bank Tags would move the item to the first empty cell for good.
+- **Tag names compare standardized**, like Bank Tags does. A tab renamed with capitals still works with Change icon and Disable/Enable layout.
 - **Deleting a tab turns it off.** If the player removes or renames a plugin tab, the `tagtabs` change arrives while the plugin is not writing. The tab's toggle is then set to off, so the plugin does not fight the player.
 - **It replaces the player's tabs, with consent.** On the first start, if `tagtabs` holds tabs the plugin didn't make, a dialog lists them and asks. *Replace my tabs* removes them from `tagtabs` with their icons and layouts. Item tags stay, so `tag:` searches still work. The removed tabs are saved as JSON in `ultimatebanktabs.replacedTabs`, and their names are reserved so new plugin tabs can't take them. *Turn plugin off* (or closing the dialog) disables the plugin. Nothing is built until `replaceAccepted` is set. That flag is global, as Bank Tags config is shared by all accounts.
   - **Restoring is on demand, not on shutdown.** A Hub update stops and restarts the plugin, so restoring on shutdown would hand the tabs back and ask again after every update. Instead the self-resetting "Bring back replaced tabs" setting appends the saved tabs to `tagtabs`.
