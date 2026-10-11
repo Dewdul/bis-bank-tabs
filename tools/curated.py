@@ -730,7 +730,7 @@ SLAYER = tab("slayer", "Slayer", "Enchanted gem", sections=[
         first("mirror", ["V's shield", "Mirror shield"]),
         all_("wyvern_shield", []),
         all_("gryphons", []),
-        first("lantern", ["Bug lantern"]),
+        first("lantern", [("Bug lantern#Lit", "Lit and wielded: kills harpie bug swarms")]),
         all_("shayzien", []),
         all_("desert_heat", []),
         all_("revenants", []),

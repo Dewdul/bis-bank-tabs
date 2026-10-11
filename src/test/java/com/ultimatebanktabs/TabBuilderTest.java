@@ -426,6 +426,21 @@ public class TabBuilderTest
 			.getSections().stream().noneMatch(s -> s.getKey().startsWith("blighted")));
 	}
 
+	@Test
+	public void onlyLitLightSourcesCount()
+	{
+		int unlit = 5014;
+		int lit = 5013;
+		assertTrue("an unlit mining helmet gives no light", build("slayer", new HashSet<>(Arrays.asList(unlit)))
+			.itemIds().isEmpty());
+		TabBuilder.Built built = build("slayer", new HashSet<>(Arrays.asList(lit)));
+		assertTrue(built.itemIds().contains(lit));
+		assertTrue(built.reasons().get(lit).contains("worn"));
+		TabBuilder.Built kandarin = build("slayer", new HashSet<>(Arrays.asList(lit, id("Kandarin headgear 1"))));
+		assertTrue("Kandarin headgear works carried and never goes out, so it is the head light",
+			kandarin.itemIds().contains(id("Kandarin headgear 1")));
+	}
+
 	static int row(int[] layout, int itemId)
 	{
 		for (int i = 0; i < layout.length; i++)

@@ -123,8 +123,8 @@ class Resolver:
                 self.errors.append("regex matched nothing: %s" % name)
             return pages
         if "#" in name:
-            # one version of a page ("Mining helmet#Lit"), not every version on it
-            if name.lower() not in self.wiki.version_ids:
+            # some versions of a page, not every version on it
+            if not self.versions(name):
                 self.errors.append("unknown version: %s" % name)
                 return []
             return [name]
@@ -133,9 +133,23 @@ class Resolver:
             return []
         return [self.wiki.page_name[name.lower()]]
 
+    def versions(self, name):
+        """The versions a "Page#Version" entry means: that one ("Mining helmet#Lit"), or with
+        "Page#re:<regex>" every version whose name matches ("Abyssal lantern#re:^(?!Unlit)")."""
+        page, _, version = name.lower().partition("#")
+        if not version.startswith("re:"):
+            return [name.lower()] if name.lower() in self.wiki.version_ids else []
+        rx = re.compile(version[3:], re.I)
+        return [k for k in self.wiki.version_ids if k.partition("#")[0] == page and rx.search(k.partition("#")[2])]
+
     def base_ids(self, name):
         if "#" in name and not name.startswith("re:"):
-            return list(self.wiki.version_ids.get(name.lower(), [])) if self.entry_pages(name) else []
+            ids = []
+            for v in self.versions(name):
+                ids += [i for i in self.wiki.version_ids[v] if i not in ids]
+            if not ids:
+                self.errors.append("unknown version: %s" % name)
+            return ids
         ids = []
         for p in self.entry_pages(name):
             ids += [i for i in self.wiki.ids_of_page(p) if i not in ids]
@@ -165,11 +179,11 @@ class Resolver:
         claimed = {i for ids in base for i in ids}
         out = []
         for (name, _), ids in zip(unique, base):
-            version = name.lower() if "#" in name and not name.startswith("re:") else None
+            versions = set(self.versions(name)) if "#" in name and not name.startswith("re:") else None
             extra = []
             for i in ids:
                 for v in self.var_group.get(i, ()):
-                    if v not in claimed and v not in ids and v not in extra and self._same_family(i, v)                             and (version is None or self.wiki.id_version.get(v, version) == version):
+                    if v not in claimed and v not in ids and v not in extra and self._same_family(i, v)                             and (versions is None or self.wiki.id_version.get(v) in versions | {None}):
                         extra.append(v)
             out.append(sorted(ids, key=self._version_order) + extra)
         return list(zip(out, [why for _, why in unique]))
