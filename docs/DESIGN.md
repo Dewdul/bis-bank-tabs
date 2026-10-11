@@ -15,7 +15,10 @@ Started 2026-10-04. The request was an "ultimate bank plugin" that does three th
     - Items the plugin no longer shows become gaps. Their cell is remembered per tab (`home_<key>`), and an item that comes back goes there if the cell is free.
     - Items the player tagged in themselves stay.
     - A new best-in-slot item (a different variant group) takes its equipment-block cell back, and anything it pushes out is placed again.
-    - Other new items go beside their plan neighbour, wherever the player put it: the same column shifted by that neighbour's row drift, else beside it, else a new row under it. Items the plan shows twice (herb secondaries) get both copies.
+    - Other new items go into their own section's rows. `LayoutPlanner.layOut` names the section of every planned row (herb bands as `key#band`), and the merge finds those rows wherever the player moved the section's items. It tries the item's planned column first, so herb columns stay aligned, then any free cell, then a new row under the section. A section the layout doesn't have yet gets rows of its own after the section before it in the plan, keeping a gap row if the plan has one.
+    - Each copy in the layout stands for its item's nearest planned cell, so an item the plan shows twice (herb secondaries) gets its missing copy in the right place.
+    - Returning items go home before any new item is placed.
+    - A tab that gains its equipment block moves the player's arrangement down under it as a whole.
     - **Known limits:** layout settings (blank rows, backups) don't re-space a rearranged tab, so Disable then Enable layout resets it. Layouts are global in Bank Tags while ownership is per account, so an alt account rearranges the shared tabs around its own items; home cells bring the main's items back when you switch back.
   - **Reset:** Disable then Enable layout clears the last plan, which restarts the tab from the plan.
   - An open tab that changes is reopened with `BankTagsService.openBankTag`.
