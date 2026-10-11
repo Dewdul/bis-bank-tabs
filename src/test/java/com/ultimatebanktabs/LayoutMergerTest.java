@@ -414,6 +414,51 @@ public class LayoutMergerTest
 	}
 
 	@Test
+	public void anUpgradeThatDemotesTheOnlyGearItemDoesNotShiftTheTab()
+	{
+		int weapon = 2 * W;
+		int[] previous = layout(ROW5 + 2, weapon, 4151, ROW5, 30, ROW5 + 1, 31);
+		int[] saved = layout(ROW5 + 2, weapon, 4151, ROW5, 31, ROW5 + 1, 30);
+		// the scythe takes the weapon cell; the whip moves down to a new weapons row
+		int[] planned = layout(ROW5 + W + 2, weapon, 22325, ROW5, 4151, ROW5 + W, 30, ROW5 + W + 1, 31);
+		String[] rows = rows(7, 2, "block", null, null, "weapons", "supplies");
+		int[] next = LayoutMerger.next(saved, previous, planned, rows, new HashSet<>(Arrays.asList(weapon)), true,
+			null, id -> id, new HashMap<>());
+		assertEquals(22325, next[weapon]);
+		assertEquals("the supplies only move down for the new weapons row", 6, pos(next, 31) / W);
+		assertEquals("their swap stays", 31, next[ROW5 + W]);
+	}
+
+	@Test
+	public void aNewHerbKeepsOneColumnDownItsBand()
+	{
+		int[] previous = layout(ROW5 + W + 2, ROW5, 249, ROW5 + 1, 253, ROW5 + 2, 255, ROW5 + 3, 257,
+			ROW5 + W, 91, ROW5 + W + 1, 95);
+		int[] saved = layout(ROW5 + W + 2, ROW5, 253, ROW5 + 1, 249, ROW5 + 2, 255, ROW5 + 3, 257,
+			ROW5 + W, 91, ROW5 + W + 1, 95);
+		// marrentill (clean 251, unfinished 93) slots in as the second herb
+		int[] planned = layout(ROW5 + W + 3, ROW5, 249, ROW5 + 1, 251, ROW5 + 2, 253, ROW5 + 3, 255, ROW5 + 4, 257,
+			ROW5 + W, 91, ROW5 + W + 1, 93, ROW5 + W + 2, 95);
+		int[] next = next(saved, previous, planned, rows(7, 5, "herbs_clean#0", "herbs_unf#0"), Collections.emptySet());
+		assertEquals("clean and unfinished in one column", pos(next, 251) % W, pos(next, 93) % W);
+	}
+
+	@Test
+	public void aNewOutfitPieceJoinsItsOwnOutfitsRow()
+	{
+		// two outfits in a sets section: A (60..65) on one row, B (70..72) on the next; they swapped two of A
+		int[] previous = layout(ROW5 + W + 3, ROW5, 60, ROW5 + 1, 61, ROW5 + 2, 62, ROW5 + 3, 63, ROW5 + 4, 64,
+			ROW5 + 5, 65, ROW5 + W, 70, ROW5 + W + 1, 71, ROW5 + W + 2, 72);
+		int[] saved = previous.clone();
+		saved[ROW5] = 61;
+		saved[ROW5 + 1] = 60;
+		int[] planned = layout(ROW5 + W + 4, ROW5, 60, ROW5 + 1, 61, ROW5 + 2, 62, ROW5 + 3, 63, ROW5 + 4, 64,
+			ROW5 + 5, 65, ROW5 + W, 73, ROW5 + W + 1, 70, ROW5 + W + 2, 71, ROW5 + W + 3, 72);
+		int[] next = next(saved, previous, planned, rows(7, 5, "graceful", "graceful"), Collections.emptySet());
+		assertEquals("B's new hood goes in B's row", 6, pos(next, 73) / W);
+	}
+
+	@Test
 	public void noGearBlockMeansNoReservedCells()
 	{
 		int[] previous = layout(2, 0, 30, 1, 31);

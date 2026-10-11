@@ -56,6 +56,7 @@ import net.runelite.client.plugins.banktags.BankTagsPlugin;
 import net.runelite.client.plugins.banktags.BankTagsService;
 import net.runelite.client.plugins.banktags.TagManager;
 import net.runelite.client.plugins.banktags.tabs.LayoutManager;
+import net.runelite.client.plugins.banktags.tabs.TabManager;
 import net.runelite.client.ui.overlay.OverlayManager;
 import net.runelite.client.util.Text;
 
@@ -75,7 +76,10 @@ public class UltimateBankTabsPlugin extends Plugin
 	/** the tabs it replaced (JSON), for "Bring back replaced tabs" */
 	private static final String REPLACED_KEY = "replacedTabs";
 	private static final String RESTORE_KEY = "restoreTabs";
-	private static final Set<String> INTERNAL_KEYS = new HashSet<>(Arrays.asList(OWNED_KEY, ACCEPTED_KEY, REPLACED_KEY));
+	/** the player agreed with the bank open: the takeover waits for the next bank open */
+	private static final String REPLACE_PENDING_KEY = "replacePending";
+	private static final Set<String> INTERNAL_KEYS = new HashSet<>(Arrays.asList(OWNED_KEY, ACCEPTED_KEY, REPLACED_KEY,
+		REPLACE_PENDING_KEY));
 	private static final Type SAVED_TABS = new TypeToken<List<BankTagsWriter.SavedTab>>()
 	{
 	}.getType();
@@ -126,6 +130,9 @@ public class UltimateBankTabsPlugin extends Plugin
 	@Inject
 	private PluginManager pluginManager;
 
+	@Inject
+	private TabManager tabManager;
+
 	private TabData data;
 	private TabBuilder builder;
 	private BankTagsWriter writer;
@@ -134,8 +141,6 @@ public class UltimateBankTabsPlugin extends Plugin
 	private Map<String, Integer> tabSprites = new HashMap<>();
 	/** nothing is built until the player agrees to this plugin replacing their tabs */
 	private boolean accepted;
-	/** "Bring back replaced tabs" waits for the next bank open (Bank Tags holds the open bank's tab list) */
-	private boolean restorePending;
 	/** conflicting plugins already mentioned this session */
 	private final Set<String> warned = new HashSet<>();
 	/** tab key -> item id -> why the item is in that tab */
@@ -161,8 +166,8 @@ public class UltimateBankTabsPlugin extends Plugin
 		builder = new TabBuilder(data, id -> EquipStats.of(itemManager.getItemStats(id)));
 		writer = new BankTagsWriter(configManager, tagManager, layoutManager, bankTagsService, itemManager::canonicalize);
 		writer.restore(data.tabs.stream().map(t -> t.key).collect(Collectors.toList()));
-		// if the bank is open right now, this is the list Bank Tags holds; BANKMAIN_INIT refreshes it otherwise
-		writer.bankOpened();
+		// what Bank Tags holds now (the bank may be open); BANKMAIN_INIT refreshes it on every bank open
+		writer.bankHolds(new ArrayList<>(tabManager.getTabs()));
 		writer.reserve(replacedTabs().stream().map(t -> t.name).collect(Collectors.toList()));
 		skillIcons = new SkillIcons(client);
 		accepted = Boolean.parseBoolean(configManager.getConfiguration(UltimateBankTabsConfig.GROUP, ACCEPTED_KEY));
@@ -170,11 +175,21 @@ public class UltimateBankTabsPlugin extends Plugin
 		BankTagsWriter w = writer;
 		clientThread.invokeLater(() ->
 		{
+			bankOpen = client.getWidget(InterfaceID.Bankmain.UNIVERSE) != null;
 			if (!accepted)
 			{
 				askToReplace(w);
+				return;
 			}
-			else if (client.getGameState() == GameState.LOGGED_IN)
+			if (!bankOpen && pending(REPLACE_PENDING_KEY))
+			{
+				replaceNow();
+			}
+			if (!bankOpen && config.restoreTabs())
+			{
+				restoreReplaced(false);
+			}
+			if (client.getGameState() == GameState.LOGGED_IN)
 			{
 				loadSnapshot();
 				rebuild(false);
@@ -234,24 +249,46 @@ public class UltimateBankTabsPlugin extends Plugin
 			// turned off while the question was open
 			return;
 		}
-		List<BankTagsWriter.SavedTab> saved = w.replaceOthers();
+		configManager.setConfiguration(UltimateBankTabsConfig.GROUP, ACCEPTED_KEY, true);
+		accepted = true;
+		bankOpen = client.getWidget(InterfaceID.Bankmain.UNIVERSE) != null;
+		if (bankOpen)
+		{
+			// Bank Tags holds the open bank's tab list and would write the old tabs back: finish on the next open
+			configManager.setConfiguration(UltimateBankTabsConfig.GROUP, REPLACE_PENDING_KEY, true);
+			chat("No Brain Bank Tabs: close your bank and open it again to finish replacing your tabs.");
+		}
+		else
+		{
+			replaceNow();
+		}
+		if (client.getGameState() == GameState.LOGGED_IN)
+		{
+			loadSnapshot();
+			rebuild(false);
+		}
+	}
+
+	private boolean pending(String key)
+	{
+		return Boolean.parseBoolean(configManager.getConfiguration(UltimateBankTabsConfig.GROUP, key));
+	}
+
+	/** Take the player's own tabs out (backed up), now that Bank Tags isn't holding an open bank's list. */
+	private void replaceNow()
+	{
+		configManager.unsetConfiguration(UltimateBankTabsConfig.GROUP, REPLACE_PENDING_KEY);
+		List<BankTagsWriter.SavedTab> saved = writer.replaceOthers();
 		if (!saved.isEmpty())
 		{
 			List<BankTagsWriter.SavedTab> all = replacedTabs();
 			all.addAll(saved);
 			configManager.setConfiguration(UltimateBankTabsConfig.GROUP, REPLACED_KEY, gson.toJson(all, SAVED_TABS));
-		}
-		configManager.setConfiguration(UltimateBankTabsConfig.GROUP, ACCEPTED_KEY, true);
-		accepted = true;
-		if (client.getGameState() == GameState.LOGGED_IN)
-		{
-			if (!saved.isEmpty())
+			if (client.getGameState() == GameState.LOGGED_IN)
 			{
 				chat("No Brain Bank Tabs: replaced your " + saved.size() + " bank tabs. Bring back replaced tabs in the"
 					+ " plugin settings puts them back.");
 			}
-			loadSnapshot();
-			rebuild(false);
 		}
 	}
 
@@ -284,8 +321,8 @@ public class UltimateBankTabsPlugin extends Plugin
 		}
 		if (bankOpen && !atBankInit)
 		{
-			// Bank Tags holds the open bank's tab list and would write it back over the restored tabs
-			restorePending = true;
+			// Bank Tags holds the open bank's tab list and would write it back over the restored tabs; the
+			// setting stays on until the next bank open does it
 			chat("No Brain Bank Tabs: close your bank and open it again to bring back your replaced tabs.");
 			return;
 		}
@@ -356,7 +393,6 @@ public class UltimateBankTabsPlugin extends Plugin
 		});
 		// an open "replace your tabs?" question checks this before acting
 		writer = null;
-		restorePending = false;
 		accepted = false;
 		stored = new HashSet<>();
 		potions = new HashSet<>();
@@ -418,9 +454,12 @@ public class UltimateBankTabsPlugin extends Plugin
 				// tabs added here are picked up by this very bank open, so no "reopen" hint
 				rebuild(false);
 			}
-			if (restorePending && writer != null)
+			if (writer != null && accepted && pending(REPLACE_PENDING_KEY))
 			{
-				restorePending = false;
+				replaceNow();
+			}
+			if (writer != null && config.restoreTabs())
+			{
 				restoreReplaced(true);
 			}
 			if (writer != null)
@@ -550,8 +589,9 @@ public class UltimateBankTabsPlugin extends Plugin
 		String tag = key.startsWith("icon_") ? key.substring("icon_".length())
 			: key.startsWith("layout_") ? key.substring("layout_".length()) : null;
 		String tabKey = tag == null ? null : writer.keyOf(tag);
-		if (tabKey == null)
+		if (tabKey == null || writer.isHidden(tabKey))
 		{
+			// a hidden tab isn't in Bank Tags' list: an icon or layout written under its name is another tab's
 			return;
 		}
 		if (key.startsWith("icon_") && event.getNewValue() != null && writer.isOurIcon(tag, event.getNewValue()))

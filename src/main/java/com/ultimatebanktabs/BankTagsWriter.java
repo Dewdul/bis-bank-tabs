@@ -21,6 +21,7 @@ import net.runelite.client.plugins.banktags.BankTagsService;
 import net.runelite.client.plugins.banktags.TagManager;
 import net.runelite.client.plugins.banktags.tabs.Layout;
 import net.runelite.client.plugins.banktags.tabs.LayoutManager;
+import net.runelite.client.plugins.banktags.tabs.TagTab;
 import net.runelite.client.util.Text;
 
 /**
@@ -60,6 +61,8 @@ class BankTagsWriter
 	private final Map<String, Set<Integer>> members = new HashMap<>();
 	/** tag name -> the layout last planned for it (before keeping the player's moves) */
 	private final Map<String, int[]> written = new HashMap<>();
+	/** tag name -> whether the layout last planned for it had the equipment block */
+	private final Map<String, Boolean> writtenBlock = new HashMap<>();
 	/** tab key -> variant group -> the cell an item had when it left the tab */
 	private final Map<String, Map<Integer, Integer>> homes = new HashMap<>();
 	/** tabs that are on but empty for this account, kept out of the tab list */
@@ -130,11 +133,16 @@ class BankTagsWriter
 			{
 				names.put(key, name);
 				register(name);
-				int[] planned = parseLayout(configManager.getConfiguration(UltimateBankTabsConfig.GROUP,
-					PLANNED_PREFIX + key));
+				String plannedValue = configManager.getConfiguration(UltimateBankTabsConfig.GROUP, PLANNED_PREFIX + key);
+				int[] planned = parseLayout(plannedValue);
 				if (planned != null)
 				{
 					written.put(name, planned);
+					Boolean block = plannedBlock(plannedValue);
+					if (block != null)
+					{
+						writtenBlock.put(name, block);
+					}
 				}
 				homes.put(key, parseHomes(configManager.getConfiguration(UltimateBankTabsConfig.GROUP, HOME_PREFIX + key)));
 			}
@@ -216,11 +224,12 @@ class BankTagsWriter
 					}
 					String homeBefore = joinHomes(home);
 					int[] next = LayoutMerger.next(saved == null ? null : saved.getLayout(), written.get(name),
-						tab.layout, tab.rows, tab.bis, tab.block, ItemVariationMapping::map, home);
+						tab.layout, tab.rows, tab.bis, tab.block, writtenBlock.get(name), ItemVariationMapping::map, home);
 					layoutManager.saveLayout(new Layout(name, next));
 					written.put(name, tab.layout);
+					writtenBlock.put(name, tab.block);
 					configManager.setConfiguration(UltimateBankTabsConfig.GROUP, PLANNED_PREFIX + key,
-						joinLayout(tab.layout));
+						(tab.block ? "b:" : "n:") + joinLayout(tab.layout));
 					if (!joinHomes(home).equals(homeBefore))
 					{
 						setOrUnset(HOME_PREFIX + key, joinHomes(home));
@@ -336,11 +345,14 @@ class BankTagsWriter
 			List<String> before = new ArrayList<>(tagTabs);
 			for (SavedTab tab : saved)
 			{
-				if (tab.name == null || tagTabs.stream().anyMatch(t -> same(t, tab.name)))
+				if (tab.name == null)
 				{
 					continue;
 				}
-				tagTabs.add(tab.name);
+				if (tagTabs.stream().noneMatch(t -> same(t, tab.name)))
+				{
+					tagTabs.add(tab.name);
+				}
 				if (tab.icon != null && configManager.getConfiguration(BANKTAGS_GROUP, iconKey(tab.name)) == null)
 				{
 					configManager.setConfiguration(BANKTAGS_GROUP, iconKey(tab.name), tab.icon);
@@ -466,6 +478,7 @@ class BankTagsWriter
 			unregister(name);
 			members.remove(name);
 			written.remove(name);
+			writtenBlock.remove(name);
 		}
 		homes.remove(key);
 		configManager.unsetConfiguration(UltimateBankTabsConfig.GROUP, NAME_PREFIX + key);
@@ -495,6 +508,11 @@ class BankTagsWriter
 		{
 			written.put(newName, layout);
 		}
+		Boolean block = writtenBlock.remove(oldName);
+		if (block != null)
+		{
+			writtenBlock.put(newName, block);
+		}
 		register(newName);
 		log.debug("tab {} renamed {} -> {}", key, oldName, newName);
 	}
@@ -506,6 +524,7 @@ class BankTagsWriter
 		if (key != null)
 		{
 			written.remove(names.get(key));
+			writtenBlock.remove(names.get(key));
 			homes.remove(key);
 			configManager.unsetConfiguration(UltimateBankTabsConfig.GROUP, PLANNED_PREFIX + key);
 			configManager.unsetConfiguration(UltimateBankTabsConfig.GROUP, HOME_PREFIX + key);
@@ -565,8 +584,18 @@ class BankTagsWriter
 		return sb.toString();
 	}
 
+	/** Whether a stored plan ("b:..." or "n:...") had the equipment block; null for plans stored before it was kept. */
+	private static Boolean plannedBlock(String value)
+	{
+		return value == null || value.length() < 2 || value.charAt(1) != ':' ? null : value.charAt(0) == 'b';
+	}
+
 	private static int[] parseLayout(String csv)
 	{
+		if (csv != null && csv.length() > 1 && csv.charAt(1) == ':')
+		{
+			csv = csv.substring(2);
+		}
 		if (csv == null || csv.isEmpty())
 		{
 			return null;
@@ -609,10 +638,35 @@ class BankTagsWriter
 	/** Remember where this plugin's tabs sit in the list, for when they come back. */
 	private void rememberOrder(List<String> tagTabs)
 	{
-		if (tagTabs.stream().anyMatch(t -> names.values().stream().anyMatch(n -> same(n, t))))
+		if (tagTabs.stream().noneMatch(t -> names.values().stream().anyMatch(n -> same(n, t))))
 		{
-			configManager.setConfiguration(UltimateBankTabsConfig.GROUP, ORDER_KEY, Text.toCSV(tagTabs));
+			return;
 		}
+		// tabs of ours already out of the list (hidden, or removed when the plugin stopped) keep their old place
+		List<String> merged = new ArrayList<>(tagTabs);
+		int at = 0;
+		for (String t : Text.fromCSV(Objects.toString(
+			configManager.getConfiguration(UltimateBankTabsConfig.GROUP, ORDER_KEY), "")))
+		{
+			int i = -1;
+			for (int k = 0; k < merged.size(); k++)
+			{
+				if (same(merged.get(k), t))
+				{
+					i = k;
+					break;
+				}
+			}
+			if (i >= 0)
+			{
+				at = i + 1;
+			}
+			else if (names.values().stream().anyMatch(n -> same(n, t)))
+			{
+				merged.add(at++, t);
+			}
+		}
+		configManager.setConfiguration(UltimateBankTabsConfig.GROUP, ORDER_KEY, Text.toCSV(merged));
 	}
 
 	/** Where a tab coming back goes: right after the tab before it in the remembered order, else at the end. */
@@ -662,6 +716,23 @@ class BankTagsWriter
 		return icon.equals(heldIcons.get(Text.standardize(tag)));
 	}
 
+	/** On but empty: out of the tab list, so Bank Tags holds no tab of ours under its name. */
+	boolean isHidden(String key)
+	{
+		return hiddenKeys.contains(key);
+	}
+
+	/** At startup (maybe at an open bank): Bank Tags' own tab list and icons are what its next save writes back. */
+	void bankHolds(Collection<TagTab> tabs)
+	{
+		loaded = tabs.stream().map(t -> Text.standardize(t.getTag())).collect(Collectors.toSet());
+		heldIcons.clear();
+		for (TagTab t : tabs)
+		{
+			heldIcons.put(Text.standardize(t.getTag()), String.valueOf(t.getIconItemId()));
+		}
+	}
+
 	/** The player picked this icon with Change icon: Bank Tags holds it now. */
 	void iconPicked(String tag, String icon)
 	{
@@ -690,6 +761,7 @@ class BankTagsWriter
 		unregister(name);
 		members.remove(name);
 		written.remove(name);
+		writtenBlock.remove(name);
 	}
 
 	private void register(String name)
