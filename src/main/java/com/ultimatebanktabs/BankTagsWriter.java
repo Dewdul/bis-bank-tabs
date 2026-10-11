@@ -51,6 +51,8 @@ class BankTagsWriter
 	/** tag name -> items the tab shows (canonical ids) */
 	private final Map<String, Set<Integer>> members = new HashMap<>();
 	private final Map<String, int[]> written = new HashMap<>();
+	/** the player's replaced tabs: never reused as names for ours */
+	private final Set<String> reserved = new HashSet<>();
 	private boolean writing;
 
 	BankTagsWriter(ConfigManager configManager, TagManager tagManager, LayoutManager layoutManager,
@@ -78,6 +80,11 @@ class BankTagsWriter
 	String keyOf(String tag)
 	{
 		return names.entrySet().stream().filter(e -> e.getValue().equals(tag)).map(Map.Entry::getKey).findFirst().orElse(null);
+	}
+
+	String tagOf(String key)
+	{
+		return names.get(key);
 	}
 
 	/** Re-adopt the tag names chosen in earlier sessions. */
@@ -200,6 +207,96 @@ class BankTagsWriter
 		unregisterAll();
 	}
 
+	/** The tabs in the bank that this plugin didn't make, in tab order. */
+	List<String> otherTabs()
+	{
+		List<String> others = new ArrayList<>(Text.fromCSV(
+			Objects.toString(configManager.getConfiguration(BANKTAGS_GROUP, TAG_TABS), "")));
+		others.removeAll(names.values());
+		return others;
+	}
+
+	/**
+	 * Take every other tab out of the bank (the player agreed to this plugin
+	 * replacing them). Items keep their tags, so "tag:" searches still work.
+	 *
+	 * @return the removed tabs with their icons and layouts, for {@link #restoreOthers}
+	 */
+	List<SavedTab> replaceOthers()
+	{
+		List<String> others = otherTabs();
+		List<SavedTab> saved = new ArrayList<>();
+		if (others.isEmpty())
+		{
+			return saved;
+		}
+		writing = true;
+		try
+		{
+			for (String name : others)
+			{
+				Layout layout = layoutManager.loadLayout(name);
+				saved.add(new SavedTab(name, configManager.getConfiguration(BANKTAGS_GROUP, ICON_PREFIX + name),
+					layout == null ? null : layout.getLayout()));
+				if (name.equals(bankTagsService.getActiveTag()))
+				{
+					bankTagsService.closeBankTag();
+				}
+				configManager.unsetConfiguration(BANKTAGS_GROUP, ICON_PREFIX + name);
+				layoutManager.removeLayout(name);
+			}
+			configManager.setConfiguration(BANKTAGS_GROUP, TAG_TABS, Text.toCSV(new ArrayList<>(names.values())));
+		}
+		finally
+		{
+			writing = false;
+		}
+		reserved.addAll(others);
+		return saved;
+	}
+
+	/** Put back tabs taken out by {@link #replaceOthers}, after any tabs still there. */
+	void restoreOthers(List<SavedTab> saved)
+	{
+		writing = true;
+		try
+		{
+			List<String> tagTabs = new ArrayList<>(Text.fromCSV(
+				Objects.toString(configManager.getConfiguration(BANKTAGS_GROUP, TAG_TABS), "")));
+			List<String> before = new ArrayList<>(tagTabs);
+			for (SavedTab tab : saved)
+			{
+				if (tab.name == null || tagTabs.contains(tab.name))
+				{
+					continue;
+				}
+				tagTabs.add(tab.name);
+				if (tab.icon != null && configManager.getConfiguration(BANKTAGS_GROUP, ICON_PREFIX + tab.name) == null)
+				{
+					configManager.setConfiguration(BANKTAGS_GROUP, ICON_PREFIX + tab.name, tab.icon);
+				}
+				if (tab.layout != null && layoutManager.loadLayout(tab.name) == null)
+				{
+					layoutManager.saveLayout(new Layout(tab.name, tab.layout));
+				}
+			}
+			if (!tagTabs.equals(before))
+			{
+				configManager.setConfiguration(BANKTAGS_GROUP, TAG_TABS, Text.toCSV(tagTabs));
+			}
+		}
+		finally
+		{
+			writing = false;
+		}
+	}
+
+	/** Names a new tab of ours must not take: the replaced tabs come back under them. */
+	void reserve(Collection<String> tags)
+	{
+		reserved.addAll(tags);
+	}
+
 	/** Forget the in-memory tags without touching config (plugin stop that keeps tabs). */
 	void unregisterAll()
 	{
@@ -320,12 +417,28 @@ class BankTagsWriter
 		}
 		for (String name : candidates)
 		{
-			if (!tagTabs.contains(name) && !names.containsValue(name) && tagManager.getItemsForTag(name).isEmpty())
+			if (!tagTabs.contains(name) && !names.containsValue(name) && !reserved.contains(name)
+				&& tagManager.getItemsForTag(name).isEmpty())
 			{
 				return name;
 			}
 		}
 		return base + " (auto " + System.currentTimeMillis() + ")";
+	}
+
+	/** One of the player's own tabs, kept while this plugin has replaced it (stored as JSON). */
+	static class SavedTab
+	{
+		String name;
+		String icon;
+		int[] layout;
+
+		SavedTab(String name, String icon, int[] layout)
+		{
+			this.name = name;
+			this.icon = icon;
+			this.layout = layout;
+		}
 	}
 
 	/** What one tab should show. */

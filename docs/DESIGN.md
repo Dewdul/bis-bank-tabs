@@ -10,6 +10,11 @@ Started 2026-10-04. The request was an "ultimate bank plugin" that does three th
 - **Layouts are written only when the computed layout changes.** A player's drag-rearrangement survives until the tab's contents change. An open tab that changes is reopened with `BankTagsService.openBankTag`.
 - **Tag names avoid collisions.** A name is skipped if it is in `tagtabs` but not owned by this plugin, or if any item carries it as a tag. The fallbacks are "x bis", "x (auto)" and "x (auto N)". The chosen name is stored in `ultimatebanktabs.tagName_<key>`.
 - **Deleting a tab turns it off.** If the player removes or renames a plugin tab, the `tagtabs` change arrives while the plugin is not writing. The tab's toggle is then set to off, so the plugin does not fight the player.
+- **It replaces the player's tabs, with consent.** On the first start, if `tagtabs` holds tabs the plugin didn't make, a dialog lists them and asks. *Replace my tabs* removes them from `tagtabs` with their icons and layouts. Item tags stay, so `tag:` searches still work. The removed tabs are saved as JSON in `ultimatebanktabs.replacedTabs`, and their names are reserved so new plugin tabs can't take them. *Turn plugin off* (or closing the dialog) disables the plugin. Nothing is built until `replaceAccepted` is set. That flag is global, as Bank Tags config is shared by all accounts.
+  - **Restoring is on demand, not on shutdown.** A Hub update stops and restarts the plugin, so restoring on shutdown would hand the tabs back and ask again after every update. Instead the self-resetting "Bring back replaced tabs" setting appends the saved tabs to `tagtabs`.
+  - **The Hub install warning.** The plugin-hub file should also carry `warning=` text (see Hub submission below). RuneLite then shows it in a confirm dialog before installing.
+- **Conflicting plugins.** Each bank open warns once per session in chat about enabled Auto Bank Sorter, Bank Assistant, Bank Sorter or Sorted Bank. Matching uses `ExternalPluginManager.getInternalName`, or the descriptor name as a fallback. The first-run dialog lists them too.
+- **Skill icons.** Bank Tags draws tab icons as items only: the icon is the `+1` child after each background, from child 4 of `Bankmain.ITEMS_CONTAINER`. On `BeforeRender`, `SkillIcons` swaps our tabs' icons for a sprite: the `Staticons` skill icons, Attack for melee, and `OrbIcon.RUN` for movement. Each sprite is centred at its native size. This is reapplied every frame because `layoutTabs` resets Y on scroll and `rebuildTabs` recreates the widgets. The best item is still written to `icon_<tag>`, so tabs drawn without the plugin show an item. A Change icon pick wins over the sprite.
 - **Turning the plugin off can remove its tabs.** "Remove tabs when turned off" (default on) deletes the plugin's `tagtabs` entries, icons and layouts on `shutDown`. The tag names are kept so the tabs come back on start.
 
 ## Ownership
@@ -82,3 +87,11 @@ This plugin differs in several ways:
 - It keeps no item tags in config.
 
 Other related hub plugins are Bank Assistant, BiS Gear, GearForge, Wiki Gear Setups and Bank Tag Generation.
+
+## Hub submission
+
+The plugin-hub file (`plugins/ultimate-bank-tabs`) should include an install warning, for example:
+
+```
+warning=Ultimate Bank Tabs replaces your bank tag tabs with its own. It asks before removing your current tabs, and keeps a backup you can bring back from its settings.
+```

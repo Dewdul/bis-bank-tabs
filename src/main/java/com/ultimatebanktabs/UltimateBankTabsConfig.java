@@ -75,12 +75,32 @@ public interface UltimateBankTabsConfig extends Config
 		return false;
 	}
 
-	@ConfigItem(keyName = "dynamicIcons", name = "Best item as tab icon", position = 7, section = contents,
-		description = "Use your best item for each tab's icon (your best weapon, food, bones, herb...). An icon you"
-			+ " pick with a tab's Change icon option is kept; switch this off and on to hand icons back to the plugin")
-	default boolean dynamicIcons()
+	enum IconStyle
 	{
-		return true;
+		SKILL("Skill icons"),
+		BEST_ITEM("Your best item");
+
+		private final String label;
+
+		IconStyle(String label)
+		{
+			this.label = label;
+		}
+
+		@Override
+		public String toString()
+		{
+			return label;
+		}
+	}
+
+	@ConfigItem(keyName = "tabIcons", name = "Tab icons", position = 7, section = contents,
+		description = "Skill icons (Attack for melee, Run for movement), or your best item for each tab (best weapon,"
+			+ " food, bones, herb...). An icon you pick with a tab's Change icon option is kept; change this setting to"
+			+ " hand icons back to the plugin")
+	default IconStyle tabIcons()
+	{
+		return IconStyle.SKILL;
 	}
 
 	@ConfigItem(keyName = "showReasons", name = "Show why on hover", position = 8, section = contents,
@@ -96,6 +116,14 @@ public interface UltimateBankTabsConfig extends Config
 	default boolean removeOnStop()
 	{
 		return true;
+	}
+
+	@ConfigItem(keyName = "restoreTabs", name = "Bring back replaced tabs", position = 10, section = contents,
+		description = "Puts back the bank tabs you had before this plugin replaced them, next to its own tabs."
+			+ " Switches itself off again once done")
+	default boolean restoreTabs()
+	{
+		return false;
 	}
 
 	// ---------------------------------------------------------------- combat & movement

@@ -1,17 +1,23 @@
 package com.ultimatebanktabs;
 
 import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
 import com.google.inject.Provides;
+import java.lang.reflect.Type;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
 import javax.inject.Inject;
+import javax.swing.JOptionPane;
+import javax.swing.SwingUtilities;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.ChatMessageType;
 import net.runelite.api.Client;
@@ -21,6 +27,7 @@ import net.runelite.api.GameState;
 import net.runelite.api.Item;
 import net.runelite.api.ItemContainer;
 import net.runelite.api.ScriptID;
+import net.runelite.api.events.BeforeRender;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.GameTick;
 import net.runelite.api.events.ItemContainerChanged;
@@ -36,10 +43,13 @@ import net.runelite.client.chat.QueuedMessage;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.ConfigChanged;
+import net.runelite.client.externalplugins.ExternalPluginManager;
 import net.runelite.client.game.ItemManager;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDependency;
 import net.runelite.client.plugins.PluginDescriptor;
+import net.runelite.client.plugins.PluginInstantiationException;
+import net.runelite.client.plugins.PluginManager;
 import net.runelite.client.plugins.banktags.BankTagsPlugin;
 import net.runelite.client.plugins.banktags.BankTagsService;
 import net.runelite.client.plugins.banktags.TagManager;
@@ -57,6 +67,22 @@ import net.runelite.client.ui.overlay.OverlayManager;
 public class UltimateBankTabsPlugin extends Plugin
 {
 	private static final String OWNED_KEY = "owned";
+	/** the player agreed to this plugin replacing their bank tabs */
+	private static final String ACCEPTED_KEY = "replaceAccepted";
+	/** the tabs it replaced (JSON), for "Bring back replaced tabs" */
+	private static final String REPLACED_KEY = "replacedTabs";
+	private static final String RESTORE_KEY = "restoreTabs";
+	private static final Set<String> INTERNAL_KEYS = new HashSet<>(Arrays.asList(OWNED_KEY, ACCEPTED_KEY, REPLACED_KEY));
+	private static final Type SAVED_TABS = new TypeToken<List<BankTagsWriter.SavedTab>>()
+	{
+	}.getType();
+	/** Hub plugins that fight over the same tabs: internal name, display name, what they do. */
+	private static final String[][] CONFLICTS = {
+		{"bank-skill-sorting", "Auto Bank Sorter", "makes its own skill tabs"},
+		{"bank-assistant", "Bank Assistant", "re-lays out the bank its own way"},
+		{"bank-sorter", "Bank Sorter", "re-sorts the items inside tabs"},
+		{"sorted-bank", "Sorted Bank", "re-sorts the items inside tabs"},
+	};
 
 	@Inject
 	private Client client;
@@ -94,9 +120,19 @@ public class UltimateBankTabsPlugin extends Plugin
 	@Inject
 	private ReasonOverlay reasonOverlay;
 
+	@Inject
+	private PluginManager pluginManager;
+
 	private TabData data;
 	private TabBuilder builder;
 	private BankTagsWriter writer;
+	private SkillIcons skillIcons;
+	/** tag name -> skill sprite, for the tabs that show one */
+	private Map<String, Integer> tabSprites = new HashMap<>();
+	/** nothing is built until the player agrees to this plugin replacing their tabs */
+	private boolean accepted;
+	/** conflicting plugins already mentioned this session */
+	private final Set<String> warned = new HashSet<>();
 	/** tab key -> item id -> why the item is in that tab */
 	private volatile Map<String, Map<Integer, String>> reasons = new HashMap<>();
 
@@ -120,10 +156,18 @@ public class UltimateBankTabsPlugin extends Plugin
 		builder = new TabBuilder(data, id -> EquipStats.of(itemManager.getItemStats(id)));
 		writer = new BankTagsWriter(configManager, tagManager, layoutManager, bankTagsService, itemManager::canonicalize);
 		writer.restore(data.tabs.stream().map(t -> t.key).collect(Collectors.toList()));
+		writer.reserve(replacedTabs().stream().map(t -> t.name).collect(Collectors.toList()));
+		skillIcons = new SkillIcons(client);
+		accepted = Boolean.parseBoolean(configManager.getConfiguration(UltimateBankTabsConfig.GROUP, ACCEPTED_KEY));
 		overlayManager.add(reasonOverlay);
+		BankTagsWriter w = writer;
 		clientThread.invokeLater(() ->
 		{
-			if (client.getGameState() == GameState.LOGGED_IN)
+			if (!accepted)
+			{
+				askToReplace(w);
+			}
+			else if (client.getGameState() == GameState.LOGGED_IN)
 			{
 				loadSnapshot();
 				rebuild(false);
@@ -131,11 +175,157 @@ public class UltimateBankTabsPlugin extends Plugin
 		});
 	}
 
+	/**
+	 * First start: this plugin takes over the bank's tabs. The player's own
+	 * tabs are removed (and backed up) only once they agree; saying no turns
+	 * the plugin back off.
+	 */
+	private void askToReplace(BankTagsWriter w)
+	{
+		List<String> others = w.otherTabs();
+		if (others.isEmpty())
+		{
+			accept(w);
+			return;
+		}
+		List<String> conflicts = conflicts();
+		StringBuilder msg = new StringBuilder("<html><body style='width: 340px'>")
+			.append("<b>Ultimate Bank Tabs replaces your bank tabs with its own.</b><br><br>")
+			.append("Your ").append(others.size()).append(others.size() == 1 ? " tab" : " tabs")
+			.append(" will be removed from the bank: <i>")
+			.append(others.stream().limit(12).collect(Collectors.joining(", ")))
+			.append(others.size() > 12 ? ", ..." : "").append("</i><br><br>")
+			.append("Items keep their tags, so tag: searches still work, and a backup is kept: <b>Bring back")
+			.append(" replaced tabs</b> in this plugin's settings puts them back.");
+		if (!conflicts.isEmpty())
+		{
+			msg.append("<br><br><b>Also on:</b> ").append(String.join("; ", conflicts))
+				.append(". Turn ").append(conflicts.size() == 1 ? "it" : "them").append(" off so it doesn't fight over your tabs.");
+		}
+		msg.append("</body></html>");
+		String[] options = {"Replace my tabs", "Turn plugin off"};
+		SwingUtilities.invokeLater(() ->
+		{
+			// owned by the game window so it can't open behind it
+			int choice = JOptionPane.showOptionDialog(client.getCanvas(), msg.toString(), "Ultimate Bank Tabs",
+				JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE, null, options, options[1]);
+			if (choice == 0)
+			{
+				clientThread.invokeLater(() -> accept(w));
+			}
+			else if (writer == w)
+			{
+				turnOff();
+			}
+		});
+	}
+
+	private void accept(BankTagsWriter w)
+	{
+		if (writer != w)
+		{
+			// turned off while the question was open
+			return;
+		}
+		List<BankTagsWriter.SavedTab> saved = w.replaceOthers();
+		if (!saved.isEmpty())
+		{
+			List<BankTagsWriter.SavedTab> all = replacedTabs();
+			all.addAll(saved);
+			configManager.setConfiguration(UltimateBankTabsConfig.GROUP, REPLACED_KEY, gson.toJson(all, SAVED_TABS));
+		}
+		configManager.setConfiguration(UltimateBankTabsConfig.GROUP, ACCEPTED_KEY, true);
+		accepted = true;
+		if (client.getGameState() == GameState.LOGGED_IN)
+		{
+			if (!saved.isEmpty())
+			{
+				chat("Ultimate Bank Tabs: replaced your " + saved.size() + " bank tabs. Bring back replaced tabs in the"
+					+ " plugin settings puts them back.");
+			}
+			loadSnapshot();
+			rebuild(false);
+		}
+	}
+
+	private void turnOff()
+	{
+		pluginManager.setPluginEnabled(this, false);
+		try
+		{
+			pluginManager.stopPlugin(this);
+		}
+		catch (PluginInstantiationException e)
+		{
+			log.warn("could not turn Ultimate Bank Tabs off", e);
+		}
+	}
+
+	private List<BankTagsWriter.SavedTab> replacedTabs()
+	{
+		String json = configManager.getConfiguration(UltimateBankTabsConfig.GROUP, REPLACED_KEY);
+		List<BankTagsWriter.SavedTab> tabs = json == null || json.isEmpty() ? null : gson.fromJson(json, SAVED_TABS);
+		return tabs == null ? new ArrayList<>() : new ArrayList<>(tabs);
+	}
+
+	/** "Bring back replaced tabs": put the player's old tabs back next to ours. */
+	private void restoreReplaced()
+	{
+		if (writer == null)
+		{
+			return;
+		}
+		List<BankTagsWriter.SavedTab> saved = replacedTabs();
+		writer.restoreOthers(saved);
+		configManager.unsetConfiguration(UltimateBankTabsConfig.GROUP, REPLACED_KEY);
+		configManager.setConfiguration(UltimateBankTabsConfig.GROUP, RESTORE_KEY, false);
+		chat(saved.isEmpty() ? "Ultimate Bank Tabs: there are no replaced tabs to bring back."
+			: "Ultimate Bank Tabs: brought back " + saved.size() + " tabs. Close and reopen your bank to see them.");
+	}
+
+	/** Enabled plugins that fight over the same tabs, as "Name (what it does)". */
+	private List<String> conflicts()
+	{
+		List<String> found = new ArrayList<>();
+		for (Plugin plugin : pluginManager.getPlugins())
+		{
+			if (plugin == this || !pluginManager.isPluginEnabled(plugin))
+			{
+				continue;
+			}
+			String internal = ExternalPluginManager.getInternalName(plugin.getClass());
+			PluginDescriptor descriptor = plugin.getClass().getAnnotation(PluginDescriptor.class);
+			String name = descriptor == null ? null : descriptor.name();
+			for (String[] c : CONFLICTS)
+			{
+				if (c[0].equals(internal) || c[1].equalsIgnoreCase(name))
+				{
+					found.add(c[1] + " (" + c[2] + ")");
+				}
+			}
+		}
+		return found;
+	}
+
+	private void warnConflicts()
+	{
+		for (String conflict : conflicts())
+		{
+			if (warned.add(conflict))
+			{
+				chat("Ultimate Bank Tabs: " + conflict + " is also on. Turn one of them off so they don't fight over"
+					+ " your bank tabs.");
+			}
+		}
+	}
+
 	@Override
 	protected void shutDown()
 	{
 		overlayManager.remove(reasonOverlay);
 		reasons = new HashMap<>();
+		tabSprites = new HashMap<>();
+		warned.clear();
 		BankTagsWriter w = writer;
 		boolean remove = config.removeOnStop();
 		clientThread.invokeLater(() ->
@@ -149,6 +339,9 @@ public class UltimateBankTabsPlugin extends Plugin
 				w.unregisterAll();
 			}
 		});
+		// an open "replace your tabs?" question checks this before acting
+		writer = null;
+		accepted = false;
 		stored = new HashSet<>();
 		potions = new HashSet<>();
 		bankOpen = false;
@@ -177,6 +370,10 @@ public class UltimateBankTabsPlugin extends Plugin
 			bankOpen = true;
 			potionsDirty = true;
 			dirty = true;
+			if (accepted)
+			{
+				warnConflicts();
+			}
 		}
 	}
 
@@ -240,13 +437,43 @@ public class UltimateBankTabsPlugin extends Plugin
 		}
 	}
 
+	/** Bank Tags rebuilds and scrolls its tab widgets at will, so skill icons go back on before every frame. */
+	@Subscribe
+	public void onBeforeRender(BeforeRender event)
+	{
+		if (bankOpen && writer != null && !writer.ownedTags().isEmpty())
+		{
+			skillIcons.paint(tabSprites, this::itemIcon);
+		}
+	}
+
+	private int itemIcon(String tag)
+	{
+		try
+		{
+			return Integer.parseInt(Objects.toString(
+				configManager.getConfiguration(BankTagsWriter.BANKTAGS_GROUP, "icon_" + tag), ""));
+		}
+		catch (NumberFormatException e)
+		{
+			return -1;
+		}
+	}
+
 	@Subscribe
 	public void onConfigChanged(ConfigChanged event)
 	{
-		if (UltimateBankTabsConfig.GROUP.equals(event.getGroup()) && !event.getKey().startsWith("tagName_")
-			&& !OWNED_KEY.equals(event.getKey()))
+		if (UltimateBankTabsConfig.GROUP.equals(event.getGroup()) && RESTORE_KEY.equals(event.getKey()))
 		{
-			if ("dynamicIcons".equals(event.getKey()))
+			if (Boolean.parseBoolean(event.getNewValue()) && writer != null)
+			{
+				clientThread.invokeLater(this::restoreReplaced);
+			}
+		}
+		else if (UltimateBankTabsConfig.GROUP.equals(event.getGroup()) && !event.getKey().startsWith("tagName_")
+			&& !INTERNAL_KEYS.contains(event.getKey()))
+		{
+			if ("tabIcons".equals(event.getKey()))
 			{
 				// toggling automatic icons hands every tab's icon back to the plugin
 				data.tabs.forEach(t -> configManager.unsetConfiguration(UltimateBankTabsConfig.GROUP,
@@ -278,9 +505,10 @@ public class UltimateBankTabsPlugin extends Plugin
 		}
 		if (key.startsWith("icon_") && event.getNewValue() != null)
 		{
-			// Change icon: keep the player's pick from now on
+			// Change icon: keep the player's pick from now on (over a skill icon too)
 			configManager.setConfiguration(UltimateBankTabsConfig.GROUP, BankTagsWriter.CUSTOM_ICON_PREFIX + tabKey,
 				event.getNewValue());
+			dirty = true;
 		}
 		else if (key.startsWith("layout_") && event.getNewValue() == null)
 		{
@@ -307,6 +535,8 @@ public class UltimateBankTabsPlugin extends Plugin
 	private void tabsEdited(String oldCsv, String newCsv)
 	{
 		List<String> gone = writer.onTagTabsEdited(oldCsv, newCsv);
+		// a renamed tab keeps its skill icon under the new name
+		dirty = true;
 		for (String key : gone)
 		{
 			configManager.setConfiguration(UltimateBankTabsConfig.GROUP, UltimateBankTabsConfig.TAB_PREFIX + key, false);
@@ -448,7 +678,7 @@ public class UltimateBankTabsPlugin extends Plugin
 	private void rebuild(boolean announce)
 	{
 		dirty = false;
-		if (client.getGameState() != GameState.LOGGED_IN || stored.isEmpty() && potions.isEmpty())
+		if (!accepted || client.getGameState() != GameState.LOGGED_IN || stored.isEmpty() && potions.isEmpty())
 		{
 			// nothing known about this account yet: keep whatever tabs exist
 			return;
@@ -479,12 +709,28 @@ public class UltimateBankTabsPlugin extends Plugin
 			{
 				continue;
 			}
-			int icon = config.dynamicIcons() && built.getHero() > 0 ? built.getHero() : def.icon;
+			// the item icon also stands under a skill icon, for when Bank Tags draws the tab without us
+			int icon = built.getHero() > 0 ? built.getHero() : def.icon;
 			tabs.put(def.key, new BankTagsWriter.Tab(built.itemIds(), LayoutPlanner.plan(built, config.gapRows()), icon));
 			why.put(def.key, built.reasons());
 		}
 		int added = writer.publish(tabs, titles);
 		reasons = why;
+		Map<String, Integer> sprites = new HashMap<>();
+		if (config.tabIcons() == UltimateBankTabsConfig.IconStyle.SKILL)
+		{
+			for (String key : tabs.keySet())
+			{
+				String tag = writer.tagOf(key);
+				Integer sprite = SkillIcons.SPRITES.get(key);
+				if (tag != null && sprite != null && configManager.getConfiguration(UltimateBankTabsConfig.GROUP,
+					BankTagsWriter.CUSTOM_ICON_PREFIX + key) == null)
+				{
+					sprites.put(tag, sprite);
+				}
+			}
+		}
+		tabSprites = sprites;
 		if (added > 0 && announce)
 		{
 			chat("Ultimate Bank Tabs: " + added + (added == 1 ? " new tab is" : " new tabs are")

@@ -27,15 +27,19 @@ Only items you own appear. That means your bank, including placeholders, potion 
 - Turn each tab on or off.
 - **Backups per slot**: also show the next best one to three items for each pick.
 - **Count worn & carried items** (on by default): gear you are wearing without a bank placeholder still gets its slot.
-- Potions and food in combat tabs, supplies and finished goods in skill tabs, a blank row between sections, and your best item as each tab's icon.
+- Potions and food in combat tabs, supplies and finished goods in skill tabs, and a blank row between sections.
+- **Tab icons**: skill icons (Attack for melee, Run for movement, the cosmetics tab keeps an item), or your best item for each tab.
 - **Remove tabs when turned off**: the plugin's tabs disappear when you turn it off and come back when you turn it on.
+- **Bring back replaced tabs**: puts back the tabs you had before the plugin replaced them.
 
 ## Notes
 
-- The tabs are normal Bank Tags tabs (the core **Bank Tags** plugin must be on). Their contents are worked out from your bank each time, so the plugin never writes tags onto your items, and your own tabs and tags are left alone. If one of your tabs already uses a name such as *melee*, the plugin's tab is called *melee bis* instead.
+- The tabs are normal Bank Tags tabs (the core **Bank Tags** plugin must be on). Their contents are worked out from your bank each time, so the plugin never writes tags onto your items.
+- **The plugin replaces your bank tabs.** The first time it starts it asks before removing the tabs you already have, and saying no turns it back off. Your items keep their tags, so `tag:` searches still work, and the removed tabs are backed up: *Bring back replaced tabs* in the settings puts them back.
+- Plugins that fight over the same tabs (Auto Bank Sorter, Bank Assistant, Bank Sorter, Sorted Bank) get a warning in chat when you open the bank.
 - The tab menu options work on the plugin's tabs too:
   - **Rename** keeps the tab working under its new name.
-  - **Change icon** keeps your pick. Switch *Best item as tab icon* off and on to give icons back to the plugin.
+  - **Change icon** keeps your pick. Change the *Tab icons* setting to give icons back to the plugin.
   - **Disable layout** keeps the tab in plain bank order until you choose *Enable layout*.
   - **Delete** switches that tab off. Turn it back on in the settings.
 - You can drag items around in a tab. Your arrangement stays until the tab's contents change.
