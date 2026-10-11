@@ -59,7 +59,7 @@ import net.runelite.client.ui.overlay.OverlayManager;
 @Slf4j
 @PluginDependency(BankTagsPlugin.class)
 @PluginDescriptor(
-	name = "Ultimate Bank Tabs",
+	name = "No Brain Bank Tabs",
 	description = "Automatic bank tag tabs with your best-in-slot gear for each combat style, movement and every skill,"
 		+ " laid out for you",
 	tags = {"bank", "tags", "tabs", "bis", "best in slot", "gear", "layout", "skilling", "teleports", "organize"}
@@ -190,7 +190,7 @@ public class UltimateBankTabsPlugin extends Plugin
 		}
 		List<String> conflicts = conflicts();
 		StringBuilder msg = new StringBuilder("<html><body style='width: 340px'>")
-			.append("<b>Ultimate Bank Tabs replaces your bank tabs with its own.</b><br><br>")
+			.append("<b>No Brain Bank Tabs replaces your bank tabs with its own.</b><br><br>")
 			.append("Your ").append(others.size()).append(others.size() == 1 ? " tab" : " tabs")
 			.append(" will be removed from the bank: <i>")
 			.append(others.stream().limit(12).collect(Collectors.joining(", ")))
@@ -207,7 +207,7 @@ public class UltimateBankTabsPlugin extends Plugin
 		SwingUtilities.invokeLater(() ->
 		{
 			// owned by the game window so it can't open behind it
-			int choice = JOptionPane.showOptionDialog(client.getCanvas(), msg.toString(), "Ultimate Bank Tabs",
+			int choice = JOptionPane.showOptionDialog(client.getCanvas(), msg.toString(), "No Brain Bank Tabs",
 				JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE, null, options, options[1]);
 			if (choice == 0)
 			{
@@ -240,7 +240,7 @@ public class UltimateBankTabsPlugin extends Plugin
 		{
 			if (!saved.isEmpty())
 			{
-				chat("Ultimate Bank Tabs: replaced your " + saved.size() + " bank tabs. Bring back replaced tabs in the"
+				chat("No Brain Bank Tabs: replaced your " + saved.size() + " bank tabs. Bring back replaced tabs in the"
 					+ " plugin settings puts them back.");
 			}
 			loadSnapshot();
@@ -257,7 +257,7 @@ public class UltimateBankTabsPlugin extends Plugin
 		}
 		catch (PluginInstantiationException e)
 		{
-			log.warn("could not turn Ultimate Bank Tabs off", e);
+			log.warn("could not turn No Brain Bank Tabs off", e);
 		}
 	}
 
@@ -279,8 +279,8 @@ public class UltimateBankTabsPlugin extends Plugin
 		writer.restoreOthers(saved);
 		configManager.unsetConfiguration(UltimateBankTabsConfig.GROUP, REPLACED_KEY);
 		configManager.setConfiguration(UltimateBankTabsConfig.GROUP, RESTORE_KEY, false);
-		chat(saved.isEmpty() ? "Ultimate Bank Tabs: there are no replaced tabs to bring back."
-			: "Ultimate Bank Tabs: brought back " + saved.size() + " tabs. Close and reopen your bank to see them.");
+		chat(saved.isEmpty() ? "No Brain Bank Tabs: there are no replaced tabs to bring back."
+			: "No Brain Bank Tabs: brought back " + saved.size() + " tabs. Close and reopen your bank to see them.");
 	}
 
 	/** Enabled plugins that fight over the same tabs, as "Name (what it does)". */
@@ -313,7 +313,7 @@ public class UltimateBankTabsPlugin extends Plugin
 		{
 			if (warned.add(conflict))
 			{
-				chat("Ultimate Bank Tabs: " + conflict + " is also on. Turn one of them off so they don't fight over"
+				chat("No Brain Bank Tabs: " + conflict + " is also on. Turn one of them off so they don't fight over"
 					+ " your bank tabs.");
 			}
 		}
@@ -541,7 +541,7 @@ public class UltimateBankTabsPlugin extends Plugin
 		{
 			configManager.setConfiguration(UltimateBankTabsConfig.GROUP, UltimateBankTabsConfig.TAB_PREFIX + key, false);
 			String name = data.tabs.stream().filter(t -> t.key.equals(key)).map(t -> t.name).findFirst().orElse(key);
-			chat("Ultimate Bank Tabs: the " + name + " tab is off now. Turn it back on in the plugin settings.");
+			chat("No Brain Bank Tabs: the " + name + " tab is off now. Turn it back on in the plugin settings.");
 		}
 	}
 
@@ -735,7 +735,7 @@ public class UltimateBankTabsPlugin extends Plugin
 		tabSprites = sprites;
 		if (added > 0 && announce)
 		{
-			chat("Ultimate Bank Tabs: " + added + (added == 1 ? " new tab is" : " new tabs are")
+			chat("No Brain Bank Tabs: " + added + (added == 1 ? " new tab is" : " new tabs are")
 				+ " ready. Close and reopen your bank to see " + (added == 1 ? "it." : "them."));
 		}
 		log.debug("rebuilt {} tabs from {} owned items", tabs.size(), owned.size());

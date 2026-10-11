@@ -1,4 +1,4 @@
-"""Hand-curated tab definitions for Ultimate Bank Tabs.
+"""Hand-curated tab definitions for No Brain Bank Tabs.
 
 Names are OSRS Wiki *page* names (case-insensitive). A page covers every
 version of an item (charges, doses, charged/uncharged), so "Amulet of glory"

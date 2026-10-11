@@ -1,6 +1,6 @@
-# Ultimate Bank Tabs
+# No Brain Bank Tabs
 
-Ultimate Bank Tabs builds bank tag tabs from what you own. Each combat style gets a tab with your best-in-slot gear. There is also a tab for getting around and one for every skill. Each tab is laid out for you and updates as your bank changes.
+No Brain Bank Tabs builds bank tag tabs from what you own. Each combat style gets a tab with your best-in-slot gear. There is also a tab for getting around and one for every skill. Each tab is laid out for you and updates as your bank changes.
 
 ## Tabs
 

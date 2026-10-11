@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build tabs.json for the Ultimate Bank Tabs RuneLite plugin.
+"""Build tabs.json for the No Brain Bank Tabs RuneLite plugin.
 
 Resolves the hand-curated tab definitions in curated.py (OSRS Wiki page
 names) to item ids, adds per-skill supplies from the wiki's recipe data, and

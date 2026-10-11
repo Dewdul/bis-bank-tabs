@@ -1,4 +1,4 @@
-# Ultimate Bank Tabs: design
+# No Brain Bank Tabs: design
 
 Started 2026-10-04. The request was an "ultimate bank plugin" that does three things. It makes tabs with best-in-slot gear for each combat style, for movement, and for every skill. It works entirely from what is in the bank, including placeholders. Its tabs can hold several weapons or armour sets when each is best for something. The layout of each tab is optimised automatically.
 
@@ -99,8 +99,8 @@ Other related hub plugins are Bank Assistant, BiS Gear, GearForge, Wiki Gear Set
 
 ## Hub submission
 
-The plugin-hub file (`plugins/ultimate-bank-tabs`) should include an install warning, for example:
+The plugin-hub file (`plugins/no-brain-bank-tabs`) should include an install warning, for example:
 
 ```
-warning=Ultimate Bank Tabs replaces your bank tag tabs with its own. It asks before removing your current tabs, and keeps a backup you can bring back from its settings.
+warning=No Brain Bank Tabs replaces your bank tag tabs with its own. It asks before removing your current tabs, and keeps a backup you can bring back from its settings.
 ```
