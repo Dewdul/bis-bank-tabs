@@ -171,7 +171,9 @@ final class Scoring
 	/** Fallback ranking for a magic weapon nobody curated. */
 	static double magicWeapon(EquipStats s)
 	{
-		if (s == null || s.getSlot() != net.runelite.api.EquipmentInventorySlot.WEAPON.getSlotIdx() || s.getMagic() <= 0)
+		// a melee weapon's token magic bonus (+1 on every dagger, +5 on the voidwaker) doesn't make it one
+		if (s == null || s.getSlot() != net.runelite.api.EquipmentInventorySlot.WEAPON.getSlotIdx() || s.getMagic() <= 0
+			|| s.getMagic() * 4 < s.bestMelee())
 		{
 			return 0;
 		}

@@ -235,8 +235,17 @@ def slayer_tasks(res):
     out = {}
     for t in SLAYER_TASKS:
         def items(rows, slotted):
-            return [dict({"slot": r["slot"]} if slotted else {}, entries=res.entries(r["items"]),
-                         required=r["required"], reason=r["why"]) for r in rows]
+            out = []
+            for r in rows:
+                item = dict({"slot": r["slot"]} if slotted else {}, entries=res.entries(r["items"]),
+                            required=r["required"], reason=r["why"])
+                if r.get("style"):
+                    # the one way this style can hurt the monster (leaf-bladed, broad ammo, Magic Dart)
+                    item["style"] = r["style"]
+                if "Anti-dragon shield" in r["items"]:
+                    item["dragonfire"] = True
+                out.append(item)
+            return out
         supplies = []
         for family in t.get("supplies", []):
             for ids in res.entries(SLAYER_SUPPLIES[family]):
@@ -631,6 +640,8 @@ def main():
         "ammoClasses": {cls: res.entries(names) for cls, names in curated.AMMO_CLASSES.items()},
         "tabs": tabs,
         "slayerTasks": slayer_tasks(res),
+        # full dragonfire immunity: with one, a dragonfire shield is a choice, not a need
+        "superAntifire": res.flat(["Extended super antifire", "Super antifire potion"]),
     }
     if res.errors:
         print("\n".join(sorted(set(res.errors))))

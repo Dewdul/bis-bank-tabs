@@ -29,6 +29,8 @@ class TabData
 	List<Tab> tabs = Collections.emptyList();
 	/** in-game slayer task name (lower case) -> the setup it wants */
 	Map<String, SlayerTaskData> slayerTasks = Collections.emptyMap();
+	/** super antifire potions, every dose: full dragonfire immunity */
+	List<Integer> superAntifire = Collections.emptyList();
 
 	/** What a slayer task wants (tools/slayer_tasks.py, from the OSRS Wiki). */
 	static class SlayerTaskData
@@ -54,6 +56,10 @@ class TabData
 		List<List<Integer>> entries = Collections.emptyList();
 		boolean required;
 		String reason;
+		/** the one way this style can hurt the monster (leaf-bladed weapon, broad ammo, Magic Dart), or null */
+		String style;
+		/** dragonfire protection: needed unless the player has a super antifire */
+		boolean dragonfire;
 	}
 
 	static class Tab

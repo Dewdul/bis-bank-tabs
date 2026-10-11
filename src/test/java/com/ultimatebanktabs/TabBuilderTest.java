@@ -41,7 +41,7 @@ public class TabBuilderTest
 			ids = f.items;
 			f.stats.forEach((id, v) -> STATS.put(Integer.parseInt(id), new EquipStats((int) v[0], (int) v[1],
 				(int) v[2], (int) v[3], (int) v[4], (int) v[5], (int) v[6], (int) v[7], (int) v[8], v[9], (int) v[10],
-				(int) v[11], v[12])));
+				(int) v[11], v[12], v.length > 13 && v[13] > 0)));
 		}
 		builder = new TabBuilder(data, STATS::get);
 	}
@@ -534,6 +534,115 @@ public class TabBuilderTest
 		assertTrue("sections " + built.getSections().stream().map(TabBuilder.Section::getKey).collect(Collectors.toList()),
 			built.getSections().stream().noneMatch(s -> s.getKey().startsWith("ontask_")));
 		assertTrue("gear " + items(section(built, "gear")), items(section(built, "gear")).contains(id("Slayer helmet (i)")));
+	}
+
+	static Map<String, Integer> taskSetup(String task, String... owned)
+	{
+		return bySlot(section(slayerOnTask(task, owned), "ontask_main"));
+	}
+
+	@Test
+	public void aRecolouredSlayerHelmetIsTheTasksHelmetToo()
+	{
+		assertEquals(id("Black slayer helmet (i)"),
+			(int) taskSetup("dust devils", "Black slayer helmet (i)", "Facemask", "Trident of the swamp").get("HEAD"));
+	}
+
+	@Test
+	public void aShieldTheTaskNeedsLeavesOneHandForTheWeapon()
+	{
+		Map<String, Integer> basilisks = taskSetup("basilisks", "Scythe of Vitur", "Abyssal whip", "Mirror shield",
+			"Rune platebody");
+		assertEquals(id("Abyssal whip"), (int) basilisks.get("WEAPON"));
+		assertEquals(id("Mirror shield"), (int) basilisks.get("SHIELD"));
+		// a super antifire makes the ward a choice: the two-handed bow sets it aside
+		TabBuilder.Built vorkath = slayerOnTask("vorkath", "Twisted bow", "Dragon arrow", "Dragonfire ward",
+			"Super antifire potion");
+		Map<String, Integer> setup = bySlot(section(vorkath, "ontask_main"));
+		assertEquals(id("Twisted bow"), (int) setup.get("WEAPON"));
+		assertNull("both hands on the bow", setup.get("SHIELD"));
+		assertTrue(items(section(vorkath, "ontask_alts")).contains(id("Dragonfire ward")));
+		// without one, the dragonfire shield is needed
+		assertEquals(id("Anti-dragon shield"), (int) taskSetup("vorkath", "Twisted bow", "Dragon arrow", "Rune crossbow",
+			"Runite bolts", "Anti-dragon shield").get("SHIELD"));
+	}
+
+	@Test
+	public void aBaneLauncherTakesItsOwnAmmo()
+	{
+		Map<String, Integer> setup = taskSetup("black dragons", "Twisted bow", "Dragon arrow", "Dragon hunter crossbow",
+			"Ruby dragon bolts (e)");
+		assertEquals(id("Dragon hunter crossbow"), (int) setup.get("WEAPON"));
+		assertEquals(id("Ruby dragon bolts (e)"), (int) setup.get("AMMO"));
+	}
+
+	@Test
+	public void theTasksOwnWeaponPicksTheStyle()
+	{
+		// the lance stays out of the main weapon pick, yet arms melee
+		Map<String, Integer> red = taskSetup("red dragons", "Dragon hunter lance", "Magic shortbow", "Rune arrow",
+			"Anti-dragon shield");
+		assertEquals(id("Dragon hunter lance"), (int) red.get("WEAPON"));
+		assertNull(red.get("AMMO"));
+		// ranged comes first on vorkath, but only the lance is a dragonbane
+		assertEquals(id("Dragon hunter lance"),
+			(int) taskSetup("vorkath", "Dragon hunter lance", "Rune crossbow", "Runite bolts").get("WEAPON"));
+		// a stab weapon of the melee tab is still the vampyre bane
+		assertEquals(id("Sunspear"), (int) taskSetup("vampyres", "Abyssal whip", "Sunspear").get("WEAPON"));
+		// every Krystilia task is in the Wilderness
+		TabBuilder.Options options = new TabBuilder.Options();
+		options.slayerTask = new SlayerTask("hill giants", null, true);
+		assertEquals(id("Ursine chainmace"), (int) bySlot(section(builder.build(tab("slayer"),
+			own("Abyssal whip", "Ursine chainmace"), options), "ontask_main")).get("WEAPON"));
+	}
+
+	@Test
+	public void onlyAStyleThatCanHurtTheMonsterIsChosen()
+	{
+		// the whip can't hurt turoth; the shortbow with broad arrows can
+		Map<String, Integer> turoth = taskSetup("turoth", "Abyssal whip", "Magic shortbow", "Broad arrows");
+		assertEquals(id("Magic shortbow"), (int) turoth.get("WEAPON"));
+		assertEquals(id("Broad arrows"), (int) turoth.get("AMMO"));
+		TabBuilder.Built kurask = slayerOnTask("kurask", "Abyssal whip", "Leaf-bladed sword", "Broad arrows");
+		Map<String, Integer> setup = bySlot(section(kurask, "ontask_main"));
+		assertEquals(id("Leaf-bladed sword"), (int) setup.get("WEAPON"));
+		assertNull("no arrows in a melee set", setup.get("AMMO"));
+		assertTrue(items(section(kurask, "ontask_alts")).contains(id("Broad arrows")));
+	}
+
+	@Test
+	public void aDaggerIsNoMagicWeapon()
+	{
+		assertEquals(id("Rune crossbow"), (int) taskSetup("dust devils", "Abyssal whip", "Dragon dagger", "Rune crossbow",
+			"Runite bolts", "Slayer helmet (i)").get("WEAPON"));
+	}
+
+	@Test
+	public void aSalveThatDoesNoBetterThanTheHelmetStaysOff()
+	{
+		// the bonuses don't stack: a plain salve only matches the helmet
+		assertEquals(id("Amulet of strength"), (int) taskSetup("aberrant spectres", "Abyssal whip", "Slayer helmet (i)",
+			"Salve amulet", "Amulet of strength").get("AMULET"));
+	}
+
+	@Test
+	public void aMagicSetupBringsItsRunes()
+	{
+		Set<Integer> supplies = items(section(slayerOnTask("smoke devils", "Slayer helmet (i)", "Kodai wand",
+			"Blood rune", "Death rune", "Rune pouch"), "ontask_supplies"));
+		assertTrue(supplies.contains(id("Blood rune")));
+		assertTrue(supplies.contains(id("Death rune")));
+	}
+
+	@Test
+	public void kreearrasGrappleIsCarriedNotWorn()
+	{
+		TabBuilder.Built built = slayerOnTask("kree'arra", "Twisted bow", "Dragon arrow", "Armadyl crossbow",
+			"Mith grapple");
+		Map<String, Integer> setup = bySlot(section(built, "ontask_main"));
+		assertEquals(id("Twisted bow"), (int) setup.get("WEAPON"));
+		assertEquals(id("Dragon arrow"), (int) setup.get("AMMO"));
+		assertTrue(items(section(built, "ontask_items")).contains(id("Mith grapple")));
 	}
 
 	@Test

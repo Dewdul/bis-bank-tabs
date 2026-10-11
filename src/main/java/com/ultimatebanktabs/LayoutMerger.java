@@ -155,6 +155,15 @@ final class LayoutMerger
 			// the tab lost its equipment block: the arrangement under it moves up as a whole
 			if (!block && hadBlock)
 			{
+				// what the block showed and the plan still shows goes back to its section (or its home) below
+				Set<Integer> wasInBlock = ids(Arrays.copyOf(previous, Math.min(previous.length, BLOCK_ROWS * WIDTH)));
+				for (int i = 0; i < Math.min(out.size(), BLOCK_ROWS * WIDTH); i++)
+				{
+					if (wasInBlock.contains(out.get(i)) && now.contains(out.get(i)))
+					{
+						out.set(i, -1);
+					}
+				}
 				dropEmptyTop();
 			}
 
@@ -225,16 +234,23 @@ final class LayoutMerger
 				{
 					continue;
 				}
+				int from = -1;
 				for (int i = 0; i < out.size(); i++)
 				{
 					if (out.get(i) == best)
 					{
 						out.set(i, -1);
+						from = i;
 					}
 				}
 				int there = at(out, pos);
 				set(pos, best);
 				home.remove(family.applyAsInt(best));
+				if (!hadBlock && from >= floor)
+				{
+					// the block just came: the item's way back when it goes again (a slayer task ends)
+					home.put(family.applyAsInt(best), from);
+				}
 				if (there != -1)
 				{
 					displaced.add(there);

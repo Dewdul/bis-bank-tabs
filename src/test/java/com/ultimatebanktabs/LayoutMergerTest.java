@@ -517,6 +517,34 @@ public class LayoutMergerTest
 	}
 
 	@Test
+	public void aBlockThatComesAndGoesLeavesTheirArrangementAsItWas()
+	{
+		Map<Integer, Integer> home = new HashMap<>();
+		int weapon = 2 * W;
+		int shield = 2 * W + 2;
+		Set<Integer> bis = new HashSet<>(Arrays.asList(HEAD, weapon, shield));
+		// no slayer task: helmet, shield and hammer in the gear row, food under it
+		int[] none = layout(W + 1, 0, 100, 1, 101, 2, 102, W, 200);
+		String[] noneRows = rows(2, 0, "gear", "food");
+		// on task: helmet and shield in the block with the whip, the hammer and food below
+		int[] task = layout(ROW5 + W + 1, HEAD, 100, weapon, 103, shield, 101, ROW5, 102, ROW5 + W, 200);
+		String[] taskRows = rows(7, 0, "block", null, null, null, null, "gear", "food");
+		int[] saved = none.clone();
+		// they swapped the helmet and the shield
+		saved[0] = 101;
+		saved[1] = 100;
+		int[] theirs = saved.clone();
+		for (int round = 0; round < 3; round++)
+		{
+			int[] on = LayoutMerger.next(saved, none, task, taskRows, bis, true, false, id -> id, home);
+			assertEquals(100, on[HEAD]);
+			assertEquals(101, on[shield]);
+			saved = LayoutMerger.next(on, task, none, noneRows, Collections.emptySet(), false, true, id -> id, home);
+			assertArrayEquals("after task " + (round + 1), theirs, saved);
+		}
+	}
+
+	@Test
 	public void noGearBlockMeansNoReservedCells()
 	{
 		int[] previous = layout(2, 0, 30, 1, 31);

@@ -66,6 +66,10 @@ ITEMS = [
     "Unicorn horn dust", "Superantipoison",
     # slayer tasks
     "Mirror shield",
+    # slayer task setups
+    "Black slayer helmet (i)", "Facemask", "Trident of the swamp", "Dragon hunter crossbow", "Rune arrow",
+    "Anti-dragon shield", "Broad arrows", "Dragon dagger", "Salve amulet", "Sunspear", "Mith grapple",
+    "Dragonfire ward", "Super antifire potion", "Leaf-bladed sword",
 ]
 STAT_FIELDS = ["stab_attack_bonus", "slash_attack_bonus", "crush_attack_bonus", "range_attack_bonus",
                "magic_attack_bonus", "strength_bonus", "ranged_strength_bonus", "magic_damage_bonus", "prayer_bonus"]
@@ -105,7 +109,7 @@ def main():
             g = (lambda k: float(b.get(k) or 0)) if b else (lambda k: 0.0)
             slot = SLOT.get(b.get("equipment_slot"), -1) if b else -1
             stats[str(item_id)] = [slot, int(g("weapon_attack_speed"))] + [g(k) for k in STAT_FIELDS] + \
-                [sum(g(k) for k in DEF_FIELDS), weight.get(sub, 0.0)]
+                [sum(g(k) for k in DEF_FIELDS), weight.get(sub, 0.0), 1 if b and b.get("equipment_slot") == "2h" else 0]
     missing = [n for n in ITEMS if n not in items]
     if missing:
         sys.exit("not found: %s" % missing)

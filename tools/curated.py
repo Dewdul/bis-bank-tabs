@@ -265,11 +265,11 @@ _BOLT_EFFECTS = [("Opal", "Lucky Lightning: extra damage, best against low defen
 ENCHANTED_BOLTS = [(name, effect) for gem, effect in _BOLT_EFFECTS
                    for name in ("%s dragon bolts (e)" % gem, "%s bolts (e)" % gem)]
 
-ARROWS = ["Dragon arrow", "Amethyst arrow", "Rune arrow", "Adamant arrow", "Mithril arrow", "Steel arrow",
-          "Iron arrow", "Bronze arrow"]
+ARROWS = ["Dragon arrow", "Amethyst arrow", "Rune arrow", "Adamant arrow", "Seeking broad arrows", "Broad arrows",
+          "Mithril arrow", "Steel arrow", "Iron arrow", "Bronze arrow"]
 BOLTS = ["Ruby dragon bolts (e)", "Diamond dragon bolts (e)", "Dragonstone dragon bolts (e)", "Onyx dragon bolts (e)",
          "Ruby bolts (e)", "Diamond bolts (e)", "Dragonstone bolts (e)", "Onyx bolts (e)", "Dragon bolts",
-         "Runite bolts", "Broad bolts", "Adamant bolts", "Mithril bolts", "Steel bolts", "Iron bolts", "Bronze bolts"]
+         "Runite bolts", "Amethyst broad bolts", "Broad bolts", "Adamant bolts", "Mithril bolts", "Steel bolts", "Iron bolts", "Bronze bolts"]
 JAVELINS = ["Dragon javelin", "Amethyst javelin", "Rune javelin", "Adamant javelin", "Mithril javelin"]
 DARTS = ["Dragon dart", "Amethyst dart", "Rune dart", "Adamant dart", "Mithril dart", "Black dart", "Steel dart"]
 
@@ -1355,6 +1355,8 @@ apply_unique(TABS, UNIQUE_USES)
 LAUNCHER_AMMO = {name: cls for name, cls in RANGED_WEAPONS if cls}
 LAUNCHER_AMMO.update({b: "arrow" for b in BOWS if b not in ("Venator bow", "Webweaver bow", "Craw's bow")})
 LAUNCHER_AMMO.update({c: "bolt" for c in CROSSBOWS if c != "Hunters' crossbow"})
+# the ornamented dragon hunter crossbows fire bolts too
+LAUNCHER_AMMO.update({"Dragon hunter crossbow (t)": "bolt", "Dragon hunter crossbow (b)": "bolt"})
 
 # ---------------------------------------------------------------- supplies from wiki recipes
 # (skill, tab key, [(section title, regex on in-game name[, order])...]). A

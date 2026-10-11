@@ -257,12 +257,45 @@ class TabBuilder
 		BANES.put("magic:wilderness", Collections.singletonList("wilderness_magic"));
 	}
 
+	/** how well a style fits the task: one that can't hurt the monster ranks below any that can */
+	private static final int UNARMED = 0;
+	private static final int CANT_HURT = 1;
+	private static final int ARMED = 2;
+	/** armed with the task's own weapon: its bane, or the only kind that hurts the monster */
+	private static final int TASK_WEAPON = 3;
+
+	/** One recommended style's take on the task. */
+	private static class Choice
+	{
+		final String style;
+		final TabData.Tab def;
+		final Built built;
+		/** the items it was built from (no two-handed weapons when the task needs a shield) */
+		final Context in;
+		/** the style's bane weapon for the task, or null */
+		Placement bane;
+		/** for a monster only some means hurt (kurask): the style's means, or null */
+		Placement means;
+		TabData.TaskItem meansItem;
+		int rank;
+
+		Choice(String style, TabData.Tab def, Built built, Context in)
+		{
+			this.style = style;
+			this.def = def;
+			this.built = built;
+			this.in = in;
+		}
+	}
+
 	/**
-	 * The Slayer tab's lead while on a task: the best setup for it from what the player owns. It starts
-	 * from the best-in-slot set of the first recommended style they have a weapon for, then the slayer
-	 * helmet, a salve amulet on undead, the bane weapon and the task's own gear take their slots (a gear
-	 * piece the task needs always does; one it only suggests goes beside it), then the task's tools and
-	 * supplies with that style's potions and food.
+	 * The Slayer tab's lead while on a task: the best setup for it from what the player owns. Each
+	 * recommended style is built from its best-in-slot set; the first armed with the task's own weapon wins,
+	 * else the first with any weapon that can hurt the monster. Then the slayer helmet, a salve amulet on
+	 * undead (only one that beats the helmet: their bonuses don't stack), the bane weapon and the task's own
+	 * gear take their slots: a piece the task can't do without always does, one it only suggests fills an
+	 * empty slot (not with another style's gear) or goes beside it. Then the task's tools, and its supplies
+	 * with that style's potions, food and runes.
 	 */
 	private List<Section> slayerTask(TabData.SlayerTaskData task, Context ctx, Options options)
 	{
@@ -271,36 +304,36 @@ class TabBuilder
 		styleOptions.foodCount = options.foodCount;
 		styleOptions.combatSupplies = options.combatSupplies;
 		styleOptions.blightedSupplies = false;
-		String style = null;
-		Built styled = null;
-		List<String> styles = task.styles.isEmpty() ? Collections.singletonList("melee") : task.styles;
-		for (String candidate : styles)
+		// every Krystilia task is in the Wilderness (its weapons win, so last), whatever the task's own
+		// categories say; no other master's is
+		List<String> categories = new ArrayList<>(task.categories);
+		categories.remove("wilderness");
+		if (options.slayerTask.isWilderness())
 		{
-			TabData.Tab def = data.tabs.stream().filter(t -> t.key.equals(candidate)).findFirst().orElse(null);
-			if (def == null)
+			categories.add("wilderness");
+		}
+		boolean superAntifire = data.superAntifire.stream().anyMatch(ctx.owned::contains);
+		// a shield the task can't do without (the mirror shield on basilisks) leaves one hand for the weapon
+		boolean needsShield = task.slots.stream().anyMatch(i -> "SHIELD".equals(i.slot) && needed(i, superAntifire)
+			&& !firstOwned(i.entries, ctx, 1).isEmpty());
+		Choice c = chooseStyle(task, categories, needsShield ? oneHanded(ctx.owned) : ctx.owned, options, styleOptions);
+		if (needsShield && (c == null || c.rank < ARMED))
+		{
+			// only two-handed weapons: one of them beats none
+			Choice any = chooseStyle(task, categories, ctx.owned, options, styleOptions);
+			if (any != null && (c == null || any.rank > c.rank))
 			{
-				continue;
-			}
-			Built b = build(def, ctx.owned, styleOptions);
-			boolean armed = b.getSections().stream().filter(sec -> "main".equals(sec.getKey()))
-				.flatMap(sec -> sec.getItems().stream()).anyMatch(p -> "WEAPON".equals(p.getSlot()));
-			if (styled == null || armed && style != null && !armedWith(styled))
-			{
-				style = candidate;
-				styled = b;
-			}
-			if (armed)
-			{
-				break;
+				c = any;
 			}
 		}
-		if (styled == null)
+		if (c == null)
 		{
 			return Collections.emptyList();
 		}
+		String style = c.style;
 		Map<String, Placement> main = new LinkedHashMap<>();
 		Map<String, List<Placement>> byGroup = new HashMap<>();
-		for (Section sec : styled.getSections())
+		for (Section sec : c.built.getSections())
 		{
 			for (Placement p : sec.getItems())
 			{
@@ -312,47 +345,107 @@ class TabBuilder
 			}
 		}
 		String on = "On task: " + task.name;
-		takeSlot(main, byGroup.get("slayer_helm"), "HEAD", "Slayer helmet: stronger on every slayer task");
-		if (task.categories.contains("undead"))
+		Placement styledWeapon = main.get("WEAPON");
+		Placement styledHead = main.get("HEAD");
+		boolean helmet = takeSlot(main, byGroup.get("slayer_helm"), "HEAD", "Slayer helmet: stronger on every slayer task",
+			c.def, "slayer_helm");
+		if (categories.contains("undead"))
 		{
-			takeSlot(main, byGroup.get("salve"), "AMULET", "Salve amulet: stronger against undead");
-		}
-		for (String category : task.categories)
-		{
-			if ("wilderness".equals(category) && !options.slayerTask.isWilderness())
+			Placement there = main.get("AMULET");
+			List<Placement> salves = byGroup.get("salve");
+			int salve = salves != null && !salves.isEmpty() ? salves.get(0).getItemId()
+				: there != null && entryIndex(c.def, "salve", there.getItemId()) >= 0 ? there.getItemId() : -1;
+			// best first: (ei), then on melee (e), (i), plain
+			int tier = entryIndex(c.def, "salve", salve);
+			// its bonus replaces the helmet's, never adds to it: only the (ei), or the (e) on melee, does better
+			if (salve != -1 && (!helmet || tier == 0 || tier == 1 && "melee".equals(style)))
 			{
-				continue;
-			}
-			for (String key : BANES.getOrDefault(style + ":" + category, Collections.emptyList()))
-			{
-				if (takeSlot(main, byGroup.get(key), "WEAPON", null))
+				main.put("AMULET", new Placement(salve, "AMULET", "task_AMULET", "Salve amulet: stronger against undead"));
+				if (helmet && styledHead != null && entryIndex(c.def, "slayer_helm", styledHead.getItemId()) < 0)
 				{
-					break;
+					// the helmet adds nothing over the salve: the best helmet for stats instead
+					main.put("HEAD", styledHead);
 				}
 			}
 		}
+		if (c.bane != null)
+		{
+			main.put("WEAPON", c.bane);
+		}
+		fitAmmo(main, styledWeapon, c.in);
+		Placement weapon = main.get("WEAPON");
+
 		List<Placement> beside = new ArrayList<>();
+		Set<String> needs = new HashSet<>();
+		boolean taskAmmo = false;
 		for (TabData.TaskItem item : task.slots)
 		{
-			List<Integer> got = firstOwned(item.entries, ctx, 1);
-			if (got.isEmpty())
+			if (item.style != null)
+			{
+				// one style's only means: it takes its slot in that style's set and goes beside any other
+				Placement p = item == c.meansItem ? c.means : first(item, ctx);
+				if (p == null)
+				{
+					continue;
+				}
+				if (item == c.meansItem)
+				{
+					main.put(item.slot, p);
+					needs.add(item.slot);
+					taskAmmo |= "AMMO".equals(item.slot);
+				}
+				else
+				{
+					beside.add(p);
+				}
+				continue;
+			}
+			Placement p = first(item, ctx);
+			if (p == null)
 			{
 				continue;
 			}
-			Placement p = new Placement(got.get(0), item.slot, "task_" + item.slot, item.reason);
 			Placement there = main.get(item.slot);
-			if (there != null && there.getItemId() == p.getItemId())
+			boolean need = needed(item, superAntifire);
+			// the slot already holds it, or (when only suggested) another of the task's choices for it, like an
+			// auto-picked dragonfire ward: that stays, for the task's reason
+			if (there != null && (there.getItemId() == p.getItemId()
+				|| !need && item.entries.stream().anyMatch(e -> e.contains(there.getItemId()))))
 			{
+				main.put(item.slot, new Placement(there.getItemId(), item.slot, "task_" + item.slot, item.reason));
+				if (need)
+				{
+					needs.add(item.slot);
+				}
 				continue;
 			}
-			if (item.required || there == null)
+			// another style's gear never fills an empty slot (brutal arrows in a melee set's quiver)
+			String of = styleOf(p.getItemId());
+			if (need || there == null && (of == null || of.equals(style)))
 			{
 				main.put(item.slot, p);
+				taskAmmo |= "AMMO".equals(item.slot);
+				if (need)
+				{
+					needs.add(item.slot);
+				}
 			}
 			else
 			{
 				beside.add(p);
 			}
+		}
+		if (!taskAmmo)
+		{
+			fitAmmo(main, weapon, c.in);
+		}
+		Placement wielded = main.get("WEAPON");
+		Placement shield = main.get("SHIELD");
+		if (wielded != null && shield != null && !needs.contains("SHIELD") && twoHanded(wielded.getItemId()))
+		{
+			// both hands on the weapon: the shield waits beside it
+			main.remove("SHIELD");
+			beside.add(shield);
 		}
 
 		List<Section> out = new ArrayList<>();
@@ -362,8 +455,13 @@ class TabBuilder
 			block.add(new Placement(p.getItemId(), p.getSlot(), "task_" + p.getSlot(),
 				p.getReason() != null ? p.getReason() : on));
 		}
+		List<Placement> alts = new ArrayList<>();
+		for (Placement p : beside)
+		{
+			alts.add(new Placement(p.getItemId(), p.getSlot(), "task_" + p.getSlot(), p.getReason()));
+		}
 		out.add(new Section("ontask_main", "Task setup", "equipment", claim(block, ctx)));
-		out.add(new Section("ontask_alts", "Task alternatives", "alts", claim(beside, ctx)));
+		out.add(new Section("ontask_alts", "Task alternatives", "alts", claim(alts, ctx)));
 		List<Placement> tools = new ArrayList<>();
 		for (boolean required : new boolean[]{true, false})
 		{
@@ -387,9 +485,11 @@ class TabBuilder
 				supplies.add(new Placement(id, null, "task_supplies", "Needed on this task"));
 			}
 		}
-		for (Section sec : styled.getSections())
+		for (Section sec : c.built.getSections())
 		{
-			if (sec.getKey().startsWith("supplies"))
+			// a spellcasting setup takes its runes (and the pouch): all but the teleport and alching ones
+			if (sec.getKey().startsWith("supplies")
+				|| sec.getKey().startsWith("runes") && !"runes_utility".equals(sec.getKey()))
 			{
 				supplies.addAll(sec.getItems());
 			}
@@ -398,21 +498,218 @@ class TabBuilder
 		return out;
 	}
 
-	private static boolean armedWith(Built b)
+	/** Each recommended style built from {@code pool}, ranked; the best (the earliest of equals), or null. */
+	private Choice chooseStyle(TabData.SlayerTaskData task, List<String> categories, Set<Integer> pool, Options options,
+		Options styleOptions)
 	{
-		return b.getSections().stream().filter(sec -> "main".equals(sec.getKey()))
-			.flatMap(sec -> sec.getItems().stream()).anyMatch(p -> "WEAPON".equals(p.getSlot()));
+		Context in = new Context(pool, options);
+		Choice best = null;
+		List<String> styles = task.styles.isEmpty() ? Collections.singletonList("melee") : task.styles;
+		for (String style : styles)
+		{
+			TabData.Tab def = data.tabs.stream().filter(t -> t.key.equals(style)).findFirst().orElse(null);
+			if (def == null)
+			{
+				continue;
+			}
+			Choice c = new Choice(style, def, build(def, pool, styleOptions), in);
+			c.bane = bane(def, style, categories, in);
+			// the lance, arclight and leaf-bladed weapons stay out of the main weapon pick: a bane counts too
+			Placement weapon = c.bane != null ? c.bane : mainItem(c.built, "WEAPON");
+			boolean limited = false;
+			for (TabData.TaskItem item : task.slots)
+			{
+				if (item.required && style.equals(item.style))
+				{
+					limited = true;
+					if (c.means == null)
+					{
+						c.means = means(item, weapon, in);
+						c.meansItem = c.means != null ? item : null;
+					}
+				}
+			}
+			boolean armed = weapon != null || c.means != null && "WEAPON".equals(c.means.getSlot());
+			c.rank = !armed ? UNARMED : limited && c.means == null ? CANT_HURT
+				: c.bane != null || c.means != null ? TASK_WEAPON : ARMED;
+			if (best == null || c.rank > best.rank)
+			{
+				best = c;
+			}
+			if (c.rank == TASK_WEAPON)
+			{
+				break;
+			}
+		}
+		return best;
 	}
 
-	/** Put the first of these placements into a slot of the task block; false if there was none. */
-	private static boolean takeSlot(Map<String, Placement> main, List<Placement> from, String slot, String reason)
+	/**
+	 * The style's owned bane weapon for these task categories (a later category's wins: the Wilderness
+	 * weapon over demonbane), or null. Read from the pick itself: the style's build may show the weapon in
+	 * a stab, slash or crush row instead.
+	 */
+	private static Placement bane(TabData.Tab def, String style, List<String> categories, Context in)
 	{
-		if (from == null || from.isEmpty())
+		Placement bane = null;
+		for (String category : categories)
+		{
+			for (String key : BANES.getOrDefault(style + ":" + category, Collections.emptyList()))
+			{
+				TabData.Pick pick = pick(def, key);
+				List<Integer> got = pick == null ? Collections.emptyList() : firstOwned(pick.entries, in, 1);
+				if (!got.isEmpty())
+				{
+					bane = new Placement(got.get(0), "WEAPON", "task_WEAPON", entryReason(pick, got.get(0), in));
+					break;
+				}
+			}
+		}
+		return bane;
+	}
+
+	/** The owned item of a style's only means that works with its weapon (broad bolts need a crossbow), or null. */
+	private Placement means(TabData.TaskItem item, Placement weapon, Context in)
+	{
+		String cls = weapon != null ? launcherAmmo.get(weapon.getItemId()) : null;
+		List<List<Integer>> fits = cls != null ? data.ammoClasses.getOrDefault(cls, Collections.emptyList())
+			: Collections.emptyList();
+		for (List<Integer> entry : item.entries)
+		{
+			for (int id : ownedOf(entry, in))
+			{
+				if (!"AMMO".equals(item.slot) || fits.stream().anyMatch(e -> e.contains(id)))
+				{
+					return new Placement(id, item.slot, "task_" + item.slot, item.reason);
+				}
+			}
+		}
+		return null;
+	}
+
+	/** A launcher swapped into the set fires its own ammo: the set's ammo fit the weapon it replaced. */
+	private void fitAmmo(Map<String, Placement> main, Placement before, Context in)
+	{
+		Placement weapon = main.get("WEAPON");
+		int was = before != null ? before.getItemId() : -1;
+		if (weapon == null || weapon.getItemId() == was
+			|| !launcherAmmo.containsKey(was) && !launcherAmmo.containsKey(weapon.getItemId()))
+		{
+			// the same weapon, or neither takes ammo (melee, magic): the slot stays as it is
+			return;
+		}
+		main.remove("AMMO");
+		String cls = launcherAmmo.get(weapon.getItemId());
+		List<Integer> ammo = cls == null ? Collections.emptyList()
+			: firstOwned(data.ammoClasses.getOrDefault(cls, Collections.emptyList()), in, 1);
+		if (!ammo.isEmpty())
+		{
+			main.put("AMMO", new Placement(ammo.get(0), "AMMO", "task_AMMO", "Best ammo for this weapon"));
+		}
+	}
+
+	/** The task can't be done without it: required, or dragonfire protection without a super antifire. */
+	private static boolean needed(TabData.TaskItem item, boolean superAntifire)
+	{
+		return item.required || item.dragonfire && !superAntifire;
+	}
+
+	/** The task item's best owned choice, or null. */
+	private static Placement first(TabData.TaskItem item, Context ctx)
+	{
+		List<Integer> got = firstOwned(item.entries, ctx, 1);
+		return got.isEmpty() ? null : new Placement(got.get(0), item.slot, "task_" + item.slot, item.reason);
+	}
+
+	/** The combat style an item's attack bonuses serve, or null for one without (armour, shields, blessings). */
+	private String styleOf(int id)
+	{
+		EquipStats s = stats.apply(id);
+		if (s == null)
+		{
+			return null;
+		}
+		if (s.getRanged() > 0 || s.getRstr() > 0)
+		{
+			return "ranged";
+		}
+		if (s.getMdmg() > 0 || s.getMagic() > 0 && s.getMagic() * 4 >= s.bestMelee())
+		{
+			return "magic";
+		}
+		return s.bestMelee() > 0 || s.getStr() > 0 ? "melee" : null;
+	}
+
+	private boolean twoHanded(int id)
+	{
+		EquipStats s = stats.apply(id);
+		return s != null && s.isTwoHanded();
+	}
+
+	private Set<Integer> oneHanded(Set<Integer> owned)
+	{
+		Set<Integer> out = new HashSet<>();
+		for (int id : owned)
+		{
+			if (!twoHanded(id))
+			{
+				out.add(id);
+			}
+		}
+		return out;
+	}
+
+	private static boolean armedWith(Built b)
+	{
+		return mainItem(b, "WEAPON") != null;
+	}
+
+	/** The item in a slot of the build's best-in-slot set, or null. */
+	private static Placement mainItem(Built b, String slot)
+	{
+		return b.getSections().stream().filter(sec -> "main".equals(sec.getKey()))
+			.flatMap(sec -> sec.getItems().stream()).filter(p -> slot.equals(p.getSlot())).findFirst().orElse(null);
+	}
+
+	private static TabData.Pick pick(TabData.Tab def, String key)
+	{
+		return def.sections.stream().flatMap(sec -> sec.picks.stream()).filter(p -> key.equals(p.key))
+			.findFirst().orElse(null);
+	}
+
+	/** Which entry of the tab's pick holds the item (0 = its best), or -1. */
+	private static int entryIndex(TabData.Tab def, String key, int id)
+	{
+		TabData.Pick pick = pick(def, key);
+		if (pick == null || id == -1)
+		{
+			return -1;
+		}
+		for (int i = 0; i < pick.entries.size(); i++)
+		{
+			if (pick.entries.get(i).contains(id))
+			{
+				return i;
+			}
+		}
+		return -1;
+	}
+
+	/**
+	 * Put the first of these placements into a slot of the task block. When there are none, the slot may
+	 * hold the pick's item already (the best-in-slot pick took it): it stays, for this reason. False if
+	 * neither.
+	 */
+	private static boolean takeSlot(Map<String, Placement> main, List<Placement> from, String slot, String reason,
+		TabData.Tab def, String key)
+	{
+		boolean listed = from != null && !from.isEmpty();
+		Placement p = listed ? from.get(0) : main.get(slot);
+		if (p == null || !listed && entryIndex(def, key, p.getItemId()) < 0)
 		{
 			return false;
 		}
-		Placement p = from.get(0);
-		main.put(slot, new Placement(p.getItemId(), slot, "task_" + slot, reason != null ? reason : p.getReason()));
+		main.put(slot, new Placement(p.getItemId(), slot, "task_" + slot, reason));
 		return true;
 	}
 

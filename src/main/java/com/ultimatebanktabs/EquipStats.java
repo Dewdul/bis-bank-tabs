@@ -29,6 +29,14 @@ class EquipStats
 	int prayer;
 	int defence;
 	double weight;
+	/** a weapon that takes both hands: no shield beside it */
+	boolean twoHanded;
+
+	EquipStats(int slot, int speed, int stab, int slash, int crush, int ranged, int magic, int str, int rstr, double mdmg,
+		int prayer, int defence, double weight)
+	{
+		this(slot, speed, stab, slash, crush, ranged, magic, str, rstr, mdmg, prayer, defence, weight, false);
+	}
 
 	static EquipStats of(ItemStats stats)
 	{
@@ -43,7 +51,7 @@ class EquipStats
 		}
 		int defence = e.getDstab() + e.getDslash() + e.getDcrush() + e.getDmagic() + e.getDrange();
 		return new EquipStats(e.getSlot(), e.getAspeed(), e.getAstab(), e.getAslash(), e.getAcrush(), e.getArange(),
-			e.getAmagic(), e.getStr(), e.getRstr(), e.getMdmg(), e.getPrayer(), defence, stats.getWeight());
+			e.getAmagic(), e.getStr(), e.getRstr(), e.getMdmg(), e.getPrayer(), defence, stats.getWeight(), e.isTwoHanded());
 	}
 
 	boolean isSlot(EquipmentInventorySlot s)

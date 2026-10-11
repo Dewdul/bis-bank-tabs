@@ -41,10 +41,19 @@ Started 2026-10-04. The request was an "ultimate bank plugin" that does three th
 - **Reading the task.** `SlayerTask.read` does what the core Slayer plugin does, so it works with that plugin off. It reads `VarPlayerID.SLAYER_COUNT` (no task at 0) and `SLAYER_TARGET`. Boss tasks (target 98) take the boss from `VarbitID.SLAYER_TARGET_BOSSID` through DB table 116. Names come from DB table 113 (`COL_NAME_UPPERCASE`), Konar's area from table 115, and Krystilia (master 7) means a Wilderness task. `VarbitChanged` on those ids re-reads the task on the next client-thread turn, and only a different task (not a kill) rebuilds.
 - **Data.** `tools/slayer_tasks.py` is wiki-researched and adversarially verified. It holds 155 tasks plus aliases, keyed by the in-game name. Each has recommended styles, bane categories, slot gear (required or suggested), carried tools and potion families. The generator writes it to `tabs.json` as `slayerTasks`.
 - **The block.**
-  - `TabBuilder.slayerTask` builds the combat tab of the first recommended style the player has a weapon for. It takes that tab's best-in-slot set, then puts the slayer helmet and (on undead) the salve amulet in their slots.
-  - The bane pick for the style and category goes in the weapon slot (`BANES`). Wilderness weapons count only on Krystilia tasks.
-  - Then the task's slot gear: a required piece takes the slot, and a suggested one goes beside it unless the slot is empty.
-  - Below come the task's tools (required first) and its potions plus that style's supplies and food. The general Slayer sections follow, without repeating anything the block shows.
+  - **Style.** `TabBuilder.slayerTask` builds the combat tab of each recommended style and ranks them:
+    - Best: armed with the task's own weapon, either its bane or the only kind that hurts the monster. Kurask and turoth tag a leaf-bladed weapon, broad ammo that fits the launcher, or a Magic Dart staff with the style each serves.
+    - Next: armed. Below that: armed but unable to hurt the monster.
+    - Ties go to the earlier style. A bane weapon arms a style even though banes stay out of the main weapon pick.
+  - **Shields.** When the task needs a shield, two-handed weapons are left out, unless they are all the player has. A shield is needed when the task requires it, or when it is dragonfire protection and the player has no super antifire. With a two-handed weapon, a shield that isn't needed goes beside the block.
+  - **Helmet and salve.** The slayer helmet goes in its slot, or keeps the cell when the best-in-slot pick already put it there. On undead, the salve goes on only if it beats the helmet, because their bonuses don't stack: the (ei), or the (e) on melee. The helmet then gives way to the best helmet for stats.
+  - **Weapon and ammo.** The bane comes from the style tab's pick, so a stab, slash or crush row can't hide it. Its category order holds, and on Krystilia tasks every task counts as Wilderness. A launcher swapped in takes ammo that fits it.
+  - **Task slot gear.** A needed piece takes the slot. A suggested one keeps a slot that already holds one of its choices (with the task's reason), or fills an empty slot when it isn't another style's gear. Otherwise it goes beside.
+  - **Below the block:**
+    - the task's tools, required first;
+    - its potions, then that style's supplies, food and combat runes;
+    - the general Slayer sections, without repeating anything the block shows.
+  - **Layout.** A block that comes and goes with the task leaves the player's arrangement where it was (`LayoutMerger`).
 
 ## Ownership
 
