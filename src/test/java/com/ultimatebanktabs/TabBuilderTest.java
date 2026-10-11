@@ -5,6 +5,7 @@ import com.google.gson.reflect.TypeToken;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -468,6 +469,28 @@ public class TabBuilderTest
 		assertEquals(id("Irit leaf"), layout[2 * w + 1]);
 		assertEquals("and beside irit", id("Eye of newt"), layout[2 * w + 2]);
 		assertTrue(herb.reasons().get(id("Eye of newt")).contains("super attack"));
+	}
+
+	@Test
+	public void iritGetsARowForEachOfItsPotions()
+	{
+		TabBuilder.Built herb = build("herblore", own("Irit leaf", "Eye of newt", "Unicorn horn dust", "Superantipoison"));
+		int[] layout = LayoutPlanner.plan(herb, false);
+		int w = LayoutPlanner.WIDTH;
+		List<Integer> iritRows = new ArrayList<>();
+		for (int i = 0; i < layout.length; i++)
+		{
+			if (layout[i] == id("Irit leaf"))
+			{
+				assertEquals("clean herbs in column 1", 1, i % w);
+				iritRows.add(i / w);
+			}
+		}
+		assertEquals("one irit row per potion", 2, iritRows.size());
+		assertEquals("super attack first", id("Eye of newt"), layout[iritRows.get(0) * w + 2]);
+		assertEquals(id("Unicorn horn dust"), layout[iritRows.get(1) * w + 2]);
+		assertEquals((int) iritRows.get(1), row(layout, id("Superantipoison")));
+		assertTrue(herb.getSections().stream().noneMatch(s -> s.getKey().equals("main") && !s.getItems().isEmpty()));
 	}
 
 	@Test

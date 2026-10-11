@@ -729,20 +729,15 @@ def situational(picks):
 
 ZEALOT = "Zealot's robes: 1.25% chance per piece to save bones, ashes or heads you offer"
 PRAYER = tab("prayer", "Prayer", "Dragon bones", sections=[
-    best_in_slot([
-        *outfit_slots("zealot", ZEALOT, [("HEAD", ["Zealot's helm"]), ("BODY", ["Zealot's robe top"]),
-                                         ("LEGS", ["Zealot's robe bottom"]), ("BOOTS", ["Zealot's boots"])]),
-        skill_cape("Prayer cape", "Works as a holy wrench"),
-        first("necklace", [("Bonecrusher necklace", "Crushes bones for Prayer XP and restores prayer"),
-                           ("Dragonbone necklace", "Restores prayer when you bury bones")], slot="AMULET"),
-    ]),
-    situational([
-        first("dragonbone", [("Dragonbone necklace", "Restores prayer when you bury bones")], slot="AMULET"),
-    ]),
     section("gear", "Gear", "rows", [
-        first("bonecrusher", ["Bonecrusher"]),
+        first("bonecrusher", [("Bonecrusher necklace", "Crushes bones for Prayer XP and restores prayer"),
+                              ("Bonecrusher", "Crushes bones for Prayer XP")]),
         first("sanctifier", ["Ash sanctifier"]),
+        first("dragonbone", [("Dragonbone necklace", "Restores prayer when you bury bones")]),
         first("wrench", ["Holy wrench"]),
+        first("cape", [("Prayer cape", "Works as a holy wrench"), ("Max cape", "Works as a holy wrench")]),
+        outfit("zealot", [("HEAD", ["Zealot's helm"]), ("BODY", ["Zealot's robe top"]),
+                          ("LEGS", ["Zealot's robe bottom"]), ("BOOTS", ["Zealot's boots"])], why=ZEALOT),
     ]),
     section("bones", "Bones", "rows", [
         # by Prayer experience, lowest first (tier order, like every other tab)
@@ -779,20 +774,17 @@ PRAYER = tab("prayer", "Prayer", "Dragon bones", sections=[
 ])
 
 SLAYER = tab("slayer", "Slayer", "Enchanted gem", sections=[
-    best_in_slot([
-        first("helm", IMBUED_SLAYER_HELMS + SLAYER_HELMS + ["Black mask (i)", "Black mask"], slot="HEAD",
-              why="Every head-slot task protection in one, plus the slayer damage bonus"),
-        skill_cape("Slayer cape", "10% chance to be offered your last task again"),
-        first("bracelet", [("Expeditious bracelet", "Chance a kill counts twice: shorter tasks"),
-                           ("Bracelet of slaughter", "Chance a kill doesn't count: longer tasks")], slot="GLOVES"),
-        first("ring", ["Slayer ring (eternal)", "Slayer ring"], slot="RING", why="Slayer teleports and task checks"),
-    ], fill=False),
-    situational([
-        first("slaughter", [("Bracelet of slaughter", "Chance a kill doesn't count: longer tasks")], slot="GLOVES"),
-    ]),
     # empty all_(key, []) picks mark where a unique_uses.py group with that key goes
     section("gear", "Slayer gear", "rows", [
+        first("helm", IMBUED_SLAYER_HELMS + SLAYER_HELMS + ["Black mask (i)", "Black mask"],
+              why="Every head-slot task protection in one, plus the slayer damage bonus"),
         first("gem", ["Eternal gem", "Enchanted gem"]),
+        first("ring", ["Slayer ring (eternal)", "Slayer ring"], why="Slayer teleports and task checks"),
+        # silver bracelets in gem order: opal, then red topaz
+        all_("bracelets", [("Expeditious bracelet", "Chance a kill counts twice: shorter tasks"),
+                           ("Bracelet of slaughter", "Chance a kill doesn't count: longer tasks")]),
+        first("cape", [("Slayer cape", "10% chance to be offered your last task again"),
+                       ("Max cape", "10% chance to be offered your last task again")]),
         all_("slayer_boost", []),
         # loot storage
         first("herb_sack", ["Silklined herb sack", "Herb sack"]),
@@ -1201,6 +1193,7 @@ HERB_CHAINS = [
     ("Ranarr weed", "Ranarr potion (unf)", "Snape grass", "Prayer potion"),
     ("Toadflax", "Toadflax potion (unf)", "Crushed nest", "Saradomin brew"),
     ("Irit leaf", "Irit potion (unf)", "Eye of newt", "Super attack"),
+    ("Irit leaf", "Irit potion (unf)", "Unicorn horn dust", "Superantipoison"),
     ("Avantoe", "Avantoe potion (unf)", "Mort myre fungus", "Super energy"),
     ("Kwuarm", "Kwuarm potion (unf)", "Limpwurt root", "Super strength"),
     ("Huasca", "Huasca potion (unf)", "Aldarium", "Prayer regeneration potion"),
@@ -1213,7 +1206,11 @@ HERB_CHAINS = [
 
 
 def herb_columns():
-    keys = [h for h, _, _, _ in HERB_CHAINS]
+    # a herb that makes two potions (irit) gets a row for each: "Irit leaf", "Irit leaf (2)"
+    keys = []
+    for h, _, _, _ in HERB_CHAINS:
+        n = sum(1 for k in keys if k == h or k.startswith(h + " ("))
+        keys.append(h if n == 0 else "%s (%d)" % (h, n + 1))
 
     def row(key, title, items, one=False):
         # repeat: a secondary shared by two herbs (eye of newt...) shows under both
@@ -1237,19 +1234,15 @@ def herb_columns():
 
 
 HERBLORE = tab("herblore", "Herblore", "Pestle and mortar", sections=[
-    best_in_slot([
-        first("goggles", [("Prescription goggles", "10% chance to save a secondary")], slot="HEAD"),
-        skill_cape("Herblore cape", "Makes unfinished potions straight from grimy herbs"),
-        first("amulet", [("Alchemist's amulet", "15% chance of an extra dose"),
-                         ("Amulet of chemistry", "5% chance of a 4-dose potion")], slot="AMULET"),
-        *outfit_slots("alchemist", "Alchemist's outfit (looks only; the goggles do the work)",
-                      [("BODY", ["Alchemist labcoat"]), ("LEGS", ["Alchemist pants"]),
-                       ("GLOVES", ["Alchemist gloves"])]),
-    ]),
     section("gear", "Tools", "rows", [
         first("pestle", ["Pestle and mortar"]),
         first("herb_sack", ["Silklined herb sack", "Herb sack"]),
+        first("goggles", [("Prescription goggles", "10% chance to save a secondary")]),
+        first("amulet", [("Alchemist's amulet", "15% chance of an extra dose"),
+                         ("Amulet of chemistry", "5% chance of a 4-dose potion")]),
         first("reagent", ["Reagent pouch"]),
+        first("cape", [("Herblore cape", "Makes unfinished potions straight from grimy herbs"),
+                       ("Max cape", "Makes unfinished potions straight from grimy herbs")]),
     ]),
     *herb_columns(),
 ])
