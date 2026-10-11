@@ -147,6 +147,9 @@ class TabBuilder
 		Context ctx = new Context(owned, options);
 		List<Section> sections = new ArrayList<>();
 		int hero = -1;
+		// a skill tab's graceful filler waits until the alternatives are known (they fill empty slots first)
+		TabData.Pick filler = null;
+		Section fillerSection = null;
 		for (TabData.Section def : tab.sections)
 		{
 			if (def.supplies && !options.skillSupplies
@@ -162,8 +165,15 @@ class TabBuilder
 			picks.sort(Comparator.comparing(p -> "weapon".equals(p.mode) ? 0 : "ammo".equals(p.mode) ? 2 : 1));
 			ctx.sectionTitle = def.title;
 			ctx.sectionSlots.clear();
+			boolean holdsFiller = false;
 			for (TabData.Pick pick : picks)
 			{
+				if (pick.fill)
+				{
+					filler = pick;
+					holdsFiller = true;
+					continue;
+				}
 				List<Placement> got = resolve(pick, ctx);
 				if (hero == -1 && "main".equals(def.key) && "WEAPON".equals(pick.slot) && !got.isEmpty())
 				{
@@ -173,7 +183,16 @@ class TabBuilder
 			}
 			List<String> columns = def.picks.stream().filter(p -> !p.groups.isEmpty()).findFirst()
 				.map(p -> p.groups).orElse(Collections.emptyList());
-			sections.add(new Section(def.key, def.title, def.layout, items, columns));
+			Section section = new Section(def.key, def.title, def.layout, items, columns);
+			sections.add(section);
+			if (holdsFiller)
+			{
+				fillerSection = section;
+			}
+		}
+		if (filler != null && fillerSection != null)
+		{
+			fill(filler, fillerSection, sections, ctx);
 		}
 		if (!tab.iconEntries.isEmpty())
 		{
@@ -189,6 +208,45 @@ class TabBuilder
 			hero = sections.stream().flatMap(s -> s.items.stream()).map(Placement::getItemId).findFirst().orElse(-1);
 		}
 		return new Built(tab, sections, hero);
+	}
+
+	/**
+	 * Fill a skill tab's empty gear slots: first with an alternative the player owns for that slot (moved
+	 * into the block), then with their lightest gear. Graceful alone never makes a tab.
+	 */
+	private void fill(TabData.Pick filler, Section main, List<Section> sections, Context ctx)
+	{
+		Set<String> filled = new HashSet<>();
+		main.items.forEach(p -> filled.add(p.getSlot()));
+		for (Section alts : sections)
+		{
+			if (!"alts".equals(alts.layout))
+			{
+				continue;
+			}
+			Map<String, Integer> groupSize = new HashMap<>();
+			alts.items.forEach(p -> groupSize.merge(p.getGroup(), 1, Integer::sum));
+			for (Placement p : new ArrayList<>(alts.items))
+			{
+				// single items only: a set keeps its own column
+				if (p.getSlot() != null && !filled.contains(p.getSlot()) && groupSize.get(p.getGroup()) == 1)
+				{
+					alts.items.remove(p);
+					main.items.add(p);
+					filled.add(p.getSlot());
+				}
+			}
+		}
+		ctx.sectionTitle = main.title;
+		ctx.sectionSlots.clear();
+		ctx.sectionSlots.addAll(filled);
+		ctx.sectionSlots.remove(null);
+		List<Placement> got = resolve(filler, ctx);
+		boolean alone = sections.stream().allMatch(s -> s.items.isEmpty());
+		if (!alone)
+		{
+			main.items.addAll(got);
+		}
 	}
 
 	private static class Context
@@ -619,11 +677,6 @@ class TabBuilder
 			}
 		}
 		List<TabData.Piece> slots = best != null ? best : pick.variants.isEmpty() ? Collections.emptyList() : pick.variants.get(0);
-		if (pick.fill && ctx.sectionSlots.isEmpty())
-		{
-			// a filler only completes a block that shows something already
-			return;
-		}
 		// slots the skill's own pieces already fill: a filler can't be worn whole then
 		Set<String> taken = pick.fill ? new HashSet<>(ctx.sectionSlots) : Collections.emptySet();
 		boolean blocked = slots.stream().anyMatch(p -> taken.contains(p.slot));

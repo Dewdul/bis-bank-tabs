@@ -60,6 +60,8 @@ ITEMS = [
     "Rogue mask", "Rogue gloves", "Gloves of silence", "Thieving cape", "Max cape",
     # mining rewards
     "Golden nugget", "Stardust",
+    # smithing alternatives
+    "Varrock armour 2", "Goldsmith gauntlets", "Ice gloves",
 ]
 STAT_FIELDS = ["stab_attack_bonus", "slash_attack_bonus", "crush_attack_bonus", "range_attack_bonus",
                "magic_attack_bonus", "strength_bonus", "ranged_strength_bonus", "magic_damage_bonus", "prayer_bonus"]

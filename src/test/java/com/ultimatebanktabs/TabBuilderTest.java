@@ -323,6 +323,22 @@ public class TabBuilderTest
 	}
 
 	@Test
+	public void alternativesFillEmptySlotsBeforeGraceful()
+	{
+		// no smiths' uniform, cape or ring: the owned alternatives move into the block, graceful fills the rest
+		TabBuilder.Built built = build("smithing", own("Varrock armour 2", "Goldsmith gauntlets", "Ice gloves",
+			"Graceful hood", "Graceful cape", "Graceful gloves", "Hammer"));
+		Map<String, Integer> main = bySlot(section(built, "main"));
+		assertEquals(id("Varrock armour 2"), (int) main.get("BODY"));
+		assertEquals(id("Goldsmith gauntlets"), (int) main.get("GLOVES"));
+		assertEquals(id("Graceful hood"), (int) main.get("HEAD"));
+		assertEquals(id("Graceful cape"), (int) main.get("CAPE"));
+		assertTrue("the other gloves stay beside it", items(section(built, "situational")).contains(id("Ice gloves")));
+		int[] layout = LayoutPlanner.plan(built, false);
+		assertEquals("graceful gloves beside the gauntlets", 4, pos(layout, id("Graceful gloves")) / LayoutPlanner.WIDTH);
+	}
+
+	@Test
 	public void gracefulStandsBesideTheSkillPiece()
 	{
 		TabBuilder.Built built = build("thieving", own("Rogue mask", "Rogue gloves", "Graceful hood", "Graceful gloves",
