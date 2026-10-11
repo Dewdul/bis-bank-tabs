@@ -279,6 +279,8 @@ def build_pick(res, pick):
             reasons.pop()
         if reasons:
             out["reasons"] = reasons
+    if pick.get("heals"):
+        out["heals"] = pick["heals"]
     if pick.get("requires"):
         out["requires"] = res.flat(pick["requires"])
         if pick.get("placed"):
@@ -642,6 +644,7 @@ def main():
         "slayerTasks": slayer_tasks(res),
         # full dragonfire immunity: with one, a dragonfire shield is a choice, not a need
         "superAntifire": res.flat(["Extended super antifire", "Super antifire potion"]),
+        "notFood": res.flat(curated.NOT_FOOD),
     }
     if res.errors:
         print("\n".join(sorted(set(res.errors))))

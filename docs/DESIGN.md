@@ -67,7 +67,10 @@ Started 2026-10-04. The request was an "ultimate bank plugin" that does three th
 ## Food
 
 - **Live heals.** The `food` pick ranks the player's foods by the HP one eat heals them now. That number comes from RuneLite's `ItemStatChangesService` (`@PluginDependency(ItemStatPlugin.class)`), which holds the data behind the Item Stats tooltips. It counts plain food (`FoodBase`) and food combos with no stat drain, so a jug of wine, brews and random foods are out. Anglerfish follow the player's Hitpoints level, and a food missing from `tabs.json` still counts.
-- **Wiki fallback.** The wiki list (`curated.FOOD`) gives each food's page versions, its hover note, any heal that follows a few seconds later, and the HP per inventory slot used to break ties. Its own heal numbers rank the foods only when RuneLite has none (in tests, or a food RuneLite doesn't know).
+- **Wiki data.** `tools/foods.py` holds every healing food on the wiki (363 of them, researched and adversarially verified in October 2026). For each it records heal per eat, any delayed heal, bites, HP per slot, combo and overheal, and whether it is random/harmful or restricted.
+  - `curated.FOOD` ranks the 179 that heal at least 3 and are not random, harmful, restricted or `NEVER_FOOD` (a strawberry basket, holiday rares).
+  - For each food it gives the page versions, the hover note, a heal that follows a few seconds later, and the HP per inventory slot that breaks ties. Its own heal numbers rank the foods only when RuneLite has none (in tests, or a food RuneLite doesn't know).
+  - `notFood` (random, harmful, raid-only, blighted and `NEVER_FOOD`) is never shown as food even when RuneLite counts it, so blighted food stays in its Wilderness section. Anything healing under 3 (onions, cheese) is left out too.
 - **How many.** Six by default (the "Food items" setting, 1-8). RuneLite saves defaults, so a stored 4 is moved to 6 once (`sixFoods`).
 
 ## Ownership

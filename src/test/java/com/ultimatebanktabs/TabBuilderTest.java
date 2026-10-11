@@ -702,6 +702,29 @@ public class TabBuilderTest
 	}
 
 	@Test
+	public void blightedFoodStaysOutOfTheFoodRow()
+	{
+		// RuneLite counts a blighted manta ray as food, but it only works in the Wilderness
+		Map<Integer, Integer> live = new HashMap<>();
+		live.put(id("Shark"), 20);
+		live.put(id("Blighted manta ray"), 22);
+		TabBuilder withHeals = new TabBuilder(data, STATS::get, i -> live.getOrDefault(i, 0));
+		TabBuilder.Built magic = withHeals.build(tab("magic"), own("Tumeken's shadow", "Shark", "Blighted manta ray"),
+			new TabBuilder.Options());
+		assertEquals(own("Shark"), items(section(magic, "supplies_food")));
+		assertTrue(items(section(magic, "blighted")).contains(id("Blighted manta ray")));
+	}
+
+	@Test
+	public void withoutLiveNumbersTheWikiRanksTheFoods()
+	{
+		TabBuilder.Built melee = build("melee", own("Abyssal whip", "Lobster", "Potato with cheese", "Shark"));
+		assertEquals(Arrays.asList(id("Shark"), id("Potato with cheese"), id("Lobster")),
+			section(melee, "supplies_food").getItems().stream().map(TabBuilder.Placement::getItemId)
+				.collect(Collectors.toList()));
+	}
+
+	@Test
 	public void theTaskSetupHasItsPrayerGear()
 	{
 		TabBuilder.Built built = slayerOnTask("basilisks", "Abyssal whip", "Mirror shield", "Ardougne cloak 4",

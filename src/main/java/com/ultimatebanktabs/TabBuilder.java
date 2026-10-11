@@ -147,6 +147,9 @@ class TabBuilder
 	private final Map<Integer, String> launcherAmmo = new HashMap<>();
 	/** HP one eat of an item heals the player now (0 for what isn't food), or -1 without live numbers */
 	private final IntUnaryOperator heals;
+	private final Set<Integer> notFood;
+	/** ingredients (onions, cheese, potatoes) heal 1-2: not food to bring */
+	private static final int MIN_FOOD_HEAL = 3;
 
 	TabBuilder(TabData data, IntFunction<EquipStats> stats)
 	{
@@ -158,6 +161,7 @@ class TabBuilder
 		this.data = data;
 		this.stats = stats;
 		this.heals = heals;
+		this.notFood = new HashSet<>(data.notFood);
 		this.excludeAuto = new HashSet<>(data.excludeAuto);
 		this.situationalOnly = new HashSet<>(data.situationalOnly);
 		this.excludeMeleeWeapon = new HashSet<>(data.excludeMeleeWeapon);
@@ -979,13 +983,18 @@ class TabBuilder
 			List<Double> wiki = i < pick.heals.size() ? pick.heals.get(i) : Collections.emptyList();
 			int live = got.stream().mapToInt(heals::applyAsInt).max().orElse(0);
 			double eat = (live > 0 ? live : at(wiki, 0)) + at(wiki, 1);
+			if (eat < MIN_FOOD_HEAL && (live > 0 || !wiki.isEmpty()))
+			{
+				continue;
+			}
 			foods.add(got);
 			keys.add(new double[]{eat, Math.max(eat, at(wiki, 2)), i});
 		}
 		for (int id : new TreeSet<>(ctx.owned))
 		{
-			int live = listed.contains(id) ? 0 : heals.applyAsInt(id);
-			if (live > 0)
+			// a food the list doesn't know (new content) still counts, by what it heals
+			int live = listed.contains(id) || notFood.contains(id) ? 0 : heals.applyAsInt(id);
+			if (live >= MIN_FOOD_HEAL)
 			{
 				foods.add(Collections.singletonList(id));
 				keys.add(new double[]{live, live, pick.entries.size() + id});

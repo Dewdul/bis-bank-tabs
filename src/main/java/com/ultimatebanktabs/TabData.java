@@ -31,6 +31,8 @@ class TabData
 	Map<String, SlayerTaskData> slayerTasks = Collections.emptyMap();
 	/** super antifire potions, every dose: full dragonfire immunity */
 	List<Integer> superAntifire = Collections.emptyList();
+	/** random, harmful, raid-only and blighted food: never shown as food, even when RuneLite counts it */
+	List<Integer> notFood = Collections.emptyList();
 
 	/** What a slayer task wants (tools/slayer_tasks.py, from the OSRS Wiki). */
 	static class SlayerTaskData

@@ -76,16 +76,43 @@ def outfit(key, slots_entries, **kw):
 IMBUED_SLAYER_HELMS = ["Slayer helmet (i)", "re:^[A-Z][a-z]+ slayer helmet \\(i\\)$"]
 SLAYER_HELMS = ["Slayer helmet", "re:^[A-Z][a-z]+ slayer helmet$"]
 
-# Best healing first (wiki Food/All_food). Raid- and boss-only foods are left out.
-FOOD = [("Marlin", "Heals 24"), ("Cooked moonlight antelope", "Heals 14, then 12 more after 3 seconds"),
-        ("Anglerfish", "Heals 22 and can overheal"), ("Manta ray", "Heals 22"), ("Dark crab", "Heals 22"),
-        ("Bluefin", "Heals 22"), ("Tuna potato", "Heals 22"),
-        ("Cooked dashing kebbit", "Heals 13, then 10 more after 3 seconds"), ("Sea turtle", "Heals 21"),
-        ("Cooked sunlight antelope", "Heals 12, then 9 more after 3 seconds"), ("Shark", "Heals 20"),
-        ("Halibut", "Heals 20"), ("Mushroom potato", "Heals 20"), ("Pineapple pizza", "Heals 11 per bite, 2 bites"),
-        ("Yellowfin", "Heals 19"), ("Curry", "Heals 19"), ("Cooked pyre fox", "Heals 11, then 8 more after 3 seconds"),
-        ("Haddock", "Heals 18"), ("Monkfish", "Heals 16"), ("Swordfish", "Heals 14"), ("Bass", "Heals 13"),
-        ("Lobster", "Heals 12"), ("Tuna", "Heals 10"), ("Salmon", "Heals 9"), ("Trout", "Heals 7")]
+# every food that heals (tools/foods.py, wiki-verified), best first: by HP per eat (with any delayed heal), then HP
+# per inventory slot. In game RuneLite's live numbers rank them (anglerfish follow Hitpoints); these are the fallback.
+from foods import FOODS, NEVER_FOOD  # noqa: E402
+
+# ingredients (onions, cheese, potatoes) heal 1-2: not food to bring
+MIN_FOOD_HEAL = 3
+
+
+def _per_eat(f):
+    return f["heal"] + f.get("delayed", 0)
+
+
+def _food_reason(f):
+    heal = "%g" % f["heal"]
+    if f.get("delayed"):
+        why = "Heals %s, then %g more a few seconds later" % (heal, f["delayed"])
+    elif f["bites"] > 1:
+        why = "Heals %s per bite, %d bites" % (heal, f["bites"])
+    else:
+        why = "Heals %s" % heal
+    if f.get("scales_with_hp"):
+        why += " (at 99 Hitpoints)"
+    if f.get("combo"):
+        why += "; combo food: eat it in the same tick as another"
+    if f.get("overheal"):
+        why += "; can heal above your max"
+    return why
+
+
+_EDIBLE = sorted((f for f in FOODS if not f.get("random_or_harmful") and not f.get("restricted")
+                  and f["page"] not in NEVER_FOOD and _per_eat(f) >= MIN_FOOD_HEAL),
+                 key=lambda f: (-_per_eat(f), -f["total"], f["page"]))
+FOOD = [(f["page"], _food_reason(f)) for f in _EDIBLE]
+# per FOOD entry: [HP per eat, HP a few seconds later, HP per inventory slot]
+FOOD_HEALS = [[f["heal"], f.get("delayed", 0), f["total"]] for f in _EDIBLE]
+# never a food to bring, even when RuneLite counts it: random, harmful, raid-only and blighted (Wilderness-only) food
+NOT_FOOD = [f["page"] for f in FOODS if f.get("random_or_harmful") or f.get("restricted")] + NEVER_FOOD
 
 ANTIPOISON = [("Extended anti-venom+", "Strongest, longest-lasting venom and poison protection"),
               ("Anti-venom+", "Cures venom and poison, then protects against both"),
@@ -121,7 +148,7 @@ def combat_supplies(boosts, restores=(), brews=()):
         ]),
         section("supplies_food", "Food", "rows", [
             # how many foods comes from the "Food items" setting
-            first("food", FOOD, take=6),
+            first("food", FOOD, take=6, heals=FOOD_HEALS),
             first("karambwan", [("Cooked karambwan", "Combo food: eat in the same tick as other food (heals 18)")]),
         ]),
     ]
