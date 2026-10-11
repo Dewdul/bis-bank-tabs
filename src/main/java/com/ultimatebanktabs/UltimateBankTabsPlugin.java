@@ -6,6 +6,7 @@ import com.google.inject.Provides;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -16,6 +17,7 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
 import javax.inject.Inject;
+import javax.swing.JCheckBox;
 import javax.swing.JOptionPane;
 import javax.swing.SwingUtilities;
 import lombok.extern.slf4j.Slf4j;
@@ -209,13 +211,14 @@ public class UltimateBankTabsPlugin extends Plugin
 				askToReplace(w);
 				return;
 			}
-			if (!bankOpen)
-			{
-				replacePending();
-			}
+			// a restore asked for first cancels a replacement still waiting for the bank
 			if (!bankOpen && config.restoreTabs())
 			{
 				restoreReplaced(false);
+			}
+			if (!bankOpen)
+			{
+				replacePending();
 			}
 			if (client.getGameState() == GameState.LOGGED_IN)
 			{
@@ -227,9 +230,9 @@ public class UltimateBankTabsPlugin extends Plugin
 	}
 
 	/**
-	 * First start: this plugin takes over the bank's tabs. The player's own
-	 * tabs are removed (and backed up) only once they agree; saying no turns
-	 * the plugin back off.
+	 * First start, when the bank has tabs this plugin didn't make: the player chooses to replace them all
+	 * (backed up), keep them (by default replacing just the ones named like one of ours, so there aren't two
+	 * Slayer tabs), or turn the plugin back off.
 	 */
 	private void askToReplace(BankTagsWriter w)
 	{
@@ -239,30 +242,43 @@ public class UltimateBankTabsPlugin extends Plugin
 			accept(w, others);
 			return;
 		}
+		// only tabs this plugin will show: a tab of ours switched off leaves theirs nothing to clash with
+		List<String> sameNamed = BankTagsWriter.sameNamed(others,
+			data.tabs.stream().filter(t -> enabled(t.key)).map(t -> t.name).collect(Collectors.toList()));
 		List<String> conflicts = conflicts();
-		StringBuilder msg = new StringBuilder("<html><body style='width: 340px'>")
-			.append("<b>No Brain Bank Tabs replaces your bank tabs with its own.</b><br><br>")
-			.append("Your ").append(others.size()).append(others.size() == 1 ? " tab" : " tabs")
-			.append(" will be removed from the bank: <i>")
+		StringBuilder msg = new StringBuilder("<html><body style='width: 360px'>")
+			.append("<b>No Brain Bank Tabs adds its own bank tabs.</b> You have ").append(others.size())
+			.append(others.size() == 1 ? " tab" : " tabs").append(" already: <i>")
 			.append(others.stream().limit(12).collect(Collectors.joining(", ")))
 			.append(others.size() > 12 ? ", ..." : "").append("</i><br><br>")
-			.append("Items keep their tags, so tag: searches still work, and a backup is kept: <b>Bring back")
-			.append(" replaced tabs</b> in this plugin's settings puts them back.");
+			.append("<b>Replace all my tabs</b> removes them, so the bank holds just this plugin's tabs.<br>")
+			.append("<b>Keep my tabs</b> leaves them, with this plugin's tabs after them.<br><br>")
+			.append("Removed tabs are backed up, and their items keep their tags, so tag: searches still work.")
+			.append(" <b>Bring back replaced tabs</b> in this plugin's settings puts them back.");
 		if (!conflicts.isEmpty())
 		{
 			msg.append("<br><br><b>Also on:</b> ").append(String.join("; ", conflicts))
 				.append(". Turn ").append(conflicts.size() == 1 ? "it" : "them").append(" off so it doesn't fight over your tabs.");
 		}
 		msg.append("</body></html>");
-		String[] options = {"Replace my tabs", "Turn plugin off"};
+		JCheckBox replaceSameNamed = new JCheckBox("<html><body style='width: 340px'>When keeping, replace the "
+			+ (sameNamed.size() == 1 ? "one" : sameNamed.size()) + " named like a tab of this plugin's: <i>"
+			+ String.join(", ", sameNamed) + "</i></body></html>", true);
+		Object message = sameNamed.isEmpty() ? msg.toString() : new Object[]{msg.toString(), replaceSameNamed};
+		String[] options = {"Replace all my tabs", "Keep my tabs", "Turn plugin off"};
 		SwingUtilities.invokeLater(() ->
 		{
-			// owned by the game window so it can't open behind it
-			int choice = JOptionPane.showOptionDialog(client.getCanvas(), msg.toString(), "No Brain Bank Tabs",
-				JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE, null, options, options[1]);
+			// owned by the game window so it can't open behind it; keeping is the default
+			int choice = JOptionPane.showOptionDialog(client.getCanvas(), message, "No Brain Bank Tabs",
+				JOptionPane.YES_NO_CANCEL_OPTION, JOptionPane.WARNING_MESSAGE, null, options, options[1]);
 			if (choice == 0)
 			{
 				clientThread.invokeLater(() -> accept(w, others));
+			}
+			else if (choice == 1)
+			{
+				List<String> replace = replaceSameNamed.isSelected() ? sameNamed : Collections.emptyList();
+				clientThread.invokeLater(() -> accept(w, replace));
 			}
 			else if (writer == w)
 			{
@@ -290,7 +306,7 @@ public class UltimateBankTabsPlugin extends Plugin
 		{
 			// Bank Tags holds the open bank's tab list and would write the old tabs back: finish on the next open
 			configManager.setConfiguration(UltimateBankTabsConfig.GROUP, REPLACE_PENDING_KEY, Text.toCSV(agreed));
-			chat("No Brain Bank Tabs: close your bank and open it again to finish replacing your tabs.");
+			chat("No Brain Bank Tabs: close your bank and open it again to finish replacing " + tabsNamed(agreed) + ".");
 		}
 		else
 		{
@@ -301,6 +317,19 @@ public class UltimateBankTabsPlugin extends Plugin
 			loadSnapshot();
 			rebuild(false);
 		}
+		if (bankOpen && agreed.isEmpty())
+		{
+			// Bank Tags loaded this bank's tab list before ours existed: they show from the next open
+			chat("No Brain Bank Tabs: close your bank and open it again to see its tabs.");
+		}
+	}
+
+	/** "your Slayer tab", "your Slayer, Mining tabs", "your 7 bank tabs" */
+	private static String tabsNamed(List<String> names)
+	{
+		return names.size() == 1 ? "your " + names.get(0) + " tab"
+			: names.size() <= 3 ? "your " + String.join(", ", names) + " tabs"
+			: "your " + names.size() + " bank tabs";
 	}
 
 	/** A takeover the player agreed to with the bank open, done now (Bank Tags is between bank opens). */
@@ -326,8 +355,8 @@ public class UltimateBankTabsPlugin extends Plugin
 			configManager.setConfiguration(UltimateBankTabsConfig.GROUP, REPLACED_KEY, gson.toJson(all, SAVED_TABS));
 			if (client.getGameState() == GameState.LOGGED_IN)
 			{
-				chat("No Brain Bank Tabs: replaced your " + saved.size() + " bank tabs. Bring back replaced tabs in the"
-					+ " plugin settings puts them back.");
+				chat("No Brain Bank Tabs: replaced " + tabsNamed(saved.stream().map(t -> t.name).collect(Collectors.toList()))
+					+ ". Bring back replaced tabs in the plugin settings puts " + (saved.size() == 1 ? "it" : "them") + " back.");
 			}
 		}
 	}
@@ -366,13 +395,18 @@ public class UltimateBankTabsPlugin extends Plugin
 			chat("No Brain Bank Tabs: close your bank and open it again to bring back your replaced tabs.");
 			return;
 		}
+		// a replacement still waiting for the bank is called off: those tabs never leave
+		String pending = configManager.getConfiguration(UltimateBankTabsConfig.GROUP, REPLACE_PENDING_KEY);
+		boolean cancelled = pending != null && !pending.isEmpty();
+		configManager.unsetConfiguration(UltimateBankTabsConfig.GROUP, REPLACE_PENDING_KEY);
 		List<BankTagsWriter.SavedTab> saved = replacedTabs();
 		writer.restoreOthers(saved);
 		configManager.unsetConfiguration(UltimateBankTabsConfig.GROUP, REPLACED_KEY);
 		configManager.setConfiguration(UltimateBankTabsConfig.GROUP, RESTORE_KEY, false);
-		chat(saved.isEmpty() ? "No Brain Bank Tabs: there are no replaced tabs to bring back."
-			: "No Brain Bank Tabs: brought back " + saved.size() + " tabs."
-				+ (atBankInit ? "" : " Open your bank to see them."));
+		chat(!saved.isEmpty() ? "No Brain Bank Tabs: brought back " + tabsNamed(saved.stream().map(t -> t.name)
+			.collect(Collectors.toList())) + "." + (atBankInit ? "" : " Open your bank to see them.")
+			: cancelled ? "No Brain Bank Tabs: kept your tabs; none will be replaced."
+			: "No Brain Bank Tabs: there are no replaced tabs to bring back.");
 	}
 
 	/** Enabled plugins that fight over the same tabs, as "Name (what it does)". */
@@ -518,13 +552,14 @@ public class UltimateBankTabsPlugin extends Plugin
 				// tabs added here are picked up by this very bank open, so no "reopen" hint
 				rebuild(false);
 			}
-			if (writer != null && accepted)
-			{
-				replacePending();
-			}
+			// a restore asked for first cancels a replacement still waiting for this open
 			if (writer != null && config.restoreTabs())
 			{
 				restoreReplaced(true);
+			}
+			if (writer != null && accepted)
+			{
+				replacePending();
 			}
 			if (writer != null)
 			{

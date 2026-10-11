@@ -27,7 +27,15 @@ Started 2026-10-04. The request was an "ultimate bank plugin" that does three th
 - **Remove-tag is hidden on the plugin's tabs.** It can't change what they hold, and Bank Tags would move the item to the first empty cell for good.
 - **Tag names compare standardized**, like Bank Tags does. A tab renamed with capitals still works with Change icon and Disable/Enable layout.
 - **Deleting a tab turns it off.** If the player removes or renames a plugin tab, the `tagtabs` change arrives while the plugin is not writing. The tab's toggle is then set to off, so the plugin does not fight the player.
-- **It replaces the player's tabs, with consent.** On the first start, if `tagtabs` holds tabs the plugin didn't make, a dialog lists them and asks. *Replace my tabs* removes them from `tagtabs` with their icons and layouts. Item tags stay, so `tag:` searches still work. The removed tabs are saved as JSON in `ultimatebanktabs.replacedTabs`, and their names are reserved so new plugin tabs can't take them. *Turn plugin off* (or closing the dialog) disables the plugin. Nothing is built until `replaceAccepted` is set. That flag is global, as Bank Tags config is shared by all accounts.
+- **It replaces the player's tabs, with consent.** On the first start, if `tagtabs` holds tabs the plugin didn't make, a dialog lists them and offers three choices:
+  - *Replace all my tabs* removes them from `tagtabs` with their icons and layouts.
+  - *Keep my tabs* (the default button) leaves them, and the plugin's tabs are appended after them. A checkbox, ticked by default, still replaces (removes and backs up) their tabs named like one of the plugin's switched-on tabs (`BankTagsWriter.sameNamed`, standardized names), so the bank has one Slayer tab, not two. Unticked, their `Slayer` stays next to the plugin's.
+  - The plugin's tab is named `slayer bis` either way. The replaced name stays reserved for *Bring back replaced tabs*, and its items keep their `slayer` tags (`freeName`). Taking the base name would merge a restored tab into the plugin's, and `tag:slayer` would find the old tagged items.
+  - *Turn plugin off*.
+
+  - *Bring back replaced tabs* while a replacement still waits for a bank open calls it off, so those tabs never leave. It runs before `replacePending` at startup and at bank open.
+
+  Removed tabs keep their item tags, so `tag:` searches still work. They are saved as JSON in `ultimatebanktabs.replacedTabs`, and their names are reserved so new plugin tabs can't take them. *Turn plugin off* (or closing the dialog) disables the plugin. Nothing is built until `replaceAccepted` is set. That flag is global, as Bank Tags config is shared by all accounts.
   - **Restoring is on demand, not on shutdown.** A Hub update stops and restarts the plugin, so restoring on shutdown would hand the tabs back and ask again after every update. Instead the self-resetting "Bring back replaced tabs" setting appends the saved tabs to `tagtabs`.
   - **The Hub install warning.** The plugin-hub file should also carry `warning=` text (see Hub submission below). RuneLite then shows it in a confirm dialog before installing.
 - **Conflicting plugins.** Each bank open warns once per session in chat about enabled Auto Bank Sorter, Bank Assistant, Bank Sorter or Sorted Bank. Matching uses `ExternalPluginManager.getInternalName`, or the descriptor name as a fallback. The first-run dialog lists them too.
@@ -138,5 +146,5 @@ Other related hub plugins are Bank Assistant, BiS Gear, GearForge, Wiki Gear Set
 The plugin-hub file (`plugins/no-brain-bank-tabs`) should include an install warning, for example:
 
 ```
-warning=No Brain Bank Tabs replaces your bank tag tabs with its own. It asks before removing your current tabs, and keeps a backup you can bring back from its settings.
+warning=No Brain Bank Tabs adds its own bank tag tabs. If you already have tabs, it asks whether to replace them or keep them, and it backs up any it removes so you can bring them back from its settings.
 ```

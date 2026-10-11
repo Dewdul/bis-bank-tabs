@@ -295,6 +295,34 @@ class BankTagsWriter
 		return others;
 	}
 
+	/** The tab list without these tabs (names compared standardized), in its order. */
+	static List<String> without(List<String> tagTabs, Collection<String> removed)
+	{
+		List<String> out = new ArrayList<>();
+		for (String tab : tagTabs)
+		{
+			if (removed.stream().noneMatch(r -> same(r, tab)))
+			{
+				out.add(tab);
+			}
+		}
+		return out;
+	}
+
+	/** The player's tabs named like one of this plugin's (their own "Slayer" beside ours would be two). */
+	static List<String> sameNamed(List<String> theirs, Collection<String> titles)
+	{
+		List<String> out = new ArrayList<>();
+		for (String tab : theirs)
+		{
+			if (titles.stream().anyMatch(t -> same(t, tab)))
+			{
+				out.add(tab);
+			}
+		}
+		return out;
+	}
+
 	/**
 	 * Take every other tab out of the bank (the player agreed to this plugin
 	 * replacing them). Items keep their tags, so "tag:" searches still work.
@@ -329,7 +357,9 @@ class BankTagsWriter
 				configManager.unsetConfiguration(BANKTAGS_GROUP, iconKey(name));
 				layoutManager.removeLayout(name);
 			}
-			configManager.setConfiguration(BANKTAGS_GROUP, TAG_TABS, Text.toCSV(new ArrayList<>(names.values())));
+			// only those: the player may be keeping the rest
+			configManager.setConfiguration(BANKTAGS_GROUP, TAG_TABS, Text.toCSV(without(Text.fromCSV(
+				Objects.toString(configManager.getConfiguration(BANKTAGS_GROUP, TAG_TABS), "")), others)));
 		}
 		finally
 		{

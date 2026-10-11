@@ -36,7 +36,12 @@ Only items you own appear. That means your bank, including placeholders, potion 
 ## Notes
 
 - The tabs are normal Bank Tags tabs (the core **Bank Tags** plugin must be on). Their contents are worked out from your bank each time, so the plugin never writes tags onto your items.
-- **The plugin replaces your bank tabs.** The first time it starts it asks before removing the tabs you already have, and saying no turns it back off. Your items keep their tags, so `tag:` searches still work, and the removed tabs are backed up: *Bring back replaced tabs* in the settings puts them back.
+- **It asks what to do with your own bank tabs.** The first time it starts, if you already have tabs, you choose:
+  - *Replace all my tabs*: the bank holds only the plugin's tabs.
+  - *Keep my tabs*: the plugin's tabs go after yours. By default, a tab of yours with the same name as one of the plugin's (your own "Slayer", say) is still replaced (backed up), so there aren't two Slayer tabs. Untick the box to keep those too.
+  - *Turn plugin off*.
+
+  Your items keep their tags, so `tag:` searches still work, and any removed tabs are backed up: *Bring back replaced tabs* in the settings puts them back.
 - Plugins that fight over the same tabs (Auto Bank Sorter, Bank Assistant, Bank Sorter, Sorted Bank) get a warning in chat when you open the bank.
 - The tab menu options work on the plugin's tabs too:
   - **Rename** keeps the tab working under its new name.
