@@ -119,8 +119,8 @@ public interface UltimateBankTabsConfig extends Config
 	}
 
 	@ConfigItem(keyName = "removeOnStop", name = "Remove tabs when turned off", position = 10, section = contents,
-		description = "Delete the tabs this plugin made when the plugin is turned off. They come back when it is"
-			+ " turned on again")
+		description = "Take the tabs this plugin made out of the bank when the plugin is turned off. They come back,"
+			+ " as you arranged them, when it is turned on again")
 	default boolean removeOnStop()
 	{
 		return true;

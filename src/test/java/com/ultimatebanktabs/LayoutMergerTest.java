@@ -211,6 +211,98 @@ public class LayoutMergerTest
 	}
 
 	@Test
+	public void aBetterCopyOfTheSameItemStillTakesTheCell()
+	{
+		// 4716 (undamaged) and 4880 (degraded) are one variant group; both are owned
+		int[] previous = layout(ROW5 + 2, BODY, 4880, 2 * W + 4, 4716, ROW5, 30, ROW5 + 1, 31);
+		int[] saved = layout(ROW5 + 2, BODY, 4880, 2 * W + 4, 4716, ROW5, 31, ROW5 + 1, 30);
+		// the degraded one is sold: the undamaged one is the best now
+		int[] planned = layout(ROW5 + 2, BODY, 4716, ROW5, 30, ROW5 + 1, 31);
+		int[] next = next(saved, previous, planned, BIS, new HashMap<>());
+		assertEquals(4716, next[BODY]);
+		assertEquals("only once", 1, Arrays.stream(next).filter(id -> id == 4716).count());
+		assertEquals("their swap stays", 31, next[ROW5]);
+	}
+
+	@Test
+	public void aReturningItemDoesNotLeaveABlankRow()
+	{
+		int[] plan = new int[ROW5 + W + 2];
+		Arrays.fill(plan, E);
+		for (int c = 0; c < W; c++)
+		{
+			plan[ROW5 + c] = 30 + c;
+		}
+		plan[ROW5 + W] = 40;
+		plan[ROW5 + W + 1] = 41;
+		int[] saved = plan.clone();
+		for (int c = 0; c < W; c++)
+		{
+			// they reversed the potion row
+			saved[ROW5 + c] = 37 - c;
+		}
+		int[] without = plan.clone();
+		without[ROW5 + 1] = E;
+		Map<Integer, Integer> home = new HashMap<>();
+		int[] gone = next(saved, plan, without, Collections.emptySet(), home);
+		int[] back = next(gone, without, plan, Collections.emptySet(), home);
+		assertEquals("31 goes back to its cell", 31, back[ROW5 + 6]);
+		assertEquals("the food stays right under the potions", 40, back[ROW5 + W]);
+	}
+
+	@Test
+	public void newItemsShareTheRowTheyOpen()
+	{
+		int[] previous = new int[ROW5 + W + 1];
+		Arrays.fill(previous, E);
+		for (int c = 0; c < W; c++)
+		{
+			previous[ROW5 + c] = 30 + c;
+		}
+		previous[ROW5 + W] = 40;
+		int[] saved = previous.clone();
+		saved[ROW5] = 31;
+		saved[ROW5 + 1] = 30;
+		// two new potions planned among the old ones
+		int[] planned = new int[ROW5 + 2 * W + 1];
+		Arrays.fill(planned, E);
+		int[] potions = {30, 38, 31, 39, 32, 33, 34, 35, 36, 37};
+		System.arraycopy(potions, 0, planned, ROW5, potions.length);
+		planned[ROW5 + 2 * W] = 40;
+		int[] next = next(saved, previous, planned, Collections.emptySet(), new HashMap<>());
+		int row38 = pos(next, 38) / W;
+		assertEquals("both new potions on one new row", row38, pos(next, 39) / W);
+		assertEquals("the food right under it", row38 + 1, pos(next, 40) / W);
+	}
+
+	@Test
+	public void aNewSectionGetsItsOwnRow()
+	{
+		int[] previous = layout(ROW5 + W + 2, ROW5, 30, ROW5 + 1, 31, ROW5 + W, 40, ROW5 + W + 1, 41);
+		int[] saved = layout(ROW5 + W + 2, ROW5, 31, ROW5 + 1, 30, ROW5 + W, 40, ROW5 + W + 1, 41);
+		// teleports (50, 51) are a new section on their own row between the potions and the food
+		int[] planned = layout(ROW5 + 2 * W + 2, ROW5, 30, ROW5 + 1, 31, ROW5 + W, 50, ROW5 + W + 1, 51,
+			ROW5 + 2 * W, 40, ROW5 + 2 * W + 1, 41);
+		int[] next = next(saved, previous, planned, Collections.emptySet(), new HashMap<>());
+		int teleports = pos(next, 50) / W;
+		assertTrue("not in the potion row", teleports != ROW5 / W);
+		assertEquals(teleports, pos(next, 51) / W);
+		assertTrue("not in the food row", teleports != pos(next, 40) / W);
+	}
+
+	@Test
+	public void anAlternativesOnlyBlockIsProtected()
+	{
+		int alt = W + 4;
+		int[] previous = layout(ROW5 + 1, alt, 70, ROW5, 30);
+		int[] saved = layout(ROW5 + 1, alt, 70, ROW5, 31);
+		int[] planned = layout(ROW5 + 2, alt, 70, ROW5, 30, ROW5 + 1, 31);
+		int[] next = LayoutMerger.next(saved, previous, planned, Collections.emptySet(), true, id -> id,
+			new HashMap<>());
+		assertTrue("the new item stays below the block", pos(next, 30) >= ROW5);
+	}
+
+	@Test
 	public void noGearBlockMeansNoReservedCells()
 	{
 		int[] previous = layout(2, 0, 30, 1, 31);

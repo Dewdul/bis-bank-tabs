@@ -405,6 +405,11 @@ public class UltimateBankTabsPlugin extends Plugin
 				// tabs added here are picked up by this very bank open, so no "reopen" hint
 				rebuild(false);
 			}
+			if (writer != null)
+			{
+				// Bank Tags loads the tab list right after this
+				writer.bankOpened();
+			}
 		}
 	}
 
@@ -447,7 +452,10 @@ public class UltimateBankTabsPlugin extends Plugin
 	@Subscribe(priority = -1)
 	public void onMenuEntryAdded(MenuEntryAdded event)
 	{
-		if (writer == null || !event.getOption().startsWith("Remove-tag")
+		// Bank Tags adds Remove-tag with createMenuEntry, which posts no event of its own, right after the game's
+		// Examine (Withdraw-All-but-1 in potion storage), so strip it on that entry's event
+		String option = event.getOption();
+		if (writer == null || !("Examine".equals(option) || "Withdraw-All-but-1".equals(option))
 			|| writer.keyOf(bankTagsService.getActiveTag()) == null)
 		{
 			return;
@@ -528,7 +536,12 @@ public class UltimateBankTabsPlugin extends Plugin
 		{
 			return;
 		}
-		if (key.startsWith("icon_") && event.getNewValue() != null)
+		if (key.startsWith("icon_") && event.getNewValue() != null && writer.isOurIcon(tag, event.getNewValue()))
+		{
+			// Bank Tags writing back its stale copy of an icon this plugin set: put the current one back
+			dirty = true;
+		}
+		else if (key.startsWith("icon_") && event.getNewValue() != null)
 		{
 			// Change icon: keep the player's pick from now on (over a skill icon too)
 			configManager.setConfiguration(UltimateBankTabsConfig.GROUP, BankTagsWriter.CUSTOM_ICON_PREFIX + tabKey,
@@ -741,7 +754,7 @@ public class UltimateBankTabsPlugin extends Plugin
 			// the item icon also stands under a skill icon, for when Bank Tags draws the tab without us
 			int icon = built.getHero() > 0 ? built.getHero() : def.icon;
 			tabs.put(def.key, new BankTagsWriter.Tab(built.itemIds(), LayoutPlanner.plan(built, config.gapRows()), icon,
-				LayoutPlanner.bisPositions(built)));
+				LayoutPlanner.bisPositions(built), LayoutPlanner.hasBlock(built)));
 			why.put(def.key, built.reasons());
 		}
 		int added = writer.publish(tabs, hidden, titles);

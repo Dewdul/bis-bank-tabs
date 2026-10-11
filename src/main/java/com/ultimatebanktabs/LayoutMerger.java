@@ -45,7 +45,13 @@ final class LayoutMerger
 
 	static int[] next(int[] saved, int[] previous, int[] planned, Set<Integer> bis)
 	{
-		return next(saved, previous, planned, bis, IntUnaryOperator.identity(), new HashMap<>());
+		return next(saved, previous, planned, bis, !bis.isEmpty(), IntUnaryOperator.identity(), new HashMap<>());
+	}
+
+	static int[] next(int[] saved, int[] previous, int[] planned, Set<Integer> bis, IntUnaryOperator family,
+		Map<Integer, Integer> home)
+	{
+		return next(saved, previous, planned, bis, !bis.isEmpty(), family, home);
 	}
 
 	/**
@@ -55,11 +61,12 @@ final class LayoutMerger
 	 * @param previous the layout the plugin last planned for the tab, or null if unknown
 	 * @param planned  the layout the plugin plans now
 	 * @param bis      bank positions of the best-in-slot cells in {@code planned}
+	 * @param block    whether the tab has the equipment block (rows 0-4), even with only alternatives in it
 	 * @param family   item id -> its variant group (charges, doses, degrade states share one)
 	 * @param home     variant group -> the cell an item had when it left the tab; updated in place
 	 */
-	static int[] next(int[] saved, int[] previous, int[] planned, Set<Integer> bis, IntUnaryOperator family,
-		Map<Integer, Integer> home)
+	static int[] next(int[] saved, int[] previous, int[] planned, Set<Integer> bis, boolean block,
+		IntUnaryOperator family, Map<Integer, Integer> home)
 	{
 		if (saved == null || previous == null
 			|| home.isEmpty() && Arrays.equals(trim(saved), trim(previous)))
@@ -67,11 +74,11 @@ final class LayoutMerger
 			// never rearranged: the plan as it is
 			return planned;
 		}
-		return merge(saved, previous, planned, bis, family, home);
+		return merge(saved, previous, planned, bis, block, family, home);
 	}
 
-	private static int[] merge(int[] saved, int[] previous, int[] planned, Set<Integer> bis, IntUnaryOperator family,
-		Map<Integer, Integer> home)
+	private static int[] merge(int[] saved, int[] previous, int[] planned, Set<Integer> bis, boolean block,
+		IntUnaryOperator family, Map<Integer, Integer> home)
 	{
 		List<Integer> out = new ArrayList<>();
 		for (int id : saved)
@@ -133,8 +140,8 @@ final class LayoutMerger
 		{
 			int best = at(planned, pos);
 			int old = at(previous, pos);
-			if (best == -1 || best == old || old != -1 && family.applyAsInt(best) == family.applyAsInt(old)
-				|| at(out, pos) == best)
+			// (the rename step above already made a charge or degrade step of the same item equal)
+			if (best == -1 || best == old || at(out, pos) == best)
 			{
 				continue;
 			}
@@ -155,7 +162,8 @@ final class LayoutMerger
 		}
 
 		// new items (and new copies of an item the plan now shows twice), and anything a new best pushed out
-		boolean block = !bis.isEmpty();
+		// rows this merge opened, so later arrivals fill them instead of opening more
+		Set<Integer> opened = new HashSet<>();
 		// (an item the plan shows that the layout lacks would otherwise be dropped in the first empty cell by Bank Tags)
 		Map<Integer, Integer> toPlace = new HashMap<>();
 		Map<Integer, Integer> have = counts(out);
@@ -175,16 +183,21 @@ final class LayoutMerger
 			{
 				continue;
 			}
-			int target = translate(out, planned, i, block);
+			// a returning item goes home first, before translate() could open a row it would leave blank
+			Integer back = home.remove(family.applyAsInt(id));
+			if (back != null && at(out, back) == -1 && !reserved(back, block, bis))
+			{
+				set(out, back, id);
+				toPlace.put(id, left - 1);
+				continue;
+			}
+			int target = translate(out, planned, i, block, home, opened);
 			if (at(out, target) == id)
 			{
 				// that copy is already where the plan wants it
 				continue;
 			}
-			Integer back = home.remove(family.applyAsInt(id));
-			int pos = back != null && at(out, back) == -1 && !reserved(back, block, bis) ? back
-				: free(out, target, block, bis);
-			set(out, pos, id);
+			set(out, free(out, target, block, bis), id);
 			toPlace.put(id, left - 1);
 		}
 		Set<Integer> placed = ids(out);
@@ -202,9 +215,11 @@ final class LayoutMerger
 
 	/**
 	 * Where a new item goes: its planned cell shifted by however far the player moved its nearest
-	 * neighbour in the plan, else beside that neighbour, else in a new row under it.
+	 * neighbour in the plan, else beside that neighbour, else in a row under it (a row this merge
+	 * already opened, or a new one). A section the plan starts on a fresh row gets a fresh row too.
 	 */
-	private static int translate(List<Integer> out, int[] planned, int i, boolean block)
+	private static int translate(List<Integer> out, int[] planned, int i, boolean block, Map<Integer, Integer> home,
+		Set<Integer> opened)
 	{
 		if (block && i / WIDTH < BLOCK_ROWS)
 		{
@@ -224,22 +239,54 @@ final class LayoutMerger
 			{
 				return t;
 			}
-			for (int c = at + 1; c % WIDTH != 0; c++)
+			boolean fresh = i % WIDTH == 0 && planned[i - 1] == -1;
+			for (int c = at + 1; !fresh && c % WIDTH != 0; c++)
 			{
 				if (at(out, c) == -1)
 				{
 					return c;
 				}
 			}
-			// the row is full: open one under it, moving everything below down together
-			int below = (at / WIDTH + 1) * WIDTH;
-			if (below < out.size())
+			int row = (at / WIDTH + 1) * WIDTH;
+			for (; !fresh && opened.contains(row); row += WIDTH)
 			{
-				out.addAll(below, Collections.nCopies(WIDTH, -1));
+				for (int k = 0; k < WIDTH; k++)
+				{
+					int c = row + (i + k) % WIDTH;
+					if (at(out, c) == -1)
+					{
+						return c;
+					}
+				}
 			}
-			return below + i % WIDTH;
+			// open as many rows as the plan puts between them (a blank one with gap rows), moving
+			// everything below down together
+			int rows = fresh ? Math.max(1, i / WIDTH - j / WIDTH) : 1;
+			insertRows(out, row, rows, home, opened);
+			int last = row + (rows - 1) * WIDTH;
+			opened.add(last);
+			return last + i % WIDTH;
 		}
 		return i;
+	}
+
+	private static void insertRows(List<Integer> out, int at, int rows, Map<Integer, Integer> home, Set<Integer> opened)
+	{
+		if (at >= out.size())
+		{
+			return;
+		}
+		int shift = rows * WIDTH;
+		out.addAll(at, Collections.nCopies(shift, -1));
+		// remembered cells and opened rows move down with their rows
+		home.replaceAll((f, cell) -> cell >= at ? cell + shift : cell);
+		Set<Integer> moved = new HashSet<>();
+		for (int r : opened)
+		{
+			moved.add(r >= at ? r + shift : r);
+		}
+		opened.clear();
+		opened.addAll(moved);
 	}
 
 	private static boolean reserved(int pos, boolean block, Set<Integer> bis)

@@ -70,6 +70,13 @@ class LayoutPlanner
 		return new LayoutPlanner().layout(tab, gapRows);
 	}
 
+	/** Whether the tab is laid out with the equipment block (best in slot or alternatives). */
+	static boolean hasBlock(TabBuilder.Built tab)
+	{
+		return tab.getSections().stream().anyMatch(s -> ("equipment".equals(s.getLayout()) || "alts".equals(s.getLayout()))
+			&& !s.getItems().isEmpty());
+	}
+
 	/** Bank positions of the tab's best-in-slot cells: the equipment-screen slots that hold an item. */
 	static Set<Integer> bisPositions(TabBuilder.Built tab)
 	{
