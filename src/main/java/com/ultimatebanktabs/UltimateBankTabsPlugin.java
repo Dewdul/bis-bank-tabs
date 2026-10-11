@@ -134,6 +134,8 @@ public class UltimateBankTabsPlugin extends Plugin
 	private Map<String, Integer> tabSprites = new HashMap<>();
 	/** nothing is built until the player agrees to this plugin replacing their tabs */
 	private boolean accepted;
+	/** "Bring back replaced tabs" waits for the next bank open (Bank Tags holds the open bank's tab list) */
+	private boolean restorePending;
 	/** conflicting plugins already mentioned this session */
 	private final Set<String> warned = new HashSet<>();
 	/** tab key -> item id -> why the item is in that tab */
@@ -159,6 +161,8 @@ public class UltimateBankTabsPlugin extends Plugin
 		builder = new TabBuilder(data, id -> EquipStats.of(itemManager.getItemStats(id)));
 		writer = new BankTagsWriter(configManager, tagManager, layoutManager, bankTagsService, itemManager::canonicalize);
 		writer.restore(data.tabs.stream().map(t -> t.key).collect(Collectors.toList()));
+		// if the bank is open right now, this is the list Bank Tags holds; BANKMAIN_INIT refreshes it otherwise
+		writer.bankOpened();
 		writer.reserve(replacedTabs().stream().map(t -> t.name).collect(Collectors.toList()));
 		skillIcons = new SkillIcons(client);
 		accepted = Boolean.parseBoolean(configManager.getConfiguration(UltimateBankTabsConfig.GROUP, ACCEPTED_KEY));
@@ -272,10 +276,17 @@ public class UltimateBankTabsPlugin extends Plugin
 	}
 
 	/** "Bring back replaced tabs": put the player's old tabs back next to ours. */
-	private void restoreReplaced()
+	private void restoreReplaced(boolean atBankInit)
 	{
 		if (writer == null)
 		{
+			return;
+		}
+		if (bankOpen && !atBankInit)
+		{
+			// Bank Tags holds the open bank's tab list and would write it back over the restored tabs
+			restorePending = true;
+			chat("No Brain Bank Tabs: close your bank and open it again to bring back your replaced tabs.");
 			return;
 		}
 		List<BankTagsWriter.SavedTab> saved = replacedTabs();
@@ -283,7 +294,8 @@ public class UltimateBankTabsPlugin extends Plugin
 		configManager.unsetConfiguration(UltimateBankTabsConfig.GROUP, REPLACED_KEY);
 		configManager.setConfiguration(UltimateBankTabsConfig.GROUP, RESTORE_KEY, false);
 		chat(saved.isEmpty() ? "No Brain Bank Tabs: there are no replaced tabs to bring back."
-			: "No Brain Bank Tabs: brought back " + saved.size() + " tabs. Close and reopen your bank to see them.");
+			: "No Brain Bank Tabs: brought back " + saved.size() + " tabs."
+				+ (atBankInit ? "" : " Open your bank to see them."));
 	}
 
 	/** Enabled plugins that fight over the same tabs, as "Name (what it does)". */
@@ -344,6 +356,7 @@ public class UltimateBankTabsPlugin extends Plugin
 		});
 		// an open "replace your tabs?" question checks this before acting
 		writer = null;
+		restorePending = false;
 		accepted = false;
 		stored = new HashSet<>();
 		potions = new HashSet<>();
@@ -404,6 +417,11 @@ public class UltimateBankTabsPlugin extends Plugin
 				readBank(bank);
 				// tabs added here are picked up by this very bank open, so no "reopen" hint
 				rebuild(false);
+			}
+			if (restorePending && writer != null)
+			{
+				restorePending = false;
+				restoreReplaced(true);
 			}
 			if (writer != null)
 			{
@@ -499,7 +517,7 @@ public class UltimateBankTabsPlugin extends Plugin
 		{
 			if (Boolean.parseBoolean(event.getNewValue()) && writer != null)
 			{
-				clientThread.invokeLater(this::restoreReplaced);
+				clientThread.invokeLater(() -> restoreReplaced(false));
 			}
 		}
 		else if (UltimateBankTabsConfig.GROUP.equals(event.getGroup()) && !event.getKey().startsWith("tagName_")
@@ -544,6 +562,7 @@ public class UltimateBankTabsPlugin extends Plugin
 		else if (key.startsWith("icon_") && event.getNewValue() != null)
 		{
 			// Change icon: keep the player's pick from now on (over a skill icon too)
+			writer.iconPicked(tag, event.getNewValue());
 			configManager.setConfiguration(UltimateBankTabsConfig.GROUP, BankTagsWriter.CUSTOM_ICON_PREFIX + tabKey,
 				event.getNewValue());
 			dirty = true;
@@ -753,7 +772,7 @@ public class UltimateBankTabsPlugin extends Plugin
 			}
 			// the item icon also stands under a skill icon, for when Bank Tags draws the tab without us
 			int icon = built.getHero() > 0 ? built.getHero() : def.icon;
-			tabs.put(def.key, new BankTagsWriter.Tab(built.itemIds(), LayoutPlanner.plan(built, config.gapRows()), icon,
+			tabs.put(def.key, new BankTagsWriter.Tab(built.itemIds(), LayoutPlanner.layOut(built, config.gapRows()), icon,
 				LayoutPlanner.bisPositions(built), LayoutPlanner.hasBlock(built)));
 			why.put(def.key, built.reasons());
 		}

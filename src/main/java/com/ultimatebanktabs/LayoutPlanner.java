@@ -3,6 +3,7 @@ package com.ultimatebanktabs;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -60,6 +61,22 @@ class LayoutPlanner
 	private final TreeMap<Integer, Integer> grid = new TreeMap<>();
 	/** empty cells of a mirrored equipment block that nothing else may take */
 	private final Set<Integer> reserved = new HashSet<>();
+	/** row -> the section placed in it ("block" for the equipment block, "key#band" for herb bands) */
+	private final Map<Integer, String> rowKeys = new HashMap<>();
+	private String rowKey = "block";
+
+	/** A planned layout and the section each of its rows belongs to (null for an empty row). */
+	static final class Plan
+	{
+		final int[] layout;
+		final String[] rows;
+
+		Plan(int[] layout, String[] rows)
+		{
+			this.layout = layout;
+			this.rows = rows;
+		}
+	}
 
 	/**
 	 * @param gapRows leave an empty row between sections
@@ -67,7 +84,22 @@ class LayoutPlanner
 	 */
 	static int[] plan(TabBuilder.Built tab, boolean gapRows)
 	{
-		return new LayoutPlanner().layout(tab, gapRows);
+		return layOut(tab, gapRows).layout;
+	}
+
+	static Plan layOut(TabBuilder.Built tab, boolean gapRows)
+	{
+		LayoutPlanner planner = new LayoutPlanner();
+		int[] layout = planner.layout(tab, gapRows);
+		String[] rows = new String[(layout.length + WIDTH - 1) / WIDTH];
+		planner.rowKeys.forEach((row, key) ->
+		{
+			if (row < rows.length)
+			{
+				rows[row] = key;
+			}
+		});
+		return new Plan(layout, rows);
 	}
 
 	/** Whether the tab is laid out with the equipment block (best in slot or alternatives). */
@@ -178,6 +210,7 @@ class LayoutPlanner
 			lastSeparate = separate;
 			goodsStarted |= goods;
 			first = false;
+			rowKey = s.getKey();
 			if ("columns".equals(s.getLayout()))
 			{
 				int end = i;
@@ -269,6 +302,7 @@ class LayoutPlanner
 			for (TabBuilder.Section s : sections)
 			{
 				boolean used = false;
+				rowKey = s.getKey() + "#" + band;
 				for (TabBuilder.Placement p : s.getItems())
 				{
 					int idx = columns.indexOf(p.getGroup());
@@ -292,6 +326,7 @@ class LayoutPlanner
 			}
 		}
 		int col = 0;
+		rowKey = "columns_extra";
 		for (TabBuilder.Placement p : extra)
 		{
 			if (col == WIDTH)
@@ -446,6 +481,11 @@ class LayoutPlanner
 
 	private boolean put(int row, int col, int itemId)
 	{
-		return !reserved.contains(row * WIDTH + col) && grid.putIfAbsent(row * WIDTH + col, itemId) == null;
+		boolean ok = !reserved.contains(row * WIDTH + col) && grid.putIfAbsent(row * WIDTH + col, itemId) == null;
+		if (ok)
+		{
+			rowKeys.putIfAbsent(row, rowKey);
+		}
+		return ok;
 	}
 }
