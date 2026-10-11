@@ -584,6 +584,12 @@ class TabBuilder
 	 * The most complete variant of an outfit (e.g. one graceful colour), with any
 	 * missing slot filled by the best item for the pick's profile.
 	 */
+	/**
+	 * The most complete outfit among the pick's variants (graceful colours, spirit angler or angler): each
+	 * slot takes that outfit's piece, and a slot it lacks takes the first owned item of the slot's fallback
+	 * ("pieces"). A "complete" outfit (graceful) counts only when worn whole: pieces of any variants mix,
+	 * and unless every slot is covered, every slot takes its fallback instead (the lightest item).
+	 */
 	private void outfit(TabData.Pick pick, Context ctx, List<Placement> out, List<Integer> chosen)
 	{
 		List<TabData.Piece> best = null;
@@ -605,18 +611,53 @@ class TabBuilder
 			}
 		}
 		List<TabData.Piece> slots = best != null ? best : pick.variants.isEmpty() ? Collections.emptyList() : pick.variants.get(0);
-		for (TabData.Piece piece : slots)
+		boolean whole = best != null && (!pick.complete || wornWhole(pick, slots.size(), ctx));
+		String label = pick.label != null ? pick.label : "Your most complete outfit";
+		for (int i = 0; i < slots.size(); i++)
 		{
-			List<Integer> ids = best != null ? firstOwned(piece.entries, ctx, 1) : Collections.emptyList();
-			if (ids.isEmpty() && pick.profile != null)
+			TabData.Piece piece = slots.get(i);
+			List<Integer> ids = whole ? firstOwned(piece.entries, ctx, 1) : Collections.emptyList();
+			for (int v = 0; ids.isEmpty() && whole && pick.complete && v < pick.variants.size(); v++)
 			{
-				ids = bestBy(slotCandidates(piece.slot, ctx), id -> Scoring.armour(pick.profile, stats.apply(id)), 1);
+				// colours mix: the same slot from another variant
+				List<TabData.Piece> other = pick.variants.get(v);
+				ids = i < other.size() ? firstOwned(other.get(i).entries, ctx, 1) : Collections.emptyList();
 			}
-			boolean fromOutfit = best != null && !firstOwned(piece.entries, ctx, 1).isEmpty();
-			String reason = fromOutfit ? (pick.label != null ? pick.label : "Your most complete outfit")
-				: "Lightest weight-reducing " + slotName(piece.slot);
-			chosen.addAll(ids);
-			add(out, ids, piece.slot, pick.key, ctx, id -> reason);
+			if (!ids.isEmpty())
+			{
+				chosen.addAll(ids);
+				add(out, ids, piece.slot, pick.key, ctx, id -> label);
+				continue;
+			}
+			TabData.Piece fallback = pick.pieces.stream().filter(p -> piece.slot.equals(p.slot)).findFirst().orElse(null);
+			if (fallback != null)
+			{
+				List<Integer> got = firstOwned(fallback.entries, ctx, 1);
+				chosen.addAll(got);
+				add(out, got, piece.slot, pick.key, ctx,
+					id -> pieceReason(fallback, id, "Lightest weight-reducing " + slotName(piece.slot)));
+			}
+			else if (pick.profile != null)
+			{
+				List<Integer> got = bestBy(slotCandidates(piece.slot, ctx),
+					id -> Scoring.armour(pick.profile, stats.apply(id)), 1);
+				chosen.addAll(got);
+				add(out, got, piece.slot, pick.key, ctx, id -> "Lightest weight-reducing " + slotName(piece.slot));
+			}
 		}
+	}
+
+	/** Every slot has a piece from one variant or another (graceful colours mix for the set bonus). */
+	private static boolean wornWhole(TabData.Pick pick, int slots, Context ctx)
+	{
+		for (int i = 0; i < slots; i++)
+		{
+			final int slot = i;
+			if (pick.variants.stream().noneMatch(v -> slot < v.size() && !firstOwned(v.get(slot).entries, ctx, 1).isEmpty()))
+			{
+				return false;
+			}
+		}
+		return true;
 	}
 }

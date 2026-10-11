@@ -503,20 +503,60 @@ GRACEFUL_PIECES = [("HEAD", "Graceful hood"), ("CAPE", "Graceful cape"), ("BODY"
                    ("LEGS", "Graceful legs"), ("GLOVES", "Graceful gloves"), ("BOOTS", "Graceful boots")]
 
 
+# every colour of a graceful piece as one entry
+GRACEFUL_ANY = {s: "re:^%s( \\(.+\\))?$" % n for s, n in GRACEFUL_PIECES}
+CAMO = "(Polar|Wood|Jungle|Desert) camo"
+# Each slot's weight-reducing items by worn weight (wiki), lightest first: what a slot takes without full graceful.
+LIGHTEST = [
+    ("HEAD", [(GRACEFUL_ANY["HEAD"], "Graceful hood: -3 kg")]),
+    ("CAPE", [("Spottier cape", "-4.5 kg, lighter than graceful but no set bonus"),
+              ("Agility cape", "-4 kg; counts as a graceful cape"), (GRACEFUL_ANY["CAPE"], "Graceful cape: -4 kg"),
+              ("Max cape", "-4 kg"), ("Spotted cape", "-2.3 kg")]),
+    ("BODY", [(GRACEFUL_ANY["BODY"], "Graceful top: -5 kg"), ("re:^%s top$" % CAMO, "Camo top: -3 kg")]),
+    ("LEGS", [(GRACEFUL_ANY["LEGS"], "Graceful legs: -6 kg"), ("re:^%s legs$" % CAMO, "Camo legs: -2 kg")]),
+    ("GLOVES", [("Penance gloves", "-4.5 kg, lighter than graceful but no set bonus"),
+                (GRACEFUL_ANY["GLOVES"], "Graceful gloves: -3 kg")]),
+    ("BOOTS", [("Boots of lightness", "-4.5 kg, lighter than graceful but no set bonus"),
+               (GRACEFUL_ANY["BOOTS"], "Graceful boots: -4 kg")]),
+]
+
+
 def graceful(key):
-    """One complete-as-possible graceful outfit: the colour with the most pieces wins;
-    empty slots fall back to the lightest weight-reducing item."""
-    return dict(key=key, mode="outfit", profile="weight",
-                variants=[[dict(slot=s, entries=[n + c]) for s, n in GRACEFUL_PIECES] for c in GRACEFUL_SETS])
+    """Full graceful (colours can mix; the Agility cape counts as its cape) fills every slot, the most complete
+    colour first. Without the full set, every slot takes its lightest weight-reducing item instead."""
+    return dict(key=key, mode="outfit", complete=True,
+                why="Full graceful (colours can mix): -25 kg and 30% faster run energy restore",
+                variants=[[dict(slot=s, entries=[n + c] + (["Agility cape"] if s == "CAPE" else []))
+                           for s, n in GRACEFUL_PIECES] for c in GRACEFUL_SETS],
+                pieces=[dict(slot=s, entries=e) for s, e in LIGHTEST])
 
 
 # Weight-reducing gear beside the graceful outfit (worn weights from the wiki).
 def weight_reducing():
     return [
-        first("light_boots", [("Boots of lightness", "Weight-reducing boots: -4.5 kg when worn")]),
-        first("light_gloves", [("Penance gloves", "Weight-reducing gloves: -4.5 kg when worn")]),
         first("light_cape", [("Spottier cape", "Weight-reducing cape: -4.5 kg when worn"),
-                             ("Spotted cape", "Weight-reducing cape: -2.3 kg when worn")]),
+                             ("Spotted cape", "Weight-reducing cape: -2.3 kg when worn")], slot="CAPE"),
+        first("light_gloves", [("Penance gloves", "Weight-reducing gloves: -4.5 kg when worn")], slot="GLOVES"),
+        first("light_boots", [("Boots of lightness", "Weight-reducing boots: -4.5 kg when worn")], slot="BOOTS"),
+    ]
+
+
+def light_gear(extra=()):
+    """Movement and Agility share one block: the lightest gear you own, full graceful first, with the
+    ring of endurance; the weight-reducing items it didn't use stand beside it."""
+    return [
+        section("main", "Lightest gear", "equipment", [
+            graceful("graceful"),
+            first("endurance", [("Ring of endurance", "Doubles stamina potions; 500+ charges: 15% less run drain")],
+                  slot="RING"),
+        ]),
+        section("situational", "Weight-reducing", "alts", [
+            # same key as the unique_uses.py group, which fills it on the Movement tab
+            first("graceful_cape_sub", [("Agility cape", "Counts as a graceful cape; daily full run + stamina")],
+                  slot="CAPE"),
+            *weight_reducing(),
+            *extra,
+        ]),
     ]
 
 
@@ -531,12 +571,9 @@ TELEPORT_TABLETS = [
 ]
 
 MOVEMENT = tab("movement", "Movement", "Graceful boots", kind="movement", sections=[
+    *light_gear(),
     section("run", "Run energy", "rows", [
-        graceful("graceful"),
-        *weight_reducing(),
-        all_("graceful_cape_sub", []),  # Agility cape (unique_uses.py): counts as a graceful cape
         first("energy", ENERGY),
-        first("endurance", ["Ring of endurance"]),
     ]),
     # teleport jewellery like the Crafting tab: silver (jade, red topaz), then gold in gem order
     # (sapphire, emerald, ruby, dragonstone: ring, necklace, bracelet, amulet), then everything else
@@ -665,15 +702,41 @@ def cape(skill_cape):
     return first("cape", [skill_cape])
 
 
+def skill_cape(skill_cape_, perk):
+    """The skill cape in the cape slot; the plain Max cape has every skill cape's perk."""
+    return first("cape", [(skill_cape_, perk), ("Max cape", perk + " (Max cape: every skill cape's perk)")],
+                 slot="CAPE")
+
+
+def outfit_slots(key, why, pieces):
+    """A skilling outfit as one best-in-slot pick per slot, so each piece sits in its own cell."""
+    return [first("%s_%s" % (key, slot.lower()), entries, slot=slot, why=why) for slot, entries in pieces]
+
+
+def best_in_slot(picks):
+    return section("main", "Best in slot", "equipment", picks)
+
+
+def situational(picks):
+    return section("situational", "Situational", "alts", picks)
+
+
+ZEALOT = "Zealot's robes: 1.25% chance per piece to save bones, ashes or heads you offer"
 PRAYER = tab("prayer", "Prayer", "Dragon bones", sections=[
+    best_in_slot([
+        *outfit_slots("zealot", ZEALOT, [("HEAD", ["Zealot's helm"]), ("BODY", ["Zealot's robe top"]),
+                                         ("LEGS", ["Zealot's robe bottom"]), ("BOOTS", ["Zealot's boots"])]),
+        skill_cape("Prayer cape", "Works as a holy wrench"),
+        first("necklace", [("Bonecrusher necklace", "Crushes bones for Prayer XP and restores prayer"),
+                           ("Dragonbone necklace", "Restores prayer when you bury bones")], slot="AMULET"),
+    ]),
+    situational([
+        first("dragonbone", [("Dragonbone necklace", "Restores prayer when you bury bones")], slot="AMULET"),
+    ]),
     section("gear", "Gear", "rows", [
-        first("bonecrusher", ["Bonecrusher necklace", "Bonecrusher"]),
+        first("bonecrusher", ["Bonecrusher"]),
         first("sanctifier", ["Ash sanctifier"]),
-        first("dragonbone", ["Dragonbone necklace"]),
         first("wrench", ["Holy wrench"]),
-        cape("Prayer cape"),
-        outfit("zealot", [("HEAD", ["Zealot's helm"]), ("BODY", ["Zealot's robe top"]),
-                          ("LEGS", ["Zealot's robe bottom"]), ("BOOTS", ["Zealot's boots"])]),
     ]),
     section("bones", "Bones", "rows", [
         # by Prayer experience, lowest first (tier order, like every other tab)
@@ -710,14 +773,20 @@ PRAYER = tab("prayer", "Prayer", "Dragon bones", sections=[
 ])
 
 SLAYER = tab("slayer", "Slayer", "Enchanted gem", sections=[
+    best_in_slot([
+        first("helm", IMBUED_SLAYER_HELMS + SLAYER_HELMS + ["Black mask (i)", "Black mask"], slot="HEAD",
+              why="Every head-slot task protection in one, plus the slayer damage bonus"),
+        skill_cape("Slayer cape", "10% chance to be offered your last task again"),
+        first("bracelet", [("Expeditious bracelet", "Chance a kill counts twice: shorter tasks"),
+                           ("Bracelet of slaughter", "Chance a kill doesn't count: longer tasks")], slot="GLOVES"),
+        first("ring", ["Slayer ring (eternal)", "Slayer ring"], slot="RING", why="Slayer teleports and task checks"),
+    ]),
+    situational([
+        first("slaughter", [("Bracelet of slaughter", "Chance a kill doesn't count: longer tasks")], slot="GLOVES"),
+    ]),
     # empty all_(key, []) picks mark where a unique_uses.py group with that key goes
     section("gear", "Slayer gear", "rows", [
-        first("helm", IMBUED_SLAYER_HELMS + SLAYER_HELMS + ["Black mask (i)", "Black mask"]),
         first("gem", ["Eternal gem", "Enchanted gem"]),
-        first("ring", ["Slayer ring (eternal)", "Slayer ring"]),
-        # silver bracelets in gem order: opal, then red topaz
-        all_("bracelets", ["Expeditious bracelet", "Bracelet of slaughter"]),
-        cape("Slayer cape"),
         all_("slayer_boost", []),
         # loot storage
         first("herb_sack", ["Silklined herb sack", "Herb sack"]),
@@ -786,51 +855,92 @@ SLAYER = tab("slayer", "Slayer", "Enchanted gem", sections=[
     ]),
 ])
 
+LUMBERJACK = "Lumberjack outfit: bonus Woodcutting XP, +2.5% with all 4 (forestry pieces mix)"
 WOODCUTTING = tab("woodcutting", "Woodcutting", "Rune axe", sections=[
-    section("gear", "Tools", "rows", [
+    best_in_slot([
         first("axe", ["Crystal axe", "Infernal axe", "Dragon axe", "3rd Age axe", "Rune axe", "Gilded axe",
-                      "Adamant axe", "Mithril axe", "Black axe", "Steel axe", "Iron axe", "Bronze axe"]),
+                      "Adamant axe", "Mithril axe", "Black axe", "Steel axe", "Iron axe", "Bronze axe"],
+              slot="WEAPON", why="Best axe you own"),
+        *outfit_slots("lumberjack", LUMBERJACK, [("HEAD", ["Forestry hat", "Lumberjack hat"]),
+                                                 ("BODY", ["Forestry top", "Lumberjack top"]),
+                                                 ("LEGS", ["Forestry legs", "Lumberjack legs"]),
+                                                 ("BOOTS", ["Forestry boots", "Lumberjack boots"])]),
+        skill_cape("Woodcutting cape", "+10% bird nest chance"),
+        all_("nest_amulet", [], slot="AMULET"),  # Strung rabbit foot (unique_uses.py)
+        all_("bird_nest_gloves", [], slot="GLOVES"),  # Twitcher's gloves (unique_uses.py)
+    ]),
+    situational([
         first("felling", ["Crystal felling axe", "3rd Age felling axe", "Dragon felling axe", "Rune felling axe",
                           "Adamant felling axe", "Mithril felling axe", "Black felling axe", "Steel felling axe",
-                          "Iron felling axe", "Bronze felling axe"]),
+                          "Iron felling axe", "Bronze felling axe"], slot="WEAPON",
+              why="Felling axe: two-handed, +10% XP with forestry rations"),
+        all_("crystal_ring", [], slot="RING"),  # saves crystal axe charges (unique_uses.py)
+    ]),
+    section("gear", "Tools", "rows", [
         first("kit", ["Forestry kit"]),
         first("basket", ["Forestry basket", "Log basket"]),
         first("brace", ["Log brace"]),
-        cape("Woodcutting cape"),
-    ]),
-    section("outfit", "Outfit", "rows", [
-        outfit("lumberjack", [("HEAD", ["Forestry hat", "Lumberjack hat"]), ("BODY", ["Forestry top", "Lumberjack top"]),
-                              ("LEGS", ["Forestry legs", "Lumberjack legs"]),
-                              ("BOOTS", ["Forestry boots", "Lumberjack boots"])]),
     ]),
 ])
 
+PROSPECTOR = "Prospector kit: bonus Mining XP, +2.5% with all 4 (golden and plain pieces mix)"
 MINING = tab("mining", "Mining", "Rune pickaxe", sections=[
-    section("gear", "Tools", "rows", [
+    best_in_slot([
         first("pickaxe", ["Crystal pickaxe", "Infernal pickaxe (or)", "Infernal pickaxe", "Dragon pickaxe (or)",
                           "Dragon pickaxe (upgraded)", "Dragon pickaxe", "3rd Age pickaxe", "Gilded pickaxe",
                           "Rune pickaxe", "Adamant pickaxe", "Mithril pickaxe", "Black pickaxe", "Steel pickaxe",
-                          "Iron pickaxe", "Bronze pickaxe"]),
-        first("gloves", ["Expert mining gloves", "Superior mining gloves", "Mining gloves"]),
-        first("ring", ["Celestial signet", "Celestial ring"]),
-        first("varrock", tiers("Varrock armour")),
+                          "Iron pickaxe", "Bronze pickaxe"], slot="WEAPON", why="Best pickaxe you own"),
+        first("prospector_head", ["Golden prospector helmet", "Prospector helmet"], slot="HEAD", why=PROSPECTOR),
+        first("prospector_body", [("Varrock armour 4", "Counts as the prospector jacket; chance of 2 ores from any rock"),
+                                  ("Golden prospector jacket", PROSPECTOR), ("Prospector jacket", PROSPECTOR)],
+              slot="BODY"),
+        first("prospector_legs", ["Golden prospector legs", "Prospector legs"], slot="LEGS", why=PROSPECTOR),
+        first("prospector_boots", ["Golden prospector boots", "Prospector boots"], slot="BOOTS", why=PROSPECTOR),
+        skill_cape("Mining cape", "5% chance of an extra ore"),
+        all_("gem_amulet", [], slot="AMULET"),  # charged glory (unique_uses.py)
+        first("gloves", ["Expert mining gloves", "Superior mining gloves", "Mining gloves"], slot="GLOVES",
+              why="Chance a rock doesn't deplete"),
+        first("ring", ["Celestial signet", "Celestial ring"], slot="RING",
+              why="+4 invisible Mining; charged: chance of an extra ore"),
+    ]),
+    situational([
+        first("jacket", ["Golden prospector jacket", "Prospector jacket"], slot="BODY", why=PROSPECTOR),
+        first("varrock", tiers("Varrock armour", 3), slot="BODY", why="Chance of an extra ore (lower ores)"),
+        all_("clay_bracelet", [], slot="GLOVES"),  # Bracelet of clay (unique_uses.py)
+    ]),
+    section("gear", "Tools", "rows", [
         first("gem_bag", ["Gem bag"]),
         first("coal_bag", ["Coal bag"]),
         first("hammer", ["Imcando hammer", "Hammer"], why="Motherlode Mine: repairs the broken water wheel struts"),
-        cape("Mining cape"),
-    ]),
-    section("outfit", "Outfit", "rows", [
-        outfit("prospector", [("HEAD", ["Golden prospector helmet", "Prospector helmet"]),
-                              ("BODY", ["Golden prospector jacket", "Prospector jacket"]),
-                              ("LEGS", ["Golden prospector legs", "Prospector legs"]),
-                              ("BOOTS", ["Golden prospector boots", "Prospector boots"])]),
     ]),
 ])
 
+ANGLER = "Angler outfit: bonus Fishing XP, +2.5% with all 4 (spirit and plain pieces mix)"
+SPIRIT_ANGLER = [("HEAD", "Spirit angler headband"), ("BODY", "Spirit angler top"), ("LEGS", "Spirit angler waders"),
+                 ("BOOTS", "Spirit angler boots")]
+PLAIN_ANGLER = [("HEAD", "Angler hat"), ("BODY", "Angler top"), ("LEGS", "Angler waders"), ("BOOTS", "Angler boots")]
 FISHING = tab("fishing", "Fishing", "Lobster pot", sections=[
-    section("gear", "Tools", "rows", [
+    best_in_slot([
+        # the more complete of the two looks fills the block; the other stands beside it
+        dict(key="angler", mode="outfit", why=ANGLER,
+             variants=[[dict(slot=s, entries=[n]) for s, n in SPIRIT_ANGLER],
+                       [dict(slot=s, entries=[n]) for s, n in PLAIN_ANGLER]],
+             pieces=[dict(slot=s, entries=[a, b]) for (s, a), (_, b) in zip(SPIRIT_ANGLER, PLAIN_ANGLER)]),
+        skill_cape("Fishing cape", "Fishing Guild teleports"),
+        all_("rada", [], slot="AMMO"),  # Rada's blessing (unique_uses.py)
         first("harpoon", ["Crystal harpoon", "Infernal harpoon (or)", "Infernal harpoon", "Dragon harpoon (or)",
-                          "Dragon harpoon", "Barb-tail harpoon", "Harpoon"]),
+                          "Dragon harpoon", "Barb-tail harpoon"], slot="WEAPON", why="Best harpoon you own"),
+    ]),
+    situational([
+        set_("angler_plain", [(s, [n]) for s, n in PLAIN_ANGLER], why=ANGLER),
+        set_("angler_spirit", [(s, [n]) for s, n in SPIRIT_ANGLER], why=ANGLER),
+        all_("barrel", [], slot="CAPE"),  # fish sack barrel (unique_uses.py)
+        all_("infernal_eel_gloves", [], slot="GLOVES"),  # (unique_uses.py)
+        all_("crystal_ring", [], slot="RING"),  # (unique_uses.py)
+        all_("lantern", [], slot="SHIELD"),  # lantern harpooning (unique_uses.py)
+    ]),
+    section("gear", "Tools", "rows", [
+        first("plain_harpoon", ["Harpoon"], unless=["harpoon"]),
         first("rod", ["Pearl fishing rod", "Fishing rod"]),
         first("fly_rod", ["Pearl fly fishing rod", "Fly fishing rod"]),
         first("barbarian_rod", ["Pearl barbarian rod", "Barbarian rod"]),
@@ -839,14 +949,7 @@ FISHING = tab("fishing", "Fishing", "Lobster pot", sections=[
         first("big_net", ["Big fishing net"]),
         first("lobster_pot", ["Lobster pot"]),
         first("vessel", ["Karambwan vessel"]),
-        first("barrel", ["Fish barrel"]),
         first("tackle", ["Tackle box"]),
-        cape("Fishing cape"),
-    ]),
-    section("outfit", "Outfit", "rows", [
-        outfit("angler", [("HEAD", ["Spirit angler headband", "Angler hat"]), ("BODY", ["Spirit angler top", "Angler top"]),
-                          ("LEGS", ["Spirit angler waders", "Angler waders"]),
-                          ("BOOTS", ["Spirit angler boots", "Angler boots"])]),
     ]),
     section("bait", "Bait", "rows", [
         # bait by the level it's used at, then the feathers, then Spirit flakes (an enhancer, not bait)
@@ -855,12 +958,26 @@ FISHING = tab("fishing", "Fishing", "Lobster pot", sections=[
     ]),
 ])
 
+GUILD_HUNTER = "Guild hunter outfit: better catch and rare-part chances, +2.5% catch rate with all 4"
 HUNTER = tab("hunter", "Hunter", "Box trap", sections=[
+    best_in_slot([
+        *outfit_slots("guild", GUILD_HUNTER, [("HEAD", ["Guild hunter headwear"]), ("BODY", ["Guild hunter top"]),
+                                              ("LEGS", ["Guild hunter legs"]), ("BOOTS", ["Guild hunter boots"])]),
+        skill_cape("Hunter cape", "Teleports to the Hunter Guild and chinchompa areas"),
+        first("net", [("Magic butterfly net", "Wield to catch implings, butterflies and moths (better odds)"),
+                      ("Butterfly net", "Wield to catch implings, butterflies and moths")], slot="WEAPON"),
+        all_("horn", [], slot="SHIELD"),  # Horn of Plenty (unique_uses.py)
+        all_("birdhouse_amulet", [], slot="AMULET"),  # Strung rabbit foot (unique_uses.py)
+        all_("pursuit", [], slot="RING"),  # Ring of pursuit (unique_uses.py)
+    ]),
+    situational([
+        all_("teasing", [], slot="WEAPON"),  # Hunter's spear (unique_uses.py)
+        all_("kyatt", []),  # damage-reducing hunter gear (unique_uses.py)
+    ]),
     section("gear", "Traps & tools", "rows", [
         first("box_trap", ["Box trap"]),
         first("bird_snare", ["Bird snare"]),
         first("rabbit_snare", ["Rabbit snare"]),
-        first("net", ["Magic butterfly net", "Butterfly net"]),
         first("impling_jar", ["Impling jar"]),
         first("butterfly_jar", ["Butterfly jar"]),
         first("noose", ["Noose wand"]),
@@ -872,39 +989,39 @@ HUNTER = tab("hunter", "Hunter", "Box trap", sections=[
         first("kit", ["Huntsman's kit"]),
         first("crossbow", ["Hunters' sunlight crossbow", "Hunters' crossbow"]),
         first("spear", ["Hunter's spear"]),
-        cape("Hunter cape"),
-    ]),
-    section("outfit", "Outfit", "rows", [
-        outfit("guild", [("HEAD", ["Guild hunter headwear"]), ("BODY", ["Guild hunter top"]),
-                         ("LEGS", ["Guild hunter legs"]), ("BOOTS", ["Guild hunter boots"])]),
     ]),
 ])
 
+ROGUE = "Rogue equipment: +15% double pickpocket loot per piece, 100% with all 5"
 THIEVING = tab("thieving", "Thieving", "Lockpick", sections=[
-    section("gear", "Gear", "rows", [
-        first("dodgy", ["Dodgy necklace"]),
-        first("silence", ["Gloves of silence"]),
-        first("lockpick", ["Lockpick"]),
-        first("stethoscope", ["Stethoscope"]),
+    best_in_slot([
+        *outfit_slots("rogue", ROGUE, [("HEAD", ["Rogue mask"]), ("BODY", ["Rogue top"]),
+                                       ("LEGS", ["Rogue trousers"]), ("BOOTS", ["Rogue boots"])]),
+        first("rogue_gloves", [("Rogue gloves", ROGUE), ("Gloves of silence", "+5% pickpocket success")],
+              slot="GLOVES"),
+        skill_cape("Thieving cape", "+10% pickpocket success"),
+        first("dodgy", [("Dodgy necklace", "25% chance to dodge the stun after a failed pickpocket")], slot="AMULET"),
         first("blackjack", ["Maple blackjack(d)", "Maple blackjack(o)", "Maple blackjack", "Willow blackjack(d)",
                             "Willow blackjack(o)", "Willow blackjack", "Oak blackjack(d)", "Oak blackjack(o)",
-                            "Oak blackjack"]),
-        first("ardy", tiers("Ardougne cloak")),
-        cape("Thieving cape"),
+                            "Oak blackjack"], slot="WEAPON", why="Blackjacking in Pollnivneach"),
     ]),
-    section("outfit", "Outfit", "rows", [
-        outfit("rogue", [("HEAD", ["Rogue mask"]), ("BODY", ["Rogue top"]), ("LEGS", ["Rogue trousers"]),
-                         ("GLOVES", ["Rogue gloves"]), ("BOOTS", ["Rogue boots"])]),
+    situational([
+        first("silence", [("Gloves of silence", "+5% pickpocket success; no use after the hard Ardougne diary")],
+              slot="GLOVES"),
+        first("ardy", ["Ardougne max cape"] + tiers("Ardougne cloak"), slot="CAPE",
+              why="Monastery teleports; the diary's pickpocket bonus works without wearing it"),
+    ]),
+    section("gear", "Gear", "rows", [
+        first("lockpick", ["Lockpick"]),
+        first("stethoscope", ["Stethoscope"]),
     ]),
 ])
 
 AGILITY = tab("agility", "Agility", "Graceful hood", sections=[
+    # Karamja gloves and the ring of Charos (unique_uses.py) beside the lightest gear
+    *light_gear([all_("karamja_gloves", [], slot="GLOVES"), all_("werewolf_course", [], slot="RING")]),
     section("gear", "Gear", "rows", [
-        graceful("graceful"),
-        *weight_reducing(),
-        cape("Agility cape"),
         first("energy", ENERGY),
-        first("endurance", ["Ring of endurance"]),
         first("pie", ["Summer pie"]),
         first("agility_potion", ["Agility potion"]),
     ]),
@@ -914,12 +1031,24 @@ AGILITY = tab("agility", "Agility", "Graceful hood", sections=[
     ]),
 ])
 
+FARMER = "Farmer's outfit: bonus Farming XP, +2.5% with all 4"
 FARMING = tab("farming", "Farming", "Seed dibber", sections=[
+    best_in_slot([
+        *outfit_slots("farmer", FARMER, [("HEAD", ["Farmer's strawhat"]),
+                                         ("BODY", ["Farmer's jacket", "Farmer's shirt"]),
+                                         ("LEGS", ["Farmer's boro trousers"]), ("BOOTS", ["Farmer's boots"])]),
+        skill_cape("Farming cape", "+5% chance to save herb harvest lives"),
+        first("magic_secateurs", [("Magic secateurs", "+10% herb, allotment and bush yields")], slot="WEAPON"),
+        all_("bounty_amulet", [], slot="AMULET"),  # Amulet of bounty (unique_uses.py)
+    ]),
+    situational([
+        all_("nature_amulet", [], slot="AMULET"),  # Amulet of Nature (unique_uses.py)
+    ]),
     section("gear", "Tools", "rows", [
         first("spade", ["Spade"]),
         first("rake", ["Rake"]),
         first("dibber", ["Seed dibber"]),
-        first("secateurs", ["Magic secateurs", "Secateurs"]),
+        first("secateurs", ["Secateurs"], unless=["magic_secateurs"]),
         first("trowel", ["Gardening trowel"]),
         first("can", ["Gricoller's can", "Watering can"]),
         first("bucket", ["Bottomless compost bucket"]),
@@ -929,25 +1058,27 @@ FARMING = tab("farming", "Farming", "Seed dibber", sections=[
                          ("Compost potion", "Turns compost into supercompost"),
                          ("Volcanic ash", "Turns supercompost into ultracompost")]),
         first("cure", ["Plant cure"]),
-        cape("Farming cape"),
-    ]),
-    section("outfit", "Outfit", "rows", [
-        outfit("farmer", [("HEAD", ["Farmer's strawhat"]), ("BODY", ["Farmer's jacket", "Farmer's shirt"]),
-                          ("LEGS", ["Farmer's boro trousers"]), ("BOOTS", ["Farmer's boots"])]),
     ]),
 ])
 
+EYE = "Raiments of the Eye: +10% bonus runes per piece, 60% with all 4"
 RUNECRAFT = tab("runecraft", "Runecraft", "Pure essence", sections=[
+    best_in_slot([
+        *outfit_slots("eye_outfit", EYE, [("HEAD", ["Hat of the Eye"]), ("BODY", ["Robe top of the Eye"]),
+                                          ("LEGS", ["Robe bottoms of the Eye"]), ("BOOTS", ["Boots of the Eye"])]),
+        skill_cape("Runecraft cape", "Any altar without a talisman; pouches never degrade"),
+        first("binding", [("Binding necklace", "Combination runes always succeed"),
+                          ("Amulet of the Eye", "Guardians of the Rift teleports")], slot="AMULET"),
+        first("elements_ring", [("Ring of the elements", "Teleports to the elemental altars")], slot="RING"),
+    ]),
+    situational([
+        first("eye", [("Amulet of the Eye", "Guardians of the Rift teleports")], slot="AMULET"),
+        all_("abyss_bracelet", [], slot="GLOVES"),  # (unique_uses.py)
+        all_("lantern", [], slot="SHIELD"),  # Abyssal lantern (unique_uses.py)
+    ]),
     section("gear", "Gear", "rows", [
         first("colossal", ["Colossal pouch"]),
         all_("pouches", ["Giant pouch", "Large pouch", "Medium pouch", "Small pouch"], unless=["colossal"]),
-        first("binding", ["Binding necklace"]),
-        first("eye", ["Amulet of the Eye"]),
-        cape("Runecraft cape"),
-    ]),
-    section("outfit", "Outfit", "rows", [
-        outfit("eye_outfit", [("HEAD", ["Hat of the Eye"]), ("BODY", ["Robe top of the Eye"]),
-                              ("LEGS", ["Robe bottoms of the Eye"]), ("BOOTS", ["Boots of the Eye"])]),
     ]),
     # altar order; the regex keeps any tiara or talisman added later
     section("tiaras", "Tiaras", "rows", [
@@ -974,33 +1105,42 @@ COOKING = tab("cooking", "Cooking", "Cooking gauntlets", sections=[
     ]),
 ])
 
+PYROMANCER = "Pyromancer outfit: +2.5% Firemaking XP with all 4; each piece keeps you warm at Wintertodt"
+BRUMA = "Lights Wintertodt braziers and keeps you warm"
 FIREMAKING = tab("firemaking", "Firemaking", "Tinderbox", sections=[
+    best_in_slot([
+        *outfit_slots("pyromancer", PYROMANCER, [("HEAD", ["Pyromancer hood"]), ("BODY", ["Pyromancer garb"]),
+                                                 ("LEGS", ["Pyromancer robe"]), ("BOOTS", ["Pyromancer boots"])]),
+        skill_cape("Firemaking cape", "Keeps you warm at Wintertodt; a light source"),
+        first("torch", [("Bruma torch", BRUMA)], slot="WEAPON"),
+        first("torch_offhand", [("Bruma torch (off-hand)", BRUMA + "; frees your weapon slot")], slot="SHIELD"),
+        first("warm_gloves", [("Warm gloves", "Keeps you warm at Wintertodt")], slot="GLOVES"),
+    ]),
     section("gear", "Gear", "rows", [
         first("tinderbox", ["Tinderbox"]),
-        first("torch", ["Bruma torch (off-hand)", "Bruma torch"]),
         first("knife", ["Knife"], requires=["Bruma torch", "Pyromancer hood"]),
         first("hammer", ["Hammer"], requires=["Bruma torch", "Pyromancer hood"]),
-        cape("Firemaking cape"),
-    ]),
-    section("outfit", "Outfit", "rows", [
-        outfit("pyromancer", [("HEAD", ["Pyromancer hood"]), ("BODY", ["Pyromancer garb"]),
-                              ("LEGS", ["Pyromancer robe"]), ("BOOTS", ["Pyromancer boots"])]),
     ]),
 ])
 
+SMITHS = "Smiths' uniform: 20% chance per piece of a faster anvil action, 100% with all 4"
 SMITHING = tab("smithing", "Smithing", "Hammer", sections=[
+    best_in_slot([
+        *outfit_slots("smiths", SMITHS, [("BODY", ["Smiths tunic"]), ("LEGS", ["Smiths trousers"]),
+                                         ("GLOVES", ["Smiths gloves (i)", "Smiths gloves"]),
+                                         ("BOOTS", ["Smiths boots"])]),
+        skill_cape("Smithing cape", "Goldsmith gauntlets effect; a bigger coal bag"),
+        first("forging", [("Ring of forging", "Iron ore always smelts into a bar")], slot="RING"),
+    ]),
+    situational([
+        all_("varrock", [], slot="BODY"),  # Varrock armour: extra bars at Edgeville (unique_uses.py)
+        first("goldsmith", [("Goldsmith gauntlets", "2.5x XP for gold bars")], slot="GLOVES"),
+        first("ice_gloves", [("Ice gloves", "Blast Furnace bars without a bucket of water")], slot="GLOVES"),
+    ]),
     section("gear", "Gear", "rows", [
         first("hammer", ["Imcando hammer (off-hand)", "Imcando hammer", "Hammer"]),
-        first("goldsmith", ["Goldsmith gauntlets"]),
-        first("bf_gloves", ["Smiths gloves (i)", "Ice gloves"]),
         first("coal_bag", ["Coal bag"]),
-        first("forging", ["Ring of forging"]),
         first("mould", ["Double ammo mould", "Ammo mould"]),
-        cape("Smithing cape"),
-    ]),
-    section("outfit", "Outfit", "rows", [
-        outfit("smiths", [("BODY", ["Smiths tunic"]), ("LEGS", ["Smiths trousers"]),
-                          ("GLOVES", ["Smiths gloves (i)", "Smiths gloves"]), ("BOOTS", ["Smiths boots"])]),
     ]),
 ])
 
@@ -1073,31 +1213,34 @@ def herb_columns():
 
 
 HERBLORE = tab("herblore", "Herblore", "Pestle and mortar", sections=[
+    best_in_slot([
+        first("goggles", [("Prescription goggles", "10% chance to save a secondary")], slot="HEAD"),
+        skill_cape("Herblore cape", "Makes unfinished potions straight from grimy herbs"),
+        first("amulet", [("Alchemist's amulet", "15% chance of an extra dose"),
+                         ("Amulet of chemistry", "5% chance of a 4-dose potion")], slot="AMULET"),
+        *outfit_slots("alchemist", "Alchemist's outfit (looks only; the goggles do the work)",
+                      [("BODY", ["Alchemist labcoat"]), ("LEGS", ["Alchemist pants"]),
+                       ("GLOVES", ["Alchemist gloves"])]),
+    ]),
     section("gear", "Tools", "rows", [
         first("pestle", ["Pestle and mortar"]),
         first("herb_sack", ["Silklined herb sack", "Herb sack"]),
-        first("amulet", ["Alchemist's amulet", "Amulet of chemistry"]),
-        first("goggles", ["Prescription goggles"]),
         first("reagent", ["Reagent pouch"]),
-        cape("Herblore cape"),
-    ]),
-    section("outfit", "Outfit", "rows", [
-        outfit("alchemist", [("BODY", ["Alchemist labcoat"]), ("LEGS", ["Alchemist pants"]),
-                             ("GLOVES", ["Alchemist gloves"])]),
     ]),
     *herb_columns(),
 ])
 
+CARPENTER = "Carpenter's outfit: bonus Construction XP, +2.5% with all 4"
 CONSTRUCTION = tab("construction", "Construction", "Saw", sections=[
+    best_in_slot([
+        *outfit_slots("carpenter", CARPENTER, [("HEAD", ["Carpenter's helmet"]), ("BODY", ["Carpenter's shirt"]),
+                                               ("LEGS", ["Carpenter's trousers"]), ("BOOTS", ["Carpenter's boots"])]),
+        skill_cape("Construct. cape", "Teleports to your house and its portals"),
+    ]),
     section("gear", "Tools", "rows", [
         *SAWS,
         first("hammer", ["Imcando hammer", "Hammer"]),
         first("plank_sack", ["Plank sack"]),
-        cape("Construct. cape"),
-    ]),
-    section("outfit", "Outfit", "rows", [
-        outfit("carpenter", [("HEAD", ["Carpenter's helmet"]), ("BODY", ["Carpenter's shirt"]),
-                             ("LEGS", ["Carpenter's trousers"]), ("BOOTS", ["Carpenter's boots"])]),
     ]),
 ])
 

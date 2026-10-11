@@ -54,6 +54,10 @@ ITEMS = [
     "Mining helmet", "Kandarin headgear 1",
     # magic tab runes
     "Fire rune", "Water rune", "Cosmic rune", "Mind rune", "Mist rune",
+    # skill tab equipment blocks
+    "Penance gloves", "Spottier cape", "Agility cape", "Graceful cape (Arceuus)", "Ring of endurance",
+    "Spirit angler headband", "Spirit angler top", "Angler hat", "Angler top", "Angler waders", "Angler boots",
+    "Rogue mask", "Rogue gloves", "Gloves of silence", "Thieving cape", "Max cape",
 ]
 STAT_FIELDS = ["stab_attack_bonus", "slash_attack_bonus", "crush_attack_bonus", "range_attack_bonus",
                "magic_attack_bonus", "strength_bonus", "ranged_strength_bonus", "magic_damage_bonus", "prayer_bonus"]

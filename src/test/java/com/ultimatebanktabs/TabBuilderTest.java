@@ -244,13 +244,73 @@ public class TabBuilderTest
 		TabBuilder.Built built = build("movement", own("Graceful hood", "Graceful cape", "Graceful top", "Graceful legs",
 			"Graceful gloves", "Graceful boots", "Graceful hood (Arceuus)", "Graceful top (Arceuus)", "Stamina potion",
 			"Ring of dueling", "Amulet of glory", "Varrock teleport (tablet)", "Law rune", "Boots of lightness"));
-		Set<Integer> run = items(section(built, "run"));
-		assertTrue("weight-reducing boots sit beside graceful", run.contains(id("Boots of lightness")));
-		assertTrue(run.containsAll(own("Graceful hood", "Graceful cape", "Graceful top", "Graceful legs",
-			"Graceful gloves", "Graceful boots", "Stamina potion")));
+		Map<String, Integer> main = bySlot(section(built, "main"));
+		assertEquals("full graceful wins over lighter boots", id("Graceful boots"), (int) main.get("BOOTS"));
+		assertEquals(id("Graceful hood"), (int) main.get("HEAD"));
+		assertTrue("the lighter boots stand beside it", items(section(built, "situational"))
+			.contains(id("Boots of lightness")));
+		assertTrue(items(section(built, "run")).contains(id("Stamina potion")));
 		assertFalse(built.itemIds().contains(id("Graceful hood (Arceuus)")));
 		assertTrue(built.itemIds().containsAll(own("Ring of dueling", "Amulet of glory", "Varrock teleport (tablet)",
 			"Law rune")));
+	}
+
+	@Test
+	public void withoutFullGracefulEachSlotTakesItsLightestItem()
+	{
+		// no graceful gloves: the set bonus is out of reach
+		Set<Integer> owned = own("Graceful hood", "Graceful cape", "Graceful top", "Graceful legs", "Graceful boots",
+			"Penance gloves", "Boots of lightness", "Spottier cape");
+		for (String tab : new String[]{"movement", "agility"})
+		{
+			Map<String, Integer> main = bySlot(section(build(tab, owned), "main"));
+			assertEquals(tab, id("Boots of lightness"), (int) main.get("BOOTS"));
+			assertEquals(tab, id("Penance gloves"), (int) main.get("GLOVES"));
+			assertEquals(tab, id("Spottier cape"), (int) main.get("CAPE"));
+			assertEquals(tab, id("Graceful legs"), (int) main.get("LEGS"));
+		}
+	}
+
+	@Test
+	public void gracefulColoursMixAndTheAgilityCapeCountsAsItsCape()
+	{
+		TabBuilder.Built mixed = build("agility", own("Graceful hood", "Graceful top", "Graceful legs",
+			"Graceful gloves", "Graceful boots", "Graceful cape (Arceuus)", "Boots of lightness"));
+		Map<String, Integer> main = bySlot(section(mixed, "main"));
+		assertEquals("a mixed set still counts as full graceful", id("Graceful boots"), (int) main.get("BOOTS"));
+		assertEquals(id("Graceful cape (Arceuus)"), (int) main.get("CAPE"));
+
+		TabBuilder.Built agilityCape = build("movement", own("Graceful hood", "Graceful top", "Graceful legs",
+			"Graceful gloves", "Graceful boots", "Agility cape", "Penance gloves"));
+		main = bySlot(section(agilityCape, "main"));
+		assertEquals(id("Agility cape"), (int) main.get("CAPE"));
+		assertEquals("the agility cape completes the set", id("Graceful gloves"), (int) main.get("GLOVES"));
+	}
+
+	@Test
+	public void fishingShowsBothAnglerLooks()
+	{
+		TabBuilder.Built built = build("fishing", own("Spirit angler headband", "Spirit angler top", "Angler hat",
+			"Angler top", "Angler waders", "Angler boots"));
+		Map<String, Integer> main = bySlot(section(built, "main"));
+		assertEquals("the more complete look fills the block", id("Angler hat"), (int) main.get("HEAD"));
+		assertEquals(id("Angler top"), (int) main.get("BODY"));
+		assertTrue("the other look stands beside it", items(section(built, "situational"))
+			.containsAll(own("Spirit angler headband", "Spirit angler top")));
+	}
+
+	@Test
+	public void thievingGetsAnEquipmentBlock()
+	{
+		TabBuilder.Built built = build("thieving", own("Rogue mask", "Rogue gloves", "Gloves of silence",
+			"Thieving cape", "Max cape"));
+		Map<String, Integer> main = bySlot(section(built, "main"));
+		assertEquals(id("Rogue mask"), (int) main.get("HEAD"));
+		assertEquals(id("Rogue gloves"), (int) main.get("GLOVES"));
+		assertEquals(id("Thieving cape"), (int) main.get("CAPE"));
+		assertTrue(items(section(built, "situational")).contains(id("Gloves of silence")));
+		int[] layout = LayoutPlanner.plan(built, false);
+		assertEquals("the mask sits in the head cell", id("Rogue mask"), layout[1]);
 	}
 
 	@Test
