@@ -30,6 +30,7 @@ import net.runelite.api.ScriptID;
 import net.runelite.api.MenuEntry;
 import net.runelite.api.events.BeforeRender;
 import net.runelite.api.events.MenuEntryAdded;
+import net.runelite.api.events.VarbitChanged;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.GameTick;
 import net.runelite.api.events.ItemContainerChanged;
@@ -141,6 +142,8 @@ public class UltimateBankTabsPlugin extends Plugin
 	private Map<String, Integer> tabSprites = new HashMap<>();
 	/** nothing is built until the player agrees to this plugin replacing their tabs */
 	private boolean accepted;
+	/** the player's current slayer task, or null */
+	private SlayerTask slayerTask;
 	/** conflicting plugins already mentioned this session */
 	private final Set<String> warned = new HashSet<>();
 	/** tab key -> item id -> why the item is in that tab */
@@ -192,6 +195,7 @@ public class UltimateBankTabsPlugin extends Plugin
 			if (client.getGameState() == GameState.LOGGED_IN)
 			{
 				loadSnapshot();
+				slayerTask = SlayerTask.read(client);
 				rebuild(false);
 			}
 		});
@@ -422,6 +426,30 @@ public class UltimateBankTabsPlugin extends Plugin
 		{
 			stored = new HashSet<>();
 			potions = new HashSet<>();
+		}
+		if (event.getGameState() == GameState.LOGIN_SCREEN || event.getGameState() == GameState.HOPPING)
+		{
+			// the server sends the task again after logging in
+			slayerTask = null;
+		}
+	}
+
+	/** A new slayer task (or none): the Slayer tab follows it. */
+	@Subscribe
+	public void onVarbitChanged(VarbitChanged event)
+	{
+		if (SlayerTask.affects(event.getVarpId(), event.getVarbitId()))
+		{
+			// later, so every value of the same server update has landed (as the core Slayer plugin does)
+			clientThread.invokeLater(() ->
+			{
+				SlayerTask now = SlayerTask.read(client);
+				if (!Objects.equals(now, slayerTask))
+				{
+					slayerTask = now;
+					dirty = true;
+				}
+			});
 		}
 	}
 
@@ -798,6 +826,7 @@ public class UltimateBankTabsPlugin extends Plugin
 		options.skillGoods = config.skillGoods();
 		options.combatSupplies = config.combatSupplies();
 		options.blightedSupplies = config.blightedSupplies();
+		options.slayerTask = slayerTask;
 		options.foodCount = config.foodCount();
 
 		Map<String, BankTagsWriter.Tab> tabs = new LinkedHashMap<>();

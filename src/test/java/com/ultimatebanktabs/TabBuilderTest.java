@@ -493,6 +493,49 @@ public class TabBuilderTest
 		assertTrue(herb.getSections().stream().noneMatch(s -> s.getKey().equals("main") && !s.getItems().isEmpty()));
 	}
 
+	static TabBuilder.Built slayerOnTask(String task, String... owned)
+	{
+		TabBuilder.Options options = new TabBuilder.Options();
+		options.slayerTask = new SlayerTask(task, null, false);
+		return builder.build(tab("slayer"), own(owned), options);
+	}
+
+	@Test
+	public void theSlayerTabFollowsTheTask()
+	{
+		TabBuilder.Built built = slayerOnTask("basilisks", "Abyssal whip", "Slayer helmet (i)", "Rune platebody",
+			"Mirror shield", "Shark");
+		Map<String, Integer> setup = bySlot(section(built, "ontask_main"));
+		assertEquals("the slayer helmet on task", id("Slayer helmet (i)"), (int) setup.get("HEAD"));
+		assertEquals("the basilisk gaze needs a mirror shield", id("Mirror shield"), (int) setup.get("SHIELD"));
+		assertEquals(id("Abyssal whip"), (int) setup.get("WEAPON"));
+		assertTrue("food comes along", items(section(built, "ontask_supplies")).contains(id("Shark")));
+		assertTrue("the general slayer gear doesn't repeat the helmet",
+			!items(section(built, "gear")).contains(id("Slayer helmet (i)")));
+		int[] layout = LayoutPlanner.plan(built, false);
+		assertEquals("drawn like the equipment screen", id("Slayer helmet (i)"), layout[1]);
+	}
+
+	@Test
+	public void undeadTasksWearTheSalveAndDragonTasksTheLance()
+	{
+		Map<String, Integer> undead = bySlot(section(slayerOnTask("aberrant spectres", "Abyssal whip",
+			"Slayer helmet (i)", "Salve amulet(ei)", "Amulet of strength"), "ontask_main"));
+		assertEquals(id("Salve amulet(ei)"), (int) undead.get("AMULET"));
+		Map<String, Integer> dragons = bySlot(section(slayerOnTask("blue dragons", "Abyssal whip",
+			"Dragon hunter lance", "Rune platebody"), "ontask_main"));
+		assertEquals(id("Dragon hunter lance"), (int) dragons.get("WEAPON"));
+	}
+
+	@Test
+	public void noTaskKeepsTheGeneralSlayerTab()
+	{
+		TabBuilder.Built built = build("slayer", own("Slayer helmet (i)", "Abyssal whip"));
+		assertTrue("sections " + built.getSections().stream().map(TabBuilder.Section::getKey).collect(Collectors.toList()),
+			built.getSections().stream().noneMatch(s -> s.getKey().startsWith("ontask_")));
+		assertTrue("gear " + items(section(built, "gear")), items(section(built, "gear")).contains(id("Slayer helmet (i)")));
+	}
+
 	@Test
 	public void finishedGoodsGoLast()
 	{

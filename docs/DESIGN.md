@@ -36,6 +36,16 @@ Started 2026-10-04. The request was an "ultimate bank plugin" that does three th
 - **Bank Tags writes back its own copy.** `TabManager` loads the tab list and icons when the bank opens, and every save (tab drag, new tab, Change icon) writes that in-memory copy back. Tab-list edits are therefore diffed against a snapshot taken at `BANKMAIN_INIT`, not against the config's old value, so a tab the plugin added since the bank opened isn't read as deleted. An icon write-back equal to one this plugin wrote earlier is stale, not a Change icon pick.
 - **Remove-tag is stripped on the `Examine` (or potion storage `Withdraw-All-but-1`) entry's event.** Bank Tags inserts it with `createMenuEntry`, which posts no event of its own.
 
+## Slayer task
+
+- **Reading the task.** `SlayerTask.read` does what the core Slayer plugin does, so it works with that plugin off. It reads `VarPlayerID.SLAYER_COUNT` (no task at 0) and `SLAYER_TARGET`. Boss tasks (target 98) take the boss from `VarbitID.SLAYER_TARGET_BOSSID` through DB table 116. Names come from DB table 113 (`COL_NAME_UPPERCASE`), Konar's area from table 115, and Krystilia (master 7) means a Wilderness task. `VarbitChanged` on those ids re-reads the task on the next client-thread turn, and only a different task (not a kill) rebuilds.
+- **Data.** `tools/slayer_tasks.py` is wiki-researched and adversarially verified. It holds 155 tasks plus aliases, keyed by the in-game name. Each has recommended styles, bane categories, slot gear (required or suggested), carried tools and potion families. The generator writes it to `tabs.json` as `slayerTasks`.
+- **The block.**
+  - `TabBuilder.slayerTask` builds the combat tab of the first recommended style the player has a weapon for. It takes that tab's best-in-slot set, then puts the slayer helmet and (on undead) the salve amulet in their slots.
+  - The bane pick for the style and category goes in the weapon slot (`BANES`). Wilderness weapons count only on Krystilia tasks.
+  - Then the task's slot gear: a required piece takes the slot, and a suggested one goes beside it unless the slot is empty.
+  - Below come the task's tools (required first) and its potions plus that style's supplies and food. The general Slayer sections follow, without repeating anything the block shows.
+
 ## Ownership
 
 - **Sources.** Owned items come from the bank container (items and placeholders, canonicalised), plus potion storage. Potion storage is read the way core's `PotionStorage` does it, with one id per stored potion because the layout matches any dose to the stored potion. Worn and carried items are added when "Count worn & carried items" is on (default on).

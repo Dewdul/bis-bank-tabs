@@ -1,11 +1,13 @@
 package com.ultimatebanktabs;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -35,6 +37,8 @@ class TabBuilder
 		int foodCount = 4;
 		/** items other tabs already show; the cosmetics tab leaves them out */
 		Set<Integer> shownElsewhere = Collections.emptySet();
+		/** the player's current slayer task: the Slayer tab leads with its setup */
+		SlayerTask slayerTask;
 	}
 
 	@Value
@@ -163,6 +167,12 @@ class TabBuilder
 		Context ctx = new Context(owned, options);
 		List<Section> sections = new ArrayList<>();
 		int hero = -1;
+		TabData.SlayerTaskData task = "slayer".equals(tab.key) && options.slayerTask != null
+			? data.slayerTasks.get(options.slayerTask.getName()) : null;
+		if (task != null)
+		{
+			sections.addAll(slayerTask(task, ctx, options));
+		}
 		// a skill tab's graceful filler waits until the alternatives are known (they fill empty slots first)
 		TabData.Pick filler = null;
 		Section fillerSection = null;
@@ -224,6 +234,200 @@ class TabBuilder
 			hero = sections.stream().flatMap(s -> s.items.stream()).map(Placement::getItemId).findFirst().orElse(-1);
 		}
 		return new Built(tab, sections, hero);
+	}
+
+	/** bane picks of the combat tabs, by style and task category */
+	private static final Map<String, List<String>> BANES = new HashMap<>();
+
+	static
+	{
+		BANES.put("melee:dragon", Collections.singletonList("dragonbane"));
+		BANES.put("melee:demon", Collections.singletonList("demonbane"));
+		BANES.put("melee:kalphite", Collections.singletonList("kalphite"));
+		BANES.put("melee:vampyre", Arrays.asList("vampyrebane", "vampyre"));
+		BANES.put("melee:golem", Collections.singletonList("golembane"));
+		BANES.put("melee:leafy", Collections.singletonList("leafbladed"));
+		BANES.put("melee:wilderness", Collections.singletonList("wilderness"));
+		BANES.put("ranged:dragon", Collections.singletonList("dragonbane_ranged"));
+		BANES.put("ranged:demon", Collections.singletonList("demonbane_ranged"));
+		BANES.put("ranged:vampyre", Collections.singletonList("vampyre_ranged"));
+		BANES.put("ranged:wilderness", Collections.singletonList("wilderness_ranged"));
+		BANES.put("magic:dragon", Collections.singletonList("dragonbane_magic"));
+		BANES.put("magic:demon", Collections.singletonList("demonbane_magic"));
+		BANES.put("magic:wilderness", Collections.singletonList("wilderness_magic"));
+	}
+
+	/**
+	 * The Slayer tab's lead while on a task: the best setup for it from what the player owns. It starts
+	 * from the best-in-slot set of the first recommended style they have a weapon for, then the slayer
+	 * helmet, a salve amulet on undead, the bane weapon and the task's own gear take their slots (a gear
+	 * piece the task needs always does; one it only suggests goes beside it), then the task's tools and
+	 * supplies with that style's potions and food.
+	 */
+	private List<Section> slayerTask(TabData.SlayerTaskData task, Context ctx, Options options)
+	{
+		Options styleOptions = new Options();
+		styleOptions.backups = 0;
+		styleOptions.foodCount = options.foodCount;
+		styleOptions.combatSupplies = options.combatSupplies;
+		styleOptions.blightedSupplies = false;
+		String style = null;
+		Built styled = null;
+		List<String> styles = task.styles.isEmpty() ? Collections.singletonList("melee") : task.styles;
+		for (String candidate : styles)
+		{
+			TabData.Tab def = data.tabs.stream().filter(t -> t.key.equals(candidate)).findFirst().orElse(null);
+			if (def == null)
+			{
+				continue;
+			}
+			Built b = build(def, ctx.owned, styleOptions);
+			boolean armed = b.getSections().stream().filter(sec -> "main".equals(sec.getKey()))
+				.flatMap(sec -> sec.getItems().stream()).anyMatch(p -> "WEAPON".equals(p.getSlot()));
+			if (styled == null || armed && style != null && !armedWith(styled))
+			{
+				style = candidate;
+				styled = b;
+			}
+			if (armed)
+			{
+				break;
+			}
+		}
+		if (styled == null)
+		{
+			return Collections.emptyList();
+		}
+		Map<String, Placement> main = new LinkedHashMap<>();
+		Map<String, List<Placement>> byGroup = new HashMap<>();
+		for (Section sec : styled.getSections())
+		{
+			for (Placement p : sec.getItems())
+			{
+				if ("main".equals(sec.getKey()) && p.getSlot() != null)
+				{
+					main.putIfAbsent(p.getSlot(), p);
+				}
+				byGroup.computeIfAbsent(p.getGroup(), g -> new ArrayList<>()).add(p);
+			}
+		}
+		String on = "On task: " + task.name;
+		takeSlot(main, byGroup.get("slayer_helm"), "HEAD", "Slayer helmet: stronger on every slayer task");
+		if (task.categories.contains("undead"))
+		{
+			takeSlot(main, byGroup.get("salve"), "AMULET", "Salve amulet: stronger against undead");
+		}
+		for (String category : task.categories)
+		{
+			if ("wilderness".equals(category) && !options.slayerTask.isWilderness())
+			{
+				continue;
+			}
+			for (String key : BANES.getOrDefault(style + ":" + category, Collections.emptyList()))
+			{
+				if (takeSlot(main, byGroup.get(key), "WEAPON", null))
+				{
+					break;
+				}
+			}
+		}
+		List<Placement> beside = new ArrayList<>();
+		for (TabData.TaskItem item : task.slots)
+		{
+			List<Integer> got = firstOwned(item.entries, ctx, 1);
+			if (got.isEmpty())
+			{
+				continue;
+			}
+			Placement p = new Placement(got.get(0), item.slot, "task_" + item.slot, item.reason);
+			Placement there = main.get(item.slot);
+			if (there != null && there.getItemId() == p.getItemId())
+			{
+				continue;
+			}
+			if (item.required || there == null)
+			{
+				main.put(item.slot, p);
+			}
+			else
+			{
+				beside.add(p);
+			}
+		}
+
+		List<Section> out = new ArrayList<>();
+		List<Placement> block = new ArrayList<>();
+		for (Placement p : main.values())
+		{
+			block.add(new Placement(p.getItemId(), p.getSlot(), "task_" + p.getSlot(),
+				p.getReason() != null ? p.getReason() : on));
+		}
+		out.add(new Section("ontask_main", "Task setup", "equipment", claim(block, ctx)));
+		out.add(new Section("ontask_alts", "Task alternatives", "alts", claim(beside, ctx)));
+		List<Placement> tools = new ArrayList<>();
+		for (boolean required : new boolean[]{true, false})
+		{
+			for (TabData.TaskItem item : task.tools)
+			{
+				if (item.required == required)
+				{
+					for (int id : firstOwned(item.entries, ctx, 1))
+					{
+						tools.add(new Placement(id, null, "task_tools", item.reason));
+					}
+				}
+			}
+		}
+		out.add(new Section("ontask_items", "Task items", "rows", claim(tools, ctx)));
+		List<Placement> supplies = new ArrayList<>();
+		for (List<Integer> entry : task.supplies)
+		{
+			for (int id : ownedOf(entry, ctx))
+			{
+				supplies.add(new Placement(id, null, "task_supplies", "Needed on this task"));
+			}
+		}
+		for (Section sec : styled.getSections())
+		{
+			if (sec.getKey().startsWith("supplies"))
+			{
+				supplies.addAll(sec.getItems());
+			}
+		}
+		out.add(new Section("ontask_supplies", "Task supplies", "rows", claim(supplies, ctx)));
+		return out;
+	}
+
+	private static boolean armedWith(Built b)
+	{
+		return b.getSections().stream().filter(sec -> "main".equals(sec.getKey()))
+			.flatMap(sec -> sec.getItems().stream()).anyMatch(p -> "WEAPON".equals(p.getSlot()));
+	}
+
+	/** Put the first of these placements into a slot of the task block; false if there was none. */
+	private static boolean takeSlot(Map<String, Placement> main, List<Placement> from, String slot, String reason)
+	{
+		if (from == null || from.isEmpty())
+		{
+			return false;
+		}
+		Placement p = from.get(0);
+		main.put(slot, new Placement(p.getItemId(), slot, "task_" + slot, reason != null ? reason : p.getReason()));
+		return true;
+	}
+
+	/** Keep each item once in the tab: the general Slayer sections below skip what the task block shows. */
+	private static List<Placement> claim(List<Placement> items, Context ctx)
+	{
+		List<Placement> out = new ArrayList<>();
+		for (Placement p : items)
+		{
+			if (ctx.placed.add(p.getItemId()))
+			{
+				out.add(p);
+			}
+		}
+		return out;
 	}
 
 	/**

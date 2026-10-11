@@ -213,6 +213,43 @@ class Resolver:
         return sorted({i for ids in self.entries([n[0] if isinstance(n, tuple) else n for n in names]) for i in ids})
 
 
+# potion families a slayer task can call for (slayer_tasks.py "supplies"), each a list of potions
+SLAYER_SUPPLIES = {
+    "antipoison": [n for n, _ in curated.ANTIPOISON],
+    "anti-venom": ["Extended anti-venom+", "Anti-venom+", "Anti-venom"],
+    "antidote": ["Antidote++", "Antidote+"],
+    "antifire": [n for n, _ in curated.ANTIFIRE],
+    "prayer potion": ["Prayer potion"],
+    "super restore": ["Super restore"],
+    "stamina": ["Stamina potion"],
+    "sanfew": ["Sanfew serum"],
+}
+
+
+def slayer_tasks(res):
+    """Every slayer task's setup (tools/slayer_tasks.py), keyed by its in-game name in lower case."""
+    try:
+        from slayer_tasks import SLAYER_TASKS
+    except ImportError:
+        return {}
+    out = {}
+    for t in SLAYER_TASKS:
+        def items(rows, slotted):
+            return [dict({"slot": r["slot"]} if slotted else {}, entries=res.entries(r["items"]),
+                         required=r["required"], reason=r["why"]) for r in rows]
+        supplies = []
+        for family in t.get("supplies", []):
+            for ids in res.entries(SLAYER_SUPPLIES[family]):
+                if ids not in supplies:
+                    supplies.append(ids)
+        data = {"name": t["game_name"], "boss": t["boss"], "styles": t["styles"],
+                "categories": [c for c in t["categories"] if c != "none"],
+                "slots": items(t["slot_items"], True), "tools": items(t["tools"], False), "supplies": supplies}
+        for name in [t["game_name"]] + t.get("aliases", []):
+            out[name.lower()] = data
+    return out
+
+
 def build_pick(res, pick):
     out = {"key": pick["key"], "mode": pick["mode"]}
     for k in ("slot", "profile", "style", "launcher", "fallback", "complete", "fill", "unless", "take", "groups", "repeat",
@@ -593,6 +630,7 @@ def main():
         "launcherAmmo": launcher_ammo,
         "ammoClasses": {cls: res.entries(names) for cls, names in curated.AMMO_CLASSES.items()},
         "tabs": tabs,
+        "slayerTasks": slayer_tasks(res),
     }
     if res.errors:
         print("\n".join(sorted(set(res.errors))))

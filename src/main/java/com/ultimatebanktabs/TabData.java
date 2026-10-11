@@ -27,6 +27,34 @@ class TabData
 	Map<String, String> launcherAmmo = Collections.emptyMap();
 	Map<String, List<List<Integer>>> ammoClasses = Collections.emptyMap();
 	List<Tab> tabs = Collections.emptyList();
+	/** in-game slayer task name (lower case) -> the setup it wants */
+	Map<String, SlayerTaskData> slayerTasks = Collections.emptyMap();
+
+	/** What a slayer task wants (tools/slayer_tasks.py, from the OSRS Wiki). */
+	static class SlayerTaskData
+	{
+		String name;
+		boolean boss;
+		/** recommended combat styles, best first */
+		List<String> styles = Collections.emptyList();
+		/** undead, demon, dragon, kalphite, vampyre, golem, leafy, wilderness... */
+		List<String> categories = Collections.emptyList();
+		/** gear the task wants in a slot; a required one takes the slot over */
+		List<TaskItem> slots = Collections.emptyList();
+		/** carried items (bag of salt, rock hammer, light source...) */
+		List<TaskItem> tools = Collections.emptyList();
+		/** potions the task calls for (antifire, anti-venom...), each with its doses */
+		List<List<Integer>> supplies = Collections.emptyList();
+	}
+
+	static class TaskItem
+	{
+		String slot;
+		/** ranked, best first */
+		List<List<Integer>> entries = Collections.emptyList();
+		boolean required;
+		String reason;
+	}
 
 	static class Tab
 	{
