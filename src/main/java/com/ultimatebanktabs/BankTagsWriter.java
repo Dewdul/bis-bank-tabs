@@ -301,9 +301,14 @@ class BankTagsWriter
 	 *
 	 * @return the removed tabs with their icons and layouts, for {@link #restoreOthers}
 	 */
-	List<SavedTab> replaceOthers()
+	List<SavedTab> replaceOthers(Collection<String> only)
 	{
 		List<String> others = otherTabs();
+		if (only != null)
+		{
+			// just the tabs the player was asked about
+			others.removeIf(t -> only.stream().noneMatch(o -> same(o, t)));
+		}
 		List<SavedTab> saved = new ArrayList<>();
 		if (others.isEmpty())
 		{

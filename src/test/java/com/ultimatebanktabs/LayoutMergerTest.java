@@ -459,6 +459,64 @@ public class LayoutMergerTest
 	}
 
 	@Test
+	public void anAltAccountRoundTripKeepsTheirArrangement()
+	{
+		Map<Integer, Integer> home = new HashMap<>();
+		Set<Integer> bis = new HashSet<>(Arrays.asList(HEAD));
+		// main: gear block, tools, bait, a blank row, raw fish
+		int[] main = layout(8 * W + 1, HEAD, 10, ROW5, 307, ROW5 + 1, 309, ROW5 + 2, 303, ROW5 + 3, 301,
+			ROW5 + W, 313, ROW5 + W + 1, 314, 8 * W, 317);
+		String[] mainRows = rows(9, 0, "block", null, null, null, null, "gear", "bait", null, "goods");
+		int[] saved = main.clone();
+		// they reversed the tools
+		saved[ROW5] = 301;
+		saved[ROW5 + 1] = 303;
+		saved[ROW5 + 2] = 309;
+		saved[ROW5 + 3] = 307;
+		// an alt with only the raw fish: no block
+		int[] alt = layout(1, 0, 317);
+		int[] onAlt = LayoutMerger.next(saved, main, alt, rows(1, 0, "goods"), Collections.emptySet(), false, true,
+			id -> id, home);
+		int[] back = LayoutMerger.next(onAlt, alt, main, mainRows, bis, true, false, id -> id, home);
+		int tools = pos(back, 301);
+		assertEquals("their tool order is back", 303, back[tools + 1]);
+		assertEquals(309, back[tools + 2]);
+		assertEquals(307, back[tools + 3]);
+		assertEquals(10, back[HEAD]);
+	}
+
+	@Test
+	public void twoNewSectionsKeepTheBlankRowBeforeTheBottom()
+	{
+		int[] previous = layout(7 * W + 1, ROW5, 30, ROW5 + 1, 31, 7 * W, 90);
+		int[] saved = layout(7 * W + 1, ROW5, 31, ROW5 + 1, 30, 7 * W, 90);
+		// blighted supplies and spell sacks arrive together, above the enchanting row
+		int[] planned = layout(10 * W + 1, ROW5, 30, ROW5 + 1, 31, 7 * W, 80, 8 * W, 85, 10 * W, 90);
+		int[] next = next(saved, previous, planned,
+			rows(11, 5, "food", null, "blighted", "blighted_sacks", null, "enchanting"), Collections.emptySet());
+		int sacks = pos(next, 85) / W;
+		assertEquals("the sacks right under the blighted row", pos(next, 80) / W + 1, sacks);
+		assertEquals("still a blank row before the enchanting row", sacks + 2, pos(next, 90) / W);
+	}
+
+	@Test
+	public void aNewHerbDoesNotTakeAnotherHerbsColumn()
+	{
+		// gear row (swapped), then grimy herbs (guam, ranarr) over clean herbs (guam, tarromin, harralander, ranarr)
+		int[] previous = layout(7 * W + 4, ROW5, 60, ROW5 + 1, 61, 6 * W, 199, 6 * W + 3, 207,
+			7 * W, 249, 7 * W + 1, 253, 7 * W + 2, 255, 7 * W + 3, 257);
+		int[] saved = previous.clone();
+		saved[ROW5] = 61;
+		saved[ROW5 + 1] = 60;
+		// marrentill (grimy 201, clean 251) becomes the second herb column
+		int[] planned = layout(7 * W + 5, ROW5, 60, ROW5 + 1, 61, 6 * W, 199, 6 * W + 1, 201, 6 * W + 4, 207,
+			7 * W, 249, 7 * W + 1, 251, 7 * W + 2, 253, 7 * W + 3, 255, 7 * W + 4, 257);
+		int[] next = next(saved, previous, planned, rows(8, 5, "gear", "herbs_grimy#0", "herbs_clean#0"),
+			Collections.emptySet());
+		assertEquals("grimy and clean marrentill in one column", pos(next, 201) % W, pos(next, 251) % W);
+	}
+
+	@Test
 	public void noGearBlockMeansNoReservedCells()
 	{
 		int[] previous = layout(2, 0, 30, 1, 31);

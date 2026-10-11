@@ -181,9 +181,9 @@ public class UltimateBankTabsPlugin extends Plugin
 				askToReplace(w);
 				return;
 			}
-			if (!bankOpen && pending(REPLACE_PENDING_KEY))
+			if (!bankOpen)
 			{
-				replaceNow();
+				replacePending();
 			}
 			if (!bankOpen && config.restoreTabs())
 			{
@@ -207,7 +207,7 @@ public class UltimateBankTabsPlugin extends Plugin
 		List<String> others = w.otherTabs();
 		if (others.isEmpty())
 		{
-			accept(w);
+			accept(w, others);
 			return;
 		}
 		List<String> conflicts = conflicts();
@@ -233,7 +233,7 @@ public class UltimateBankTabsPlugin extends Plugin
 				JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE, null, options, options[1]);
 			if (choice == 0)
 			{
-				clientThread.invokeLater(() -> accept(w));
+				clientThread.invokeLater(() -> accept(w, others));
 			}
 			else if (writer == w)
 			{
@@ -242,7 +242,8 @@ public class UltimateBankTabsPlugin extends Plugin
 		});
 	}
 
-	private void accept(BankTagsWriter w)
+	/** @param agreed the player's tabs the question listed: only these are replaced */
+	private void accept(BankTagsWriter w, List<String> agreed)
 	{
 		if (writer != w)
 		{
@@ -252,15 +253,19 @@ public class UltimateBankTabsPlugin extends Plugin
 		configManager.setConfiguration(UltimateBankTabsConfig.GROUP, ACCEPTED_KEY, true);
 		accepted = true;
 		bankOpen = client.getWidget(InterfaceID.Bankmain.UNIVERSE) != null;
-		if (bankOpen)
+		if (agreed.isEmpty())
+		{
+			// nothing of theirs to replace
+		}
+		else if (bankOpen)
 		{
 			// Bank Tags holds the open bank's tab list and would write the old tabs back: finish on the next open
-			configManager.setConfiguration(UltimateBankTabsConfig.GROUP, REPLACE_PENDING_KEY, true);
+			configManager.setConfiguration(UltimateBankTabsConfig.GROUP, REPLACE_PENDING_KEY, Text.toCSV(agreed));
 			chat("No Brain Bank Tabs: close your bank and open it again to finish replacing your tabs.");
 		}
 		else
 		{
-			replaceNow();
+			replaceNow(agreed);
 		}
 		if (client.getGameState() == GameState.LOGGED_IN)
 		{
@@ -269,16 +274,22 @@ public class UltimateBankTabsPlugin extends Plugin
 		}
 	}
 
-	private boolean pending(String key)
+	/** A takeover the player agreed to with the bank open, done now (Bank Tags is between bank opens). */
+	private void replacePending()
 	{
-		return Boolean.parseBoolean(configManager.getConfiguration(UltimateBankTabsConfig.GROUP, key));
+		String pending = configManager.getConfiguration(UltimateBankTabsConfig.GROUP, REPLACE_PENDING_KEY);
+		if (pending != null && !pending.isEmpty())
+		{
+			// "true": stored before the agreed tabs were kept, meaning all of them
+			replaceNow("true".equals(pending) ? null : Text.fromCSV(pending));
+		}
 	}
 
 	/** Take the player's own tabs out (backed up), now that Bank Tags isn't holding an open bank's list. */
-	private void replaceNow()
+	private void replaceNow(List<String> agreed)
 	{
 		configManager.unsetConfiguration(UltimateBankTabsConfig.GROUP, REPLACE_PENDING_KEY);
-		List<BankTagsWriter.SavedTab> saved = writer.replaceOthers();
+		List<BankTagsWriter.SavedTab> saved = writer.replaceOthers(agreed);
 		if (!saved.isEmpty())
 		{
 			List<BankTagsWriter.SavedTab> all = replacedTabs();
@@ -454,9 +465,9 @@ public class UltimateBankTabsPlugin extends Plugin
 				// tabs added here are picked up by this very bank open, so no "reopen" hint
 				rebuild(false);
 			}
-			if (writer != null && accepted && pending(REPLACE_PENDING_KEY))
+			if (writer != null && accepted)
 			{
-				replaceNow();
+				replacePending();
 			}
 			if (writer != null && config.restoreTabs())
 			{

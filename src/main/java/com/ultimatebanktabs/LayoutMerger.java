@@ -132,7 +132,8 @@ final class LayoutMerger
 			Set<Integer> now = ids(planned);
 
 			// the tab just got its equipment block: the player's arrangement moves down under it as a whole
-			if (block && !hadBlock && out.subList(0, Math.min(floor, out.size())).stream().anyMatch(id -> id != -1))
+			if (block && !hadBlock && (out.subList(0, Math.min(floor, out.size())).stream().anyMatch(id -> id != -1)
+				|| home.values().stream().anyMatch(cell -> cell < floor)))
 			{
 				insertRows(0, BLOCK_ROWS);
 			}
@@ -339,6 +340,33 @@ final class LayoutMerger
 			}
 		}
 
+		/** A new herb's column: its planned one unless another herb of its band has it, else the band's next free one. */
+		int herbColumn(String herb, int planned)
+		{
+			if (herb == null)
+			{
+				return planned;
+			}
+			// "#0:" (the colon keeps "#1:" from matching "#10:")
+			String band = herb.substring(0, herb.indexOf(':') + 1);
+			Set<Integer> taken = new HashSet<>();
+			herbColumns.forEach((k, c) ->
+			{
+				if (k.startsWith(band))
+				{
+					taken.add(c);
+				}
+			});
+			for (int c = planned, n = 0; n < WIDTH; c = (c + 1) % WIDTH, n++)
+			{
+				if (!taken.contains(c))
+				{
+					return c;
+				}
+			}
+			return planned;
+		}
+
 		/** A herb's column key in a band ("#0:3"), or null outside the herb bands. */
 		String herb(int occurrence)
 		{
@@ -363,7 +391,7 @@ final class LayoutMerger
 			}
 			// a herb keeps one column down its band; anything else tries its planned column first
 			String herb = herb(i);
-			int col = herb != null && herbColumns.containsKey(herb) ? herbColumns.get(herb) : i % WIDTH;
+			int col = herb != null && herbColumns.containsKey(herb) ? herbColumns.get(herb) : herbColumn(herb, i % WIDTH);
 			String section = section(i);
 			TreeSet<Integer> mine = section == null ? null : sectionRows.get(section);
 			if (mine != null && !mine.isEmpty())
@@ -408,7 +436,7 @@ final class LayoutMerger
 					// keep the plan's blank row between them (gap rows, finished goods)
 					int gap = rows[first - 1] == null ? 1 : 0;
 					int row = prev.last() + 1;
-					if (gap == 1 && emptyRow(row) && !blankBelow(first))
+					if (gap == 1 && emptyRow(row) && nextStartsAt(first, row + 1))
 					{
 						// the blank row already there (above the section after this one) is that gap
 						row++;
@@ -460,15 +488,20 @@ final class LayoutMerger
 			return true;
 		}
 
-		/** Whether the plan has a blank row right under the section whose first planned row is {@code first}. */
-		boolean blankBelow(int first)
+		/**
+		 * Whether the section the plan puts right under the one whose first planned row is {@code first}
+		 * (no blank row between) already starts at row {@code row} of the layout.
+		 */
+		boolean nextStartsAt(int first, int row)
 		{
 			int last = first;
 			while (last + 1 < rows.length && rows[last + 1] != null && rows[last + 1].equals(rows[first]))
 			{
 				last++;
 			}
-			return last + 1 < rows.length && rows[last + 1] == null;
+			TreeSet<Integer> next = last + 1 < rows.length && rows[last + 1] != null ? sectionRows.get(rows[last + 1])
+				: null;
+			return next != null && !next.isEmpty() && next.first() == row;
 		}
 
 		/** Leading empty rows go once the whole old block area is empty (the tab lost its block). */
@@ -479,6 +512,14 @@ final class LayoutMerger
 				&& out.subList(empty * WIDTH, (empty + 1) * WIDTH).stream().allMatch(id -> id == -1))
 			{
 				empty++;
+			}
+			for (int cell : home.values())
+			{
+				if (cell >= BLOCK_ROWS * WIDTH)
+				{
+					// a section that left (an alt's bank) keeps its rows for when it comes back
+					empty = Math.min(empty, cell / WIDTH);
+				}
 			}
 			if (empty < BLOCK_ROWS)
 			{
