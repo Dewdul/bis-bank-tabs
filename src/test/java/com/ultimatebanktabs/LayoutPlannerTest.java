@@ -153,40 +153,38 @@ public class LayoutPlannerTest
 	}
 
 	@Test
-	public void columnsKeepEachKeyInItsColumn()
+	public void herbChainsGetARowPerHerb()
 	{
 		List<String> herbs = Arrays.asList("guam", "marrentill", "tarromin");
 		int[] layout = plan(
 			new TabBuilder.Section("grimy", "Grimy", "columns", Arrays.asList(p(1, null, "tarromin")), herbs),
 			new TabBuilder.Section("clean", "Clean", "columns", Arrays.asList(p(2, null, "guam"), p(3, null, "tarromin")), herbs));
-		// marrentill has nothing, so tarromin takes column 1 in both rows
-		assertEquals(1, at(layout, 0, 1));
+		// marrentill has nothing, so it gets no row; grimy is column 0, clean column 1
 		assertEquals(-1, at(layout, 0, 0));
-		assertEquals(2, at(layout, 1, 0));
+		assertEquals(2, at(layout, 0, 1));
+		assertEquals(1, at(layout, 1, 0));
 		assertEquals(3, at(layout, 1, 1));
 	}
 
 	@Test
-	public void columnsGoInBandsOfEight()
+	public void eachPotionDoseHasItsOwnColumn()
 	{
-		List<String> herbs = Arrays.asList("h0", "h1", "h2", "h3", "h4", "h5", "h6", "h7", "h8", "h9");
-		TabBuilder.Placement[] clean = new TabBuilder.Placement[10];
-		TabBuilder.Placement[] secondary = new TabBuilder.Placement[10];
-		for (int i = 0; i < 10; i++)
-		{
-			clean[i] = p(100 + i, null, "h" + i);
-			secondary[i] = p(200 + i, null, "h" + i);
-		}
+		List<String> herbs = Arrays.asList("h0", "h1");
 		int[] layout = plan(
-			new TabBuilder.Section("clean", "Clean", "columns", Arrays.asList(clean), herbs),
-			new TabBuilder.Section("sec", "Secondaries", "columns", Arrays.asList(secondary), herbs),
+			new TabBuilder.Section("grimy", "Grimy", "columns", Arrays.asList(p(1, null, "h0")), herbs),
+			new TabBuilder.Section("clean", "Clean", "columns", Arrays.asList(p(2, null, "h0"), p(12, null, "h1")), herbs),
+			new TabBuilder.Section("sec", "Secondaries", "columns", Arrays.asList(), herbs),
+			new TabBuilder.Section("unf", "Unfinished", "columns", Arrays.asList(p(14, null, "h1")), herbs),
+			new TabBuilder.Section("potion", "Potions", "columns", Arrays.asList(new TabBuilder.Placement(50, null, "h0", null, 0),
+				new TabBuilder.Placement(52, null, "h0", null, 2), new TabBuilder.Placement(63, null, "h1", null, 3)), herbs),
 			s("after", "rows", p(999, null, "x")));
-		assertEquals("herbs 1-8", 107, at(layout, 0, 7));
-		assertEquals("their secondaries right below", 207, at(layout, 1, 7));
-		assertEquals("next band of herbs", 108, at(layout, 2, 0));
-		assertEquals(209, at(layout, 3, 1));
-		assertEquals(-1, at(layout, 3, 2));
-		assertEquals(999, at(layout, 4, 0));
+		assertEquals(1, at(layout, 0, 0));
+		assertEquals(2, at(layout, 0, 1));
+		assertEquals("4-dose in column 4", 50, at(layout, 0, 4));
+		assertEquals("2-dose in column 6", 52, at(layout, 0, 6));
+		assertEquals("the secondary column stays even when empty", 14, at(layout, 1, 3));
+		assertEquals("1-dose in column 7", 63, at(layout, 1, 7));
+		assertEquals(999, at(layout, 2, 0));
 	}
 
 	@Test

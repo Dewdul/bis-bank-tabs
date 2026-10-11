@@ -31,9 +31,8 @@ import java.util.TreeMap;
  * "goods" sections (what a skill makes) come last, after one blank row,
  * a "separate" section (blighted supplies) gets a blank row above it (one
  * for a run of them) and keeps each pick on one row when it fits,
- * and runs of "columns" sections (herblore) go in bands of eight herbs: a row
- * each of grimy herbs, clean herbs, secondaries, unfinished potions and
- * potions, with every herb in the same column down its band.
+ * and runs of "columns" sections (herblore) go a row per herb: grimy herb,
+ * clean herb, secondary, unfinished potion, then the potion's doses 4 to 1.
  */
 class LayoutPlanner
 {
@@ -191,6 +190,15 @@ class LayoutPlanner
 			}
 		}
 		List<String> columns = activeColumns(rowSections);
+		// every herb-chain stage keeps its column, even one you own nothing for
+		List<String> stages = new ArrayList<>();
+		for (TabBuilder.Section s : tab.getSections())
+		{
+			if ("columns".equals(s.getLayout()))
+			{
+				stages.add(s.getKey());
+			}
+		}
 		boolean first = !block;
 		boolean goodsStarted = false;
 		boolean lastSeparate = false;
@@ -218,7 +226,7 @@ class LayoutPlanner
 				{
 					end++;
 				}
-				row = placeBands(rowSections.subList(i, end + 1), columns, row, gapRows);
+				row = placeChains(rowSections.subList(i, end + 1), stages, columns, row);
 				i = end;
 				continue;
 			}
@@ -284,33 +292,30 @@ class LayoutPlanner
 	}
 
 	/**
-	 * Lay a run of columns sections out in bands of {@link #WIDTH} columns: for the
-	 * first eight herbs a row per section (grimy, clean, secondary...), then the
-	 * same rows for the next eight. Rows with nothing in a band are skipped.
+	 * Lay a run of columns sections (herb chains) out a row per herb: each stage is a column in order
+	 * (grimy, clean, secondary, unfinished) and the last stage (the potion) spreads its doses over the
+	 * rest of the row, fullest first, each dose in its own column. Herbs with nothing owned get no row.
 	 * Returns the next free row.
 	 */
-	private int placeBands(List<TabBuilder.Section> sections, List<String> columns, int row, boolean gapRows)
+	private int placeChains(List<TabBuilder.Section> sections, List<String> stages, List<String> herbs, int row)
 	{
-		int bands = (columns.size() + WIDTH - 1) / WIDTH;
+		int last = stages.size() - 1;
 		List<TabBuilder.Placement> extra = new ArrayList<>();
-		for (int band = 0; band < bands; band++)
+		for (String herb : herbs)
 		{
-			if (band > 0 && gapRows)
-			{
-				row++;
-			}
+			rowKey = "herb:" + herb;
+			boolean used = false;
 			for (TabBuilder.Section s : sections)
 			{
-				boolean used = false;
-				rowKey = s.getKey() + "#" + band;
+				int stage = stages.indexOf(s.getKey());
 				for (TabBuilder.Placement p : s.getItems())
 				{
-					int idx = columns.indexOf(p.getGroup());
-					if (idx / WIDTH != band)
+					if (!herb.equals(p.getGroup()))
 					{
 						continue;
 					}
-					if (put(row, idx % WIDTH, p.getItemId()))
+					int col = stage < last ? stage : Math.min(WIDTH - 1, stage + Math.max(0, p.getVariant()));
+					if (stage >= 0 && put(row, col, p.getItemId()))
 					{
 						used = true;
 					}
@@ -319,10 +324,10 @@ class LayoutPlanner
 						extra.add(p);
 					}
 				}
-				if (used)
-				{
-					row++;
-				}
+			}
+			if (used)
+			{
+				row++;
 			}
 		}
 		int col = 0;

@@ -1190,8 +1190,8 @@ FLETCHING = tab("fletching", "Fletching", "Knife", sections=[
     ]),
 ])
 
-# Herb chains in bands of 8 herbs: rows of grimy herbs, clean herbs, their main secondaries,
-# unfinished potions and main potions, each herb in the same column of every row of its band. (clean herb, unfinished potion, secondary, potion) - the potion most
+# Herb chains, a row per herb: grimy herb, clean herb, its main secondary, the unfinished potion,
+# then the main potion's doses 4 to 1. (clean herb, unfinished potion, secondary, potion) - the potion most
 # players make from each herb; other secondaries and potions follow in the supply sections.
 HERB_CHAINS = [
     ("Guam leaf", "Guam potion (unf)", "Eye of newt", "Attack potion"),
@@ -1230,9 +1230,9 @@ def herb_columns():
             [(sec, "Secondary for %s (with %s)" % (pot.lower(), h.lower())) for h, _, sec, pot in HERB_CHAINS]),
         row("herbs_unf", "Unfinished potions",
             [(unf, "Add %s to make %s" % (sec.lower(), pot.lower())) for _, unf, sec, pot in HERB_CHAINS]),
-        # one: only your fullest dose sits in the column; other doses follow in Potions
+        # every dose you own, each in its own column of the herb's row (4 to 1)
         row("herbs_potion", "Potions",
-            [(pot, "%s: %s + %s" % (pot, h.lower(), sec.lower())) for h, _, sec, pot in HERB_CHAINS], one=True),
+            [(pot, "%s: %s + %s" % (pot, h.lower(), sec.lower())) for h, _, sec, pot in HERB_CHAINS]),
     ]
 
 

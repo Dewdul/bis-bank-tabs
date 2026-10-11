@@ -47,6 +47,22 @@ class TabBuilder
 		String group;
 		/** why the item is in the tab, shown when hovering it in the bank */
 		String reason;
+		/** which version of its entry this is (0 = the fullest dose of a potion), or -1 */
+		int variant;
+
+		Placement(int itemId, String slot, String group, String reason, int variant)
+		{
+			this.itemId = itemId;
+			this.slot = slot;
+			this.group = group;
+			this.reason = reason;
+			this.variant = variant;
+		}
+
+		Placement(int itemId, String slot, String group, String reason)
+		{
+			this(itemId, slot, group, reason, -1);
+		}
 	}
 
 	@Value
@@ -327,7 +343,7 @@ class TabBuilder
 						for (int id : got)
 						{
 							ctx.placed.add(id);
-							out.add(new Placement(id, pick.slot, group, reason));
+							out.add(new Placement(id, pick.slot, group, reason, pick.entries.get(i).indexOf(id)));
 						}
 					}
 					else
