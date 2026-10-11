@@ -106,20 +106,25 @@ RUNE_POUCH = ["Divine rune pouch", "Rune pouch"]
 
 
 def combat_supplies(boosts, restores=(), brews=()):
-    """Every potion together (boosts, restores, brews, antipoison, antifire), then the food. restores and
-    brews take tab-specific unique_uses.py markers (Surge potion, Armadyl brew) so they sit by their family."""
-    return section("supplies", "Supplies", "rows", [
-        *boosts,
-        all_("restore", RESTORE),
-        *restores,
-        first("brew", ["Saradomin brew"]),
-        *brews,
-        all_("antipoison", ANTIPOISON),
-        all_("antifire", ANTIFIRE),
-        # how many foods comes from the "Food items" setting
-        first("food", FOOD, take=4),
-        first("karambwan", [("Cooked karambwan", "Combo food: eat in the same tick as other food (heals 18)")]),
-    ])
+    """Every potion together (boosts, restores, brews, antipoison, antifire), then the food on a row of its own.
+    restores and brews take tab-specific unique_uses.py markers (Surge potion, Armadyl brew) so they sit by
+    their family."""
+    return [
+        section("supplies", "Supplies", "rows", [
+            *boosts,
+            all_("restore", RESTORE),
+            *restores,
+            first("brew", ["Saradomin brew"]),
+            *brews,
+            all_("antipoison", ANTIPOISON),
+            all_("antifire", ANTIFIRE),
+        ]),
+        section("supplies_food", "Food", "rows", [
+            # how many foods comes from the "Food items" setting
+            first("food", FOOD, take=4),
+            first("karambwan", [("Cooked karambwan", "Combo food: eat in the same tick as other food (heals 18)")]),
+        ]),
+    ]
 
 
 # Blighted supplies only work in the Wilderness and PvP areas (Ferox Enclave, PvP worlds, Castle Wars, Clan Wars...),
@@ -227,7 +232,7 @@ MELEE = tab("melee", "Melee", "Abyssal whip", kind="gear", sections=[
                        "Bone dagger", "Dragon longsword", "Dragon mace", "Dragon scimitar", "Barrelchest anchor",
                        "Crimson kisten", "Saradomin's blessed sword", "Saradomin sword"]),
     ]),
-    combat_supplies([
+    *combat_supplies([
         first("boost", ["Divine super combat potion", "Super combat potion", "Combat potion"]),
         first("boost_att", ["Divine super attack potion", "Super attack", "Attack potion"], unless=["boost"]),
         first("boost_str", ["Divine super strength potion", "Super strength", "Strength potion"],
@@ -371,7 +376,7 @@ RANGED = tab("ranged", "Ranged", "Magic shortbow", kind="gear", sections=[
         first("darts", DARTS, requires=["Toxic blowpipe", "Blazing blowpipe"], placed=True),
         first("atlatl_darts", ["Atlatl dart"], requires=["Eclipse atlatl"], placed=True),
     ]),
-    combat_supplies([
+    *combat_supplies([
         first("boost", ["Divine bastion potion", "Divine ranging potion", "Bastion potion", "Ranging potion"]),
     ], restores=[all_("spec_restore", [])], brews=[all_("armadyl_brew", [])]),  # Surge potion, Armadyl brew
     *blighted_supplies(),
@@ -481,7 +486,7 @@ MAGIC = tab("magic", "Magic", "Mystic air staff", kind="gear", sections=[
     section("runes_combo", "Combination runes", "rows", [
         all_("runes_combo", COMBO_RUNES + ["Aether rune"]),
     ]),
-    combat_supplies([
+    *combat_supplies([
         first("boost", ["Divine magic potion", "Magic potion", "Divine battlemage potion", "Battlemage potion",
                         "Forgotten brew", "Ancient brew"]),
         first("heart", ["Saturated heart", "Imbued heart"]),

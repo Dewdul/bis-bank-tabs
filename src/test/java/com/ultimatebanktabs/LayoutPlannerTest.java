@@ -70,6 +70,28 @@ public class LayoutPlannerTest
 	}
 
 	@Test
+	public void aSetSharingRowsMirrorsTheEquipmentScreen()
+	{
+		int[] layout = plan(
+			s("main", "equipment", p(1, "HEAD", "head"), p(2, "CAPE", "cape")),
+			s("situational", "alts", p(20, "HEAD", "slayer_helm"), p(21, "AMULET", "salve"),
+				p(40, "HEAD", "prayer"), p(41, "CAPE", "prayer"), p(42, "AMULET", "prayer"), p(43, "AMMO", "prayer"),
+				p(44, "BODY", "prayer"), p(45, "SHIELD", "prayer"), p(46, "BOOTS", "prayer"),
+				p(30, "HEAD", "inquisitor"), p(31, "BODY", "inquisitor")));
+		// the prayer set's own equipment screen comes first, right beside the best-in-slot one
+		assertEquals(40, at(layout, 0, 5));
+		assertEquals("the cape sits where a cape goes", 41, at(layout, 1, 4));
+		assertEquals(42, at(layout, 1, 5));
+		assertEquals("the blessing sits where ammo goes", 43, at(layout, 1, 6));
+		assertEquals(44, at(layout, 2, 5));
+		assertEquals(45, at(layout, 2, 6));
+		assertEquals(46, at(layout, 4, 5));
+		assertEquals("its empty cells stay empty", -1, at(layout, 0, 4));
+		assertEquals("single pieces take the column after it", 20, at(layout, 0, 7));
+		assertEquals(21, at(layout, 1, 7));
+	}
+
+	@Test
 	public void rowSectionsStartBelowTheBlockOnFreshRows()
 	{
 		TabBuilder.Placement[] weapons = new TabBuilder.Placement[10];

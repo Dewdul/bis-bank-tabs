@@ -4,12 +4,12 @@ Ultimate Bank Tabs builds bank tag tabs from what you own. Each combat style get
 
 ## Tabs
 
-- **Melee, Ranged, Magic.** Your best item for every slot sits in the shape of the equipment screen. Situational gear goes beside it, lined up with the slot it replaces. For melee that means a slayer helmet, a salve amulet, Inquisitor's, Void, and so on. Below that are your best weapon for each job:
+- **Melee, Ranged, Magic.** Your best item for every slot sits in the shape of the equipment screen. Situational gear goes beside it, lined up with the slot it replaces. A set with pieces for several slots on one row, such as your prayer gear, gets its own small equipment screen next to the main one, so its cape sits where a cape goes. For melee that means a slayer helmet, a salve amulet, Inquisitor's, Void, and so on. Below that are your best weapon for each job:
   - Melee: stab, slash and crush, plus dragonbane, demonbane, kalphite and other slayer weapons.
   - Ranged: dragonbane, demonbane, blowpipe and multi-target weapons.
   - Magic: an ancient spellbook staff and a standard spellbook staff. The magic tab also holds every rune, a row per kind: elemental, utility (law under fire), combat and combination.
 
-  Then come your special attack weapons, the right ammunition for the launchers in the tab, and your best potions and food. Below those, after a blank row, are your **blighted supplies** (blighted food and super restores, plus the blighted spell sacks on the magic tab), which only work in the Wilderness and PvP areas.
+  Then come your special attack weapons, the right ammunition for the launchers in the tab, your best potions, and your best food on a row of its own. Below those, after a blank row, are your **blighted supplies** (blighted food and super restores, plus the blighted spell sacks on the magic tab), which only work in the Wilderness and PvP areas.
 - **Movement.** Your most complete graceful set, stamina potions, teleport jewellery, diary rewards and other teleport items. It also has every teleport tablet and scroll, and the runes for teleport spells.
 - **Skills.** Prayer, Slayer, Agility, Thieving, Herblore, Crafting, Fletching, Hunter, Mining, Smithing, Fishing, Cooking, Firemaking, Woodcutting, Farming, Runecraft, Construction and Sailing. Each tab shows your best tools and skilling outfit, then the supplies you own for that skill, grouped and in level order. For example, Herblore shows each herb grimy then clean, then unfinished potions, potions and secondaries. At the bottom, after a blank row, each skill tab shows its **finished goods**: what the skill makes, grouped by what it is made from (potions, jewellery, d'hide, bows and arrows, smithed items, cooked food, runes and so on), plus logs, ores, gems, raw fish and hunter catches for the gathering skills.
 

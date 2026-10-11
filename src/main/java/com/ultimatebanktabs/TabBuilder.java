@@ -151,7 +151,7 @@ class TabBuilder
 		{
 			if (def.supplies && !options.skillSupplies
 				|| "goods".equals(def.layout) && !options.skillGoods
-				|| tab.isGear() && "supplies".equals(def.key) && !options.combatSupplies
+				|| tab.isGear() && def.key.startsWith("supplies") && !options.combatSupplies
 				|| tab.isGear() && def.key.startsWith("blighted") && !(options.combatSupplies && options.blightedSupplies))
 			{
 				continue;

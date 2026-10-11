@@ -142,8 +142,8 @@ public class TabBuilderTest
 			"Inquisitor's hauberk", "Inquisitor's plateskirt")));
 
 		Set<Integer> supplies = items(section(built, "supplies"));
-		assertTrue(supplies.containsAll(own("Super combat potion", "Saradomin brew", "Super restore", "Anglerfish",
-			"Shark")));
+		assertTrue(supplies.containsAll(own("Super combat potion", "Saradomin brew", "Super restore")));
+		assertEquals("the food has its own row", own("Anglerfish", "Shark"), items(section(built, "supplies_food")));
 		assertEquals("Heals 20", built.reasons().get(id("Shark")));
 
 		TabBuilder.Options oneFood = new TabBuilder.Options();
@@ -396,7 +396,8 @@ public class TabBuilderTest
 		assertTrue(keys.indexOf("supplies") < keys.indexOf("blighted"));
 		assertTrue(keys.indexOf("blighted") < keys.indexOf("blighted_sacks"));
 		assertTrue(keys.indexOf("blighted_sacks") < keys.indexOf("orbs"));
-		assertEquals(own("Super restore", "Shark"), items(section(magic, "supplies")));
+		assertEquals(own("Super restore"), items(section(magic, "supplies")));
+		assertEquals(own("Shark"), items(section(magic, "supplies_food")));
 		Set<Integer> blighted = items(section(magic, "blighted"));
 		assertTrue(blighted.containsAll(own("Blighted anglerfish", "Blighted manta ray", "Blighted karambwan")));
 		assertEquals(own("Blighted ancient ice sack", "Blighted vengeance sack"), items(section(magic, "blighted_sacks")));
@@ -420,7 +421,7 @@ public class TabBuilderTest
 		off.blightedSupplies = false;
 		TabBuilder.Built without = builder.build(tab("magic"), owned, off);
 		assertTrue(without.getSections().stream().noneMatch(s -> s.getKey().startsWith("blighted")));
-		assertTrue(items(section(without, "supplies")).contains(id("Shark")));
+		assertTrue(items(section(without, "supplies_food")).contains(id("Shark")));
 		off.blightedSupplies = true;
 		off.combatSupplies = false;
 		assertTrue("blighted supplies follow the combat supplies setting", builder.build(tab("magic"), owned, off)

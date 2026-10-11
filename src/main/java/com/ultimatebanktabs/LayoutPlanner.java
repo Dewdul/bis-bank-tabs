@@ -2,6 +2,7 @@ package com.ultimatebanktabs;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -57,6 +58,8 @@ class LayoutPlanner
 	}
 
 	private final TreeMap<Integer, Integer> grid = new TreeMap<>();
+	/** empty cells of a mirrored equipment block that nothing else may take */
+	private final Set<Integer> reserved = new HashSet<>();
 
 	/**
 	 * @param gapRows leave an empty row between sections
@@ -113,7 +116,10 @@ class LayoutPlanner
 			if ("alts".equals(s.getLayout()) && !s.getItems().isEmpty())
 			{
 				block = true;
-				for (List<TabBuilder.Placement> group : groups(s.getItems()))
+				List<List<TabBuilder.Placement>> groups = groups(s.getItems());
+				// a set drawn as its own equipment screen goes right beside the best-in-slot one
+				groups.sort(Comparator.comparing(g -> !sharesRows(g)));
+				for (List<TabBuilder.Placement> group : groups)
 				{
 					placeGroup(group, overflow);
 				}
@@ -331,6 +337,10 @@ class LayoutPlanner
 					}
 				}
 			}
+			else if (Arrays.stream(rows).allMatch(r -> r >= 0) && placeBlock(group, overflow))
+			{
+				return;
+			}
 		}
 		for (TabBuilder.Placement p : group)
 		{
@@ -339,6 +349,64 @@ class LayoutPlanner
 				overflow.add(p);
 			}
 		}
+	}
+
+	/**
+	 * A set with several pieces on one equipment row (prayer gear: cape, amulet and blessing; graceful
+	 * gloves and boots) is drawn as a second equipment screen beside the first, so each piece sits in
+	 * the same spot as the slot it replaces. Its whole 3-column footprint must be free and stays its own.
+	 */
+	private boolean placeBlock(List<TabBuilder.Placement> group, List<TabBuilder.Placement> overflow)
+	{
+		for (int base = FIRST_ALT_COLUMN; base + 3 <= WIDTH; base++)
+		{
+			boolean fits = true;
+			for (int r = 0; r < BLOCK_ROWS && fits; r++)
+			{
+				for (int c = 0; c < 3 && fits; c++)
+				{
+					fits = free(r, base + c);
+				}
+			}
+			if (!fits)
+			{
+				continue;
+			}
+			for (TabBuilder.Placement p : group)
+			{
+				int[] cell = DIAGRAM.get(p.getSlot());
+				if (!put(cell[0], base + cell[1], p.getItemId()))
+				{
+					// a second item for the same slot
+					overflow.add(p);
+				}
+			}
+			for (int r = 0; r < BLOCK_ROWS; r++)
+			{
+				for (int c = 0; c < 3; c++)
+				{
+					reserved.add(r * WIDTH + base + c);
+				}
+			}
+			return true;
+		}
+		return false;
+	}
+
+	/** Several pieces of the set on one equipment row (cape, amulet and ammo...): it needs its own block. */
+	private static boolean sharesRows(List<TabBuilder.Placement> group)
+	{
+		Set<Integer> rows = new HashSet<>();
+		for (TabBuilder.Placement p : group)
+		{
+			int row = rowOf(p);
+			if (row < 0)
+			{
+				return false;
+			}
+			rows.add(row);
+		}
+		return group.size() > 1 && rows.size() < group.size();
 	}
 
 	private boolean placeSingle(TabBuilder.Placement p)
@@ -366,11 +434,11 @@ class LayoutPlanner
 
 	private boolean free(int row, int col)
 	{
-		return !grid.containsKey(row * WIDTH + col);
+		return !grid.containsKey(row * WIDTH + col) && !reserved.contains(row * WIDTH + col);
 	}
 
 	private boolean put(int row, int col, int itemId)
 	{
-		return grid.putIfAbsent(row * WIDTH + col, itemId) == null;
+		return !reserved.contains(row * WIDTH + col) && grid.putIfAbsent(row * WIDTH + col, itemId) == null;
 	}
 }
