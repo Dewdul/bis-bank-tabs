@@ -161,6 +161,7 @@ class TabBuilder
 			List<TabData.Pick> picks = new ArrayList<>(def.picks);
 			picks.sort(Comparator.comparing(p -> "weapon".equals(p.mode) ? 0 : "ammo".equals(p.mode) ? 2 : 1));
 			ctx.sectionTitle = def.title;
+			ctx.sectionSlots.clear();
 			for (TabData.Pick pick : picks)
 			{
 				List<Placement> got = resolve(pick, ctx);
@@ -198,6 +199,8 @@ class TabBuilder
 		/** pick key -> every item the pick settled on, including ones placed earlier */
 		final Map<String, List<Integer>> resolved = new HashMap<>();
 		String sectionTitle;
+		/** equipment slots something in the current section already fills */
+		final Set<String> sectionSlots = new HashSet<>();
 		/** attack style of the main melee weapon; melee armour accuracy follows it */
 		String meleeStyle = "any";
 
@@ -339,6 +342,10 @@ class TabBuilder
 			if (ctx.placed.add(id))
 			{
 				out.add(new Placement(id, slot, group, reason.apply(id)));
+				if (slot != null)
+				{
+					ctx.sectionSlots.add(slot);
+				}
 			}
 		}
 	}
@@ -589,6 +596,7 @@ class TabBuilder
 	 * slot takes that outfit's piece, and a slot it lacks takes the first owned item of the slot's fallback
 	 * ("pieces"). A "complete" outfit (graceful) counts only when worn whole: pieces of any variants mix,
 	 * and unless every slot is covered, every slot takes its fallback instead (the lightest item).
+	 * A "fill" outfit only takes the slots the section left empty (graceful on the skill tabs).
 	 */
 	private void outfit(TabData.Pick pick, Context ctx, List<Placement> out, List<Integer> chosen)
 	{
@@ -611,11 +619,22 @@ class TabBuilder
 			}
 		}
 		List<TabData.Piece> slots = best != null ? best : pick.variants.isEmpty() ? Collections.emptyList() : pick.variants.get(0);
-		boolean whole = best != null && (!pick.complete || wornWhole(pick, slots.size(), ctx));
+		if (pick.fill && ctx.sectionSlots.isEmpty())
+		{
+			// a filler only completes a block that shows something already
+			return;
+		}
+		// a filler can't be worn whole once the skill's own pieces take some of its slots
+		boolean blocked = pick.fill && slots.stream().anyMatch(p -> ctx.sectionSlots.contains(p.slot));
+		boolean whole = best != null && !blocked && (!pick.complete || wornWhole(pick, slots.size(), ctx));
 		String label = pick.label != null ? pick.label : "Your most complete outfit";
 		for (int i = 0; i < slots.size(); i++)
 		{
 			TabData.Piece piece = slots.get(i);
+			if (pick.fill && ctx.sectionSlots.contains(piece.slot))
+			{
+				continue;
+			}
 			List<Integer> ids = whole ? firstOwned(piece.entries, ctx, 1) : Collections.emptyList();
 			for (int v = 0; ids.isEmpty() && whole && pick.complete && v < pick.variants.size(); v++)
 			{

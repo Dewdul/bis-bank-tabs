@@ -713,8 +713,14 @@ def outfit_slots(key, why, pieces):
     return [first("%s_%s" % (key, slot.lower()), entries, slot=slot, why=why) for slot, entries in pieces]
 
 
-def best_in_slot(picks):
-    return section("main", "Best in slot", "equipment", picks)
+def light_filler():
+    """A skill tab's gear slot that no skilling piece fills takes your lightest gear (graceful), like Movement."""
+    return dict(graceful("light_fill"), fill=True, why="Nothing for this skill in the slot: your graceful")
+
+
+def best_in_slot(picks, fill=True):
+    """The skill's best item per slot; with fill, empty slots take your lightest gear (not for Slayer's combat)."""
+    return section("main", "Best in slot", "equipment", picks + ([light_filler()] if fill else []))
 
 
 def situational(picks):
@@ -780,7 +786,7 @@ SLAYER = tab("slayer", "Slayer", "Enchanted gem", sections=[
         first("bracelet", [("Expeditious bracelet", "Chance a kill counts twice: shorter tasks"),
                            ("Bracelet of slaughter", "Chance a kill doesn't count: longer tasks")], slot="GLOVES"),
         first("ring", ["Slayer ring (eternal)", "Slayer ring"], slot="RING", why="Slayer teleports and task checks"),
-    ]),
+    ], fill=False),
     situational([
         first("slaughter", [("Bracelet of slaughter", "Chance a kill doesn't count: longer tasks")], slot="GLOVES"),
     ]),

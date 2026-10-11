@@ -215,7 +215,7 @@ class Resolver:
 
 def build_pick(res, pick):
     out = {"key": pick["key"], "mode": pick["mode"]}
-    for k in ("slot", "profile", "style", "launcher", "fallback", "complete", "unless", "take", "groups", "repeat",
+    for k in ("slot", "profile", "style", "launcher", "fallback", "complete", "fill", "unless", "take", "groups", "repeat",
               "one", "slots"):
         if pick.get(k):
             out[k] = pick[k]

@@ -308,6 +308,29 @@ public class TabBuilderTest
 	}
 
 	@Test
+	public void emptySkillSlotsTakeYourLightestGear()
+	{
+		Set<Integer> owned = own("Rogue mask", "Rogue gloves", "Graceful hood", "Graceful cape", "Graceful top",
+			"Graceful legs", "Graceful gloves", "Graceful boots", "Boots of lightness");
+		Map<String, Integer> main = bySlot(section(build("thieving", owned), "main"));
+		assertEquals("the skill's own piece wins", id("Rogue mask"), (int) main.get("HEAD"));
+		assertEquals(id("Rogue gloves"), (int) main.get("GLOVES"));
+		assertEquals("an empty slot takes graceful", id("Graceful top"), (int) main.get("BODY"));
+		assertEquals(id("Graceful legs"), (int) main.get("LEGS"));
+		assertEquals(id("Graceful cape"), (int) main.get("CAPE"));
+		assertEquals("no set bonus with a rogue mask on, so the lighter boots", id("Boots of lightness"),
+			(int) main.get("BOOTS"));
+	}
+
+	@Test
+	public void noSkillGearMeansNoGracefulFiller()
+	{
+		TabBuilder.Built built = build("thieving", own("Graceful hood", "Graceful top", "Graceful legs"));
+		assertTrue(items(section(built, "main")).isEmpty());
+		assertTrue("graceful alone doesn't make a skill tab", built.isEmpty());
+	}
+
+	@Test
 	public void thievingGetsAnEquipmentBlock()
 	{
 		TabBuilder.Built built = build("thieving", own("Rogue mask", "Rogue gloves", "Gloves of silence",

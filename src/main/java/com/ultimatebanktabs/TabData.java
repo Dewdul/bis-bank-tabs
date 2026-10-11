@@ -82,6 +82,8 @@ class TabData
 		boolean repeat;
 		/** "all" picks: show only the first owned version of each entry (the fullest dose) */
 		boolean one;
+		/** "outfit" picks: only fill the slots the section left empty */
+		boolean fill;
 		/** hover text: one per entry (may be shorter than entries), else the label */
 		List<String> reasons = Collections.emptyList();
 		/** "all" picks: the outfit/set each entry belongs to, kept together on one row by the "sets" layout */
