@@ -67,6 +67,27 @@ class LayoutPlanner
 		return new LayoutPlanner().layout(tab, gapRows);
 	}
 
+	/** Bank positions of the tab's best-in-slot cells: the equipment-screen slots that hold an item. */
+	static Set<Integer> bisPositions(TabBuilder.Built tab)
+	{
+		Set<Integer> out = new HashSet<>();
+		for (TabBuilder.Section s : tab.getSections())
+		{
+			if ("equipment".equals(s.getLayout()))
+			{
+				for (TabBuilder.Placement p : s.getItems())
+				{
+					int[] cell = p.getSlot() == null ? null : DIAGRAM.get(p.getSlot());
+					if (cell != null)
+					{
+						out.add(cell[0] * WIDTH + cell[1]);
+					}
+				}
+			}
+		}
+		return out;
+	}
+
 	private int[] layout(TabBuilder.Built tab, boolean gapRows)
 	{
 		List<TabBuilder.Placement> overflow = new ArrayList<>();

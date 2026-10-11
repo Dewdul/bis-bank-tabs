@@ -466,12 +466,20 @@ MAGIC = tab("magic", "Magic", "Mystic air staff", kind="gear", sections=[
         all_("power_of_death", []), all_("magic_specs", []),
         all_("specs", ["Volatile Nightmare staff", "Eldritch Nightmare staff", "Accursed sceptre"]),
     ]),
-    section("runes", "Runes", "rows", [
+    # every rune, a row per kind: elemental (and the pouch), then utility with Law under Fire, then the combat
+    # runes, then the combination runes, each by Runecraft level
+    section("runes", "Elemental runes", "rows", [
+        all_("runes", ELEMENTAL_RUNES + ["Sunfire rune"]),
         first("pouch", RUNE_POUCH),
-        # elemental (sunfire is the stronger fire rune), combination by Runecraft level, then catalytic by tier
-        all_("runes", ["Sunfire rune"] + ELEMENTAL_RUNES + COMBO_RUNES +
-             ["Mind rune", "Cosmic rune", "Chaos rune", "Nature rune", "Death rune", "Blood rune", "Soul rune",
-              "Aether rune", "Wrath rune"]),
+    ]),
+    section("runes_utility", "Utility runes", "rows", [
+        all_("runes_utility", ["Law rune", "Cosmic rune", "Astral rune", "Nature rune", "Soul rune"]),
+    ]),
+    section("runes_combat", "Combat runes", "rows", [
+        all_("runes_combat", ["Mind rune", "Body rune", "Chaos rune", "Death rune", "Blood rune", "Wrath rune"]),
+    ]),
+    section("runes_combo", "Combination runes", "rows", [
+        all_("runes_combo", COMBO_RUNES + ["Aether rune"]),
     ]),
     combat_supplies([
         first("boost", ["Divine magic potion", "Magic potion", "Divine battlemage potion", "Battlemage potion",

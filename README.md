@@ -7,7 +7,7 @@ Ultimate Bank Tabs builds bank tag tabs from what you own. Each combat style get
 - **Melee, Ranged, Magic.** Your best item for every slot sits in the shape of the equipment screen. Situational gear goes beside it, lined up with the slot it replaces. For melee that means a slayer helmet, a salve amulet, Inquisitor's, Void, and so on. Below that are your best weapon for each job:
   - Melee: stab, slash and crush, plus dragonbane, demonbane, kalphite and other slayer weapons.
   - Ranged: dragonbane, demonbane, blowpipe and multi-target weapons.
-  - Magic: an ancient spellbook staff and a standard spellbook staff.
+  - Magic: an ancient spellbook staff and a standard spellbook staff. The magic tab also holds every rune, a row per kind: elemental, utility (law under fire), combat and combination.
 
   Then come your special attack weapons, the right ammunition for the launchers in the tab, and your best potions and food. Below those, after a blank row, are your **blighted supplies** (blighted food and super restores, plus the blighted spell sacks on the magic tab), which only work in the Wilderness and PvP areas.
 - **Movement.** Your most complete graceful set, stamina potions, teleport jewellery, diary rewards and other teleport items. It also has every teleport tablet and scroll, and the runes for teleport spells.
@@ -42,7 +42,11 @@ Only items you own appear. That means your bank, including placeholders, potion 
   - **Change icon** keeps your pick. Change the *Tab icons* setting to give icons back to the plugin.
   - **Disable layout** keeps the tab in plain bank order until you choose *Enable layout*.
   - **Delete** switches that tab off. Turn it back on in the settings.
-- You can drag items around in a tab. Your arrangement stays until the tab's contents change.
+- You can drag items around in a tab, and your arrangement is kept, across restarts too. When the tab changes:
+  - A new best-in-slot item takes its gear cell back, whatever you put there. Whatever it pushes out moves to a free spot.
+  - Any other new item goes into its usual spot if that is free, otherwise the next free spot.
+  - An item the plugin stops showing leaves a gap.
+  - *Disable layout* then *Enable layout* starts the tab over from the plugin's own layout.
 - A brand-new tab shows up the next time you open the bank.
 
 ## Data

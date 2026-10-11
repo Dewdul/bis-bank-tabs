@@ -234,7 +234,8 @@ public class TabBuilderTest
 		assertEquals(id("Elidinis' ward (f)"), (int) main.get("SHIELD"));
 		Set<Integer> weapons = items(section(built, "weapons"));
 		assertTrue(weapons.containsAll(own("Kodai wand", "Harmonised Nightmare staff")));
-		assertTrue(items(section(built, "runes")).containsAll(own("Blood rune", "Death rune", "Rune pouch")));
+		assertTrue(items(section(built, "runes")).contains(id("Rune pouch")));
+		assertTrue(items(section(built, "runes_combat")).containsAll(own("Blood rune", "Death rune")));
 	}
 
 	@Test
@@ -439,6 +440,40 @@ public class TabBuilderTest
 		TabBuilder.Built kandarin = build("slayer", new HashSet<>(Arrays.asList(lit, id("Kandarin headgear 1"))));
 		assertTrue("Kandarin headgear works carried and never goes out, so it is the head light",
 			kandarin.itemIds().contains(id("Kandarin headgear 1")));
+	}
+
+	@Test
+	public void magicRunesGetARowPerKindWithLawUnderFire()
+	{
+		TabBuilder.Built magic = build("magic", own("Tumeken's shadow", "Fire rune", "Water rune", "Law rune",
+			"Cosmic rune", "Mind rune", "Death rune", "Blood rune", "Mist rune"));
+		int[] layout = LayoutPlanner.plan(magic, false);
+		int fire = pos(layout, id("Fire rune"));
+		int law = pos(layout, id("Law rune"));
+		assertEquals("law sits right under fire", fire + LayoutPlanner.WIDTH, law);
+		assertEquals("cosmic right of law", law + 1, pos(layout, id("Cosmic rune")));
+		int mind = pos(layout, id("Mind rune"));
+		assertEquals("combat runes on their own row", row(layout, id("Law rune")) + 1, mind / LayoutPlanner.WIDTH);
+		assertEquals(mind + 1, pos(layout, id("Death rune")));
+		assertEquals("combination runes on their own row", mind / LayoutPlanner.WIDTH + 1,
+			row(layout, id("Mist rune")));
+	}
+
+	static int pos(int[] layout, int itemId)
+	{
+		return row(layout, itemId) * LayoutPlanner.WIDTH + col(layout, itemId);
+	}
+
+	static int col(int[] layout, int itemId)
+	{
+		for (int i = 0; i < layout.length; i++)
+		{
+			if (layout[i] == itemId)
+			{
+				return i % LayoutPlanner.WIDTH;
+			}
+		}
+		throw new AssertionError("not laid out: " + itemId);
 	}
 
 	static int row(int[] layout, int itemId)

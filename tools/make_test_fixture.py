@@ -52,6 +52,8 @@ ITEMS = [
     "Blighted ancient ice sack", "Blighted vengeance sack", "Unpowered orb",
     # light sources: only the lit versions count
     "Mining helmet", "Kandarin headgear 1",
+    # magic tab runes
+    "Fire rune", "Water rune", "Cosmic rune", "Mind rune", "Mist rune",
 ]
 STAT_FIELDS = ["stab_attack_bonus", "slash_attack_bonus", "crush_attack_bonus", "range_attack_bonus",
                "magic_attack_bonus", "strength_bonus", "ranged_strength_bonus", "magic_damage_bonus", "prayer_bonus"]

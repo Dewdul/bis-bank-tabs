@@ -7,7 +7,16 @@ Started 2026-10-04. The request was an "ultimate bank plugin" that does three th
 - **Membership is in memory.** Each tab registers a `BankTag` with `TagManager.registerTag`. Bank Tags combines registered tags with a tab of the same name. The plugin never writes `banktags.item_*` keys, so the player's own tags are untouched and the config does not churn on every bank change.
 - **Persisted keys are the tab list, icon and layout.** The plugin writes `banktags.tagtabs` (appending new tabs and leaving the player's own order alone), `banktags.icon_<tag>`, and the layout through `LayoutManager.saveLayout`. These are the public APIs exposed to `@PluginDependency(BankTagsPlugin.class)` plugins. `TabManager` is not public, so the tab list is edited through config.
 - **The tab list reloads on bank open.** Bank Tags reads `tagtabs` in `TabInterface.init()` on `BANKMAIN_INIT`. The plugin subscribes to that script at priority 1 so it runs first. When the bank container is already known at that point, new tabs appear in the same open. Otherwise a chat line says to reopen the bank.
-- **Layouts are written only when the computed layout changes.** A player's drag-rearrangement survives until the tab's contents change. An open tab that changes is reopened with `BankTagsService.openBankTag`.
+- **Layouts are written only when the computed layout changes.** The last planned layout is kept per tab in `ultimatebanktabs.planned_<key>`, so a restart can tell the player's moves from the plan. When the plan changes, `LayoutMerger` decides what is saved:
+  - **Untouched tab** (saved layout equals the last plan, ignoring trailing gaps): the new plan as it is.
+  - **Rearranged tab:**
+    - The player's layout is the base.
+    - Items the plugin no longer shows become gaps.
+    - Items the player tagged in themselves stay.
+    - A new best-in-slot item takes its equipment-block cell back, and anything it pushes out is placed again.
+    - Other new items go to their planned cell if it is free, else the next free cell outside the equipment block.
+  - **Reset:** Disable then Enable layout clears the last plan, which restarts the tab from the plan.
+  - An open tab that changes is reopened with `BankTagsService.openBankTag`.
 - **Tag names avoid collisions.** A name is skipped if it is in `tagtabs` but not owned by this plugin, or if any item carries it as a tag. The fallbacks are "x bis", "x (auto)" and "x (auto N)". The chosen name is stored in `ultimatebanktabs.tagName_<key>`.
 - **Deleting a tab turns it off.** If the player removes or renames a plugin tab, the `tagtabs` change arrives while the plugin is not writing. The tab's toggle is then set to off, so the plugin does not fight the player.
 - **It replaces the player's tabs, with consent.** On the first start, if `tagtabs` holds tabs the plugin didn't make, a dialog lists them and asks. *Replace my tabs* removes them from `tagtabs` with their icons and layouts. Item tags stay, so `tag:` searches still work. The removed tabs are saved as JSON in `ultimatebanktabs.replacedTabs`, and their names are reserved so new plugin tabs can't take them. *Turn plugin off* (or closing the dialog) disables the plugin. Nothing is built until `replaceAccepted` is set. That flag is global, as Bank Tags config is shared by all accounts.

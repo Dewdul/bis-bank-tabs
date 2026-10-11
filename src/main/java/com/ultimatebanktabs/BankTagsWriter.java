@@ -39,6 +39,8 @@ class BankTagsWriter
 	static final String CUSTOM_ICON_PREFIX = "customIcon_";
 	/** the player chose "Disable layout": the tab shows its items in bank order until they enable it again */
 	static final String LAYOUT_OFF_PREFIX = "layoutOff_";
+	/** the layout last planned for a tab, so a restart can tell the player's moves from the plan */
+	static final String PLANNED_PREFIX = "planned_";
 
 	private final ConfigManager configManager;
 	private final TagManager tagManager;
@@ -50,6 +52,7 @@ class BankTagsWriter
 	private final Map<String, String> names = new LinkedHashMap<>();
 	/** tag name -> items the tab shows (canonical ids) */
 	private final Map<String, Set<Integer>> members = new HashMap<>();
+	/** tag name -> the layout last planned for it (before keeping the player's moves) */
 	private final Map<String, int[]> written = new HashMap<>();
 	/** the player's replaced tabs: never reused as names for ours */
 	private final Set<String> reserved = new HashSet<>();
@@ -97,6 +100,12 @@ class BankTagsWriter
 			{
 				names.put(key, name);
 				register(name);
+				int[] planned = parseLayout(configManager.getConfiguration(UltimateBankTabsConfig.GROUP,
+					PLANNED_PREFIX + key));
+				if (planned != null)
+				{
+					written.put(name, planned);
+				}
 			}
 		}
 	}
@@ -152,10 +161,16 @@ class BankTagsWriter
 				}
 				boolean layoutOff = Boolean.parseBoolean(
 					configManager.getConfiguration(UltimateBankTabsConfig.GROUP, LAYOUT_OFF_PREFIX + key));
-				if (!layoutOff && (!Arrays.equals(written.get(name), tab.layout) || layoutManager.loadLayout(name) == null))
+				Layout saved = layoutManager.loadLayout(name);
+				if (!layoutOff && (!Arrays.equals(written.get(name), tab.layout) || saved == null))
 				{
-					layoutManager.saveLayout(new Layout(name, tab.layout));
+					// keep the player's own arrangement; only a new best in slot takes its cell back
+					int[] next = LayoutMerger.next(saved == null ? null : saved.getLayout(), written.get(name),
+						tab.layout, tab.bis);
+					layoutManager.saveLayout(new Layout(name, next));
 					written.put(name, tab.layout);
+					configManager.setConfiguration(UltimateBankTabsConfig.GROUP, PLANNED_PREFIX + key,
+						joinLayout(tab.layout));
 					if (name.equals(bankTagsService.getActiveTag()))
 					{
 						bankTagsService.openBankTag(name, BankTagsService.OPTION_ALLOW_MODIFICATIONS);
@@ -369,10 +384,45 @@ class BankTagsWriter
 		log.debug("tab {} renamed {} -> {}", key, oldName, newName);
 	}
 
-	/** The player re-enabled layout mode: lay the tab out again on the next publish. */
+	/** The player re-enabled layout mode: lay the tab out from the plan again on the next publish. */
 	void forgetLayout(String name)
 	{
 		written.remove(name);
+		String key = keyOf(name);
+		if (key != null)
+		{
+			configManager.unsetConfiguration(UltimateBankTabsConfig.GROUP, PLANNED_PREFIX + key);
+		}
+	}
+
+	private static String joinLayout(int[] layout)
+	{
+		StringBuilder sb = new StringBuilder();
+		for (int id : LayoutMerger.trim(layout))
+		{
+			if (sb.length() > 0)
+			{
+				sb.append(',');
+			}
+			sb.append(id);
+		}
+		return sb.toString();
+	}
+
+	private static int[] parseLayout(String csv)
+	{
+		if (csv == null || csv.isEmpty())
+		{
+			return null;
+		}
+		try
+		{
+			return Arrays.stream(csv.split(",")).mapToInt(s -> Integer.parseInt(s.trim())).toArray();
+		}
+		catch (NumberFormatException e)
+		{
+			return null;
+		}
 	}
 
 	/** Whether the tab list currently holds this tag. */
@@ -385,6 +435,7 @@ class BankTagsWriter
 	{
 		String name = names.remove(key);
 		configManager.unsetConfiguration(UltimateBankTabsConfig.GROUP, NAME_PREFIX + key);
+		configManager.unsetConfiguration(UltimateBankTabsConfig.GROUP, PLANNED_PREFIX + key);
 		if (name.equals(bankTagsService.getActiveTag()))
 		{
 			bankTagsService.closeBankTag();
@@ -447,12 +498,15 @@ class BankTagsWriter
 		final Set<Integer> items;
 		final int[] layout;
 		final int icon;
+		/** bank positions of the best-in-slot cells in the layout */
+		final Set<Integer> bis;
 
-		Tab(Set<Integer> items, int[] layout, int icon)
+		Tab(Set<Integer> items, int[] layout, int icon, Set<Integer> bis)
 		{
 			this.items = items;
 			this.layout = layout;
 			this.icon = icon;
+			this.bis = bis;
 		}
 	}
 }

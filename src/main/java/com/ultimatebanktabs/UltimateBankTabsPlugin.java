@@ -471,7 +471,7 @@ public class UltimateBankTabsPlugin extends Plugin
 			}
 		}
 		else if (UltimateBankTabsConfig.GROUP.equals(event.getGroup()) && !event.getKey().startsWith("tagName_")
-			&& !INTERNAL_KEYS.contains(event.getKey()))
+			&& !event.getKey().startsWith(BankTagsWriter.PLANNED_PREFIX) && !INTERNAL_KEYS.contains(event.getKey()))
 		{
 			if ("tabIcons".equals(event.getKey()))
 			{
@@ -712,7 +712,8 @@ public class UltimateBankTabsPlugin extends Plugin
 			}
 			// the item icon also stands under a skill icon, for when Bank Tags draws the tab without us
 			int icon = built.getHero() > 0 ? built.getHero() : def.icon;
-			tabs.put(def.key, new BankTagsWriter.Tab(built.itemIds(), LayoutPlanner.plan(built, config.gapRows()), icon));
+			tabs.put(def.key, new BankTagsWriter.Tab(built.itemIds(), LayoutPlanner.plan(built, config.gapRows()), icon,
+				LayoutPlanner.bisPositions(built)));
 			why.put(def.key, built.reasons());
 		}
 		int added = writer.publish(tabs, titles);
