@@ -323,6 +323,23 @@ public class TabBuilderTest
 	}
 
 	@Test
+	public void gracefulStandsBesideTheSkillPiece()
+	{
+		TabBuilder.Built built = build("thieving", own("Rogue mask", "Rogue gloves", "Graceful hood", "Graceful gloves",
+			"Graceful top"));
+		Map<String, Integer> main = bySlot(section(built, "main"));
+		assertEquals(id("Rogue mask"), (int) main.get("HEAD"));
+		int[] layout = LayoutPlanner.plan(built, false);
+		int hood = pos(layout, id("Graceful hood"));
+		assertEquals("the graceful hood is on the head row", 0, hood / LayoutPlanner.WIDTH);
+		assertTrue("to the side", hood % LayoutPlanner.WIDTH >= 4);
+		int gloves = pos(layout, id("Graceful gloves"));
+		assertEquals("the graceful gloves on the gloves row", 4, gloves / LayoutPlanner.WIDTH);
+		assertTrue(gloves % LayoutPlanner.WIDTH >= 4);
+		assertEquals("an empty slot still takes graceful in the block", id("Graceful top"), (int) main.get("BODY"));
+	}
+
+	@Test
 	public void noSkillGearMeansNoGracefulFiller()
 	{
 		TabBuilder.Built built = build("thieving", own("Graceful hood", "Graceful top", "Graceful legs"));

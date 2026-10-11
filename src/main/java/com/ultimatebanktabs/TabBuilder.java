@@ -624,18 +624,31 @@ class TabBuilder
 			// a filler only completes a block that shows something already
 			return;
 		}
-		// a filler can't be worn whole once the skill's own pieces take some of its slots
-		boolean blocked = pick.fill && slots.stream().anyMatch(p -> ctx.sectionSlots.contains(p.slot));
+		// slots the skill's own pieces already fill: a filler can't be worn whole then
+		Set<String> taken = pick.fill ? new HashSet<>(ctx.sectionSlots) : Collections.emptySet();
+		boolean blocked = slots.stream().anyMatch(p -> taken.contains(p.slot));
 		boolean whole = best != null && !blocked && (!pick.complete || wornWhole(pick, slots.size(), ctx));
 		String label = pick.label != null ? pick.label : "Your most complete outfit";
 		for (int i = 0; i < slots.size(); i++)
 		{
 			TabData.Piece piece = slots.get(i);
-			if (pick.fill && ctx.sectionSlots.contains(piece.slot))
-			{
-				continue;
-			}
 			List<Integer> ids = whole ? firstOwned(piece.entries, ctx, 1) : Collections.emptyList();
+			if (taken.contains(piece.slot))
+			{
+				// the skill's piece keeps the slot; your graceful piece (any colour) stands beside it, else the
+				// lightest item below (the planner moves a second item for a slot into the alternatives)
+				for (int v = -1; ids.isEmpty() && v < pick.variants.size(); v++)
+				{
+					List<TabData.Piece> variant = v < 0 ? slots : pick.variants.get(v);
+					ids = i < variant.size() ? firstOwned(variant.get(i).entries, ctx, 1) : Collections.emptyList();
+				}
+				if (!ids.isEmpty())
+				{
+					chosen.addAll(ids);
+					add(out, ids, piece.slot, pick.key, ctx, id -> "Your graceful, to swap in when you'd rather run");
+					continue;
+				}
+			}
 			for (int v = 0; ids.isEmpty() && whole && pick.complete && v < pick.variants.size(); v++)
 			{
 				// colours mix: the same slot from another variant
