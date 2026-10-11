@@ -56,7 +56,7 @@ class TabData
 	{
 		String key;
 		String title;
-		/** equipment, alts or rows */
+		/** equipment, alts, rows, sets, columns, goods, bottom or separate (see LayoutPlanner) */
 		String layout;
 		/** generated from wiki recipes rather than curated */
 		boolean supplies;

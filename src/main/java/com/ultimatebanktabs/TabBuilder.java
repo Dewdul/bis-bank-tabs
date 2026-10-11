@@ -30,6 +30,7 @@ class TabBuilder
 		boolean skillSupplies = true;
 		boolean skillGoods = true;
 		boolean combatSupplies = true;
+		boolean blightedSupplies = true;
 		/** how many foods the combat tabs show */
 		int foodCount = 4;
 		/** items other tabs already show; the cosmetics tab leaves them out */
@@ -150,7 +151,8 @@ class TabBuilder
 		{
 			if (def.supplies && !options.skillSupplies
 				|| "goods".equals(def.layout) && !options.skillGoods
-				|| tab.isGear() && "supplies".equals(def.key) && !options.combatSupplies)
+				|| tab.isGear() && "supplies".equals(def.key) && !options.combatSupplies
+				|| tab.isGear() && def.key.startsWith("blighted") && !(options.combatSupplies && options.blightedSupplies))
 			{
 				continue;
 			}

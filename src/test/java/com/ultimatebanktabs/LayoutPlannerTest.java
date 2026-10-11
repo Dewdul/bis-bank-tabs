@@ -192,6 +192,24 @@ public class LayoutPlannerTest
 	}
 
 	@Test
+	public void separateSectionStandsApartAboveTheBottom()
+	{
+		TabBuilder.Section[] sections = {s("supplies", "rows", p(1, null, "food")),
+			s("blighted", "separate", p(2, null, "food"), p(3, null, "food")),
+			s("blighted_sacks", "separate", p(7, null, "sacks"), p(8, null, "sacks")),
+			s("enchanting", "bottom", p(11, null, "opal"))};
+		int[] layout = plan(sections);
+		assertEquals(1, at(layout, 0, 0));
+		assertEquals("blank row before the blighted section", -1, at(layout, 1, 0));
+		assertEquals(2, at(layout, 2, 0));
+		assertEquals("the next separate section follows on its own row, no blank between", 7, at(layout, 3, 0));
+		assertEquals("the bottom keeps its own blank row", -1, at(layout, 4, 0));
+		assertEquals(11, at(layout, 5, 0));
+		int[] gaps = LayoutPlanner.plan(new TabBuilder.Built(null, Arrays.asList(sections), -1), true);
+		assertEquals("one blank row, not two, with gap rows on", 2, at(gaps, 2, 0));
+	}
+
+	@Test
 	public void emptyTab()
 	{
 		assertEquals(0, plan(new TabBuilder.Section("x", "x", "rows", Collections.emptyList())).length);

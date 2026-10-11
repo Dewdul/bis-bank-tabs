@@ -74,6 +74,8 @@ class Wiki:
         self.page_name = {}                 # lower -> display page name
         self.id_name = {}                   # id -> in-game item name
         self.id_page = {}                   # id -> lower page name
+        self.version_ids = defaultdict(list)  # lower "Page#Version" -> ids
+        self.id_version = {}                # id -> lower "Page#Version" (versioned pages only)
         self.quest_only = set()             # lower page names of untradeable quest items
         for r in rows:
             page = r.get("page_name") or ""
@@ -92,6 +94,11 @@ class Wiki:
                     self.page_ids[key].append(item_id)
                 self.id_name.setdefault(item_id, r.get("item_name") or page)
                 self.id_page.setdefault(item_id, key)
+                sub = (r.get("page_name_sub") or "").lower()
+                if "#" in sub:
+                    if item_id not in self.version_ids[sub]:
+                        self.version_ids[sub].append(item_id)
+                    self.id_version.setdefault(item_id, sub)
         self.pages = sorted(self.page_name.values())
 
     def ids_of_page(self, page):
@@ -115,12 +122,20 @@ class Resolver:
             if not pages:
                 self.errors.append("regex matched nothing: %s" % name)
             return pages
+        if "#" in name:
+            # one version of a page ("Mining helmet#Lit"), not every version on it
+            if name.lower() not in self.wiki.version_ids:
+                self.errors.append("unknown version: %s" % name)
+                return []
+            return [name]
         if name.lower() not in self.wiki.page_ids:
             self.errors.append("unknown page: %s" % name)
             return []
         return [self.wiki.page_name[name.lower()]]
 
     def base_ids(self, name):
+        if "#" in name and not name.startswith("re:"):
+            return list(self.wiki.version_ids.get(name.lower(), [])) if self.entry_pages(name) else []
         ids = []
         for p in self.entry_pages(name):
             ids += [i for i in self.wiki.ids_of_page(p) if i not in ids]
@@ -149,11 +164,12 @@ class Resolver:
         base = [self.base_ids(n) for n, _ in unique]
         claimed = {i for ids in base for i in ids}
         out = []
-        for ids in base:
+        for (name, _), ids in zip(unique, base):
+            version = name.lower() if "#" in name and not name.startswith("re:") else None
             extra = []
             for i in ids:
                 for v in self.var_group.get(i, ()):
-                    if v not in claimed and v not in ids and v not in extra and self._same_family(i, v):
+                    if v not in claimed and v not in ids and v not in extra and self._same_family(i, v)                             and (version is None or self.wiki.id_version.get(v, version) == version):
                         extra.append(v)
             out.append(sorted(ids, key=self._version_order) + extra)
         return list(zip(out, [why for _, why in unique]))

@@ -385,6 +385,60 @@ public class TabBuilderTest
 	}
 
 	@Test
+	public void blightedSuppliesSitApartBelowTheSupplies()
+	{
+		Set<Integer> owned = own("Tumeken's shadow", "Super restore", "Shark", "Blighted super restore",
+			"Blighted anglerfish", "Blighted manta ray", "Blighted karambwan", "Blighted ancient ice sack",
+			"Blighted vengeance sack", "Unpowered orb");
+		TabBuilder.Built magic = build("magic", owned);
+		List<String> keys = magic.getSections().stream().map(TabBuilder.Section::getKey).collect(Collectors.toList());
+		assertTrue(keys.indexOf("supplies") < keys.indexOf("blighted"));
+		assertTrue(keys.indexOf("blighted") < keys.indexOf("blighted_sacks"));
+		assertTrue(keys.indexOf("blighted_sacks") < keys.indexOf("orbs"));
+		assertEquals(own("Super restore", "Shark"), items(section(magic, "supplies")));
+		Set<Integer> blighted = items(section(magic, "blighted"));
+		assertTrue(blighted.containsAll(own("Blighted anglerfish", "Blighted manta ray", "Blighted karambwan")));
+		assertEquals(own("Blighted ancient ice sack", "Blighted vengeance sack"), items(section(magic, "blighted_sacks")));
+		assertTrue(blighted.contains(id("Blighted super restore")));
+		assertTrue(magic.reasons().get(id("Blighted manta ray")).startsWith("Wilderness/PvP only"));
+
+		int[] layout = LayoutPlanner.plan(magic, false);
+		int shark = row(layout, id("Shark"));
+		int food = row(layout, id("Blighted manta ray"));
+		int sacks = row(layout, id("Blighted ancient ice sack"));
+		assertEquals("a blank row between the supplies and the blighted ones", shark + 2, food);
+		assertEquals("the spell sacks get their own row", food + 1, sacks);
+		assertEquals("the orbs keep their blank row", sacks + 2, row(layout, id("Unpowered orb")));
+
+		TabBuilder.Built melee = build("melee", owned);
+		assertTrue(items(section(melee, "blighted")).contains(id("Blighted manta ray")));
+		assertTrue("spell sacks are for the magic tab", melee.getSections().stream()
+			.noneMatch(s -> s.getKey().equals("blighted_sacks")));
+
+		TabBuilder.Options off = new TabBuilder.Options();
+		off.blightedSupplies = false;
+		TabBuilder.Built without = builder.build(tab("magic"), owned, off);
+		assertTrue(without.getSections().stream().noneMatch(s -> s.getKey().startsWith("blighted")));
+		assertTrue(items(section(without, "supplies")).contains(id("Shark")));
+		off.blightedSupplies = true;
+		off.combatSupplies = false;
+		assertTrue("blighted supplies follow the combat supplies setting", builder.build(tab("magic"), owned, off)
+			.getSections().stream().noneMatch(s -> s.getKey().startsWith("blighted")));
+	}
+
+	static int row(int[] layout, int itemId)
+	{
+		for (int i = 0; i < layout.length; i++)
+		{
+			if (layout[i] == itemId)
+			{
+				return i / LayoutPlanner.WIDTH;
+			}
+		}
+		throw new AssertionError("not laid out: " + itemId);
+	}
+
+	@Test
 	public void emptyBankBuildsEmptyTabs()
 	{
 		for (TabData.Tab t : data.tabs)

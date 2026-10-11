@@ -9,7 +9,7 @@ Ultimate Bank Tabs builds bank tag tabs from what you own. Each combat style get
   - Ranged: dragonbane, demonbane, blowpipe and multi-target weapons.
   - Magic: an ancient spellbook staff and a standard spellbook staff.
 
-  Then come your special attack weapons, the right ammunition for the launchers in the tab, and your best potions and food.
+  Then come your special attack weapons, the right ammunition for the launchers in the tab, and your best potions and food. Below those, after a blank row, are your **blighted supplies** (blighted food and super restores, plus the blighted spell sacks on the magic tab), which only work in the Wilderness and PvP areas.
 - **Movement.** Your most complete graceful set, stamina potions, teleport jewellery, diary rewards and other teleport items. It also has every teleport tablet and scroll, and the runes for teleport spells.
 - **Skills.** Prayer, Slayer, Agility, Thieving, Herblore, Crafting, Fletching, Hunter, Mining, Smithing, Fishing, Cooking, Firemaking, Woodcutting, Farming, Runecraft, Construction and Sailing. Each tab shows your best tools and skilling outfit, then the supplies you own for that skill, grouped and in level order. For example, Herblore shows each herb grimy then clean, then unfinished potions, potions and secondaries. At the bottom, after a blank row, each skill tab shows its **finished goods**: what the skill makes, grouped by what it is made from (potions, jewellery, d'hide, bows and arrows, smithed items, cooked food, runes and so on), plus logs, ores, gems, raw fish and hunter catches for the gathering skills.
 
@@ -27,7 +27,7 @@ Only items you own appear. That means your bank, including placeholders, potion 
 - Turn each tab on or off.
 - **Backups per slot**: also show the next best one to three items for each pick.
 - **Count worn & carried items** (on by default): gear you are wearing without a bank placeholder still gets its slot.
-- Potions and food in combat tabs, supplies and finished goods in skill tabs, and a blank row between sections.
+- Potions and food in combat tabs, **blighted supplies** in combat tabs, supplies and finished goods in skill tabs, and a blank row between sections.
 - **Tab icons**: skill icons (Attack for melee, Run for movement, the cosmetics tab keeps an item), or your best item for each tab.
 - **Remove tabs when turned off**: the plugin's tabs disappear when you turn it off and come back when you turn it on.
 - **Bring back replaced tabs**: puts back the tabs you had before the plugin replaced them.

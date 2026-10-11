@@ -122,6 +122,33 @@ def combat_supplies(boosts, restores=(), brews=()):
     ])
 
 
+# Blighted supplies only work in the Wilderness and PvP areas (Ferox Enclave, PvP worlds, Castle Wars, Clan Wars...),
+# so they get their own section. The bind, snare and wave sacks were merged into the entangle and surge sacks.
+BLIGHTED_SACKS = [
+    ("Blighted ancient ice sack", "Wilderness/PvP only: runes for one Ice spell (Ancient Magicks)"),
+    ("Blighted surge sack", "Wilderness/PvP only: runes for one Surge or Wave spell"),
+    ("Blighted entangle sack", "Wilderness/PvP only: runes for one Bind, Snare or Entangle"),
+    ("Blighted teleport spell sack", "Wilderness only: runes for one Tele Block or Teleport to Target"),
+    ("Blighted vengeance sack", "Wilderness/PvP only: runes for one Vengeance (Lunar)"),
+]
+
+
+def blighted_supplies(sacks=False):
+    """The blighted versions of the tab's supplies, a blank row below them ("separate"). The magic tab's
+    spell sacks follow on a row of their own: back-to-back "separate" sections share one block."""
+    return [
+        section("blighted", "Blighted supplies", "separate", [
+            first("blighted_boost", [("Blighted overload", "Deadman only: boosts Attack, Strength, Ranged and Magic")]),
+            first("blighted_restore",
+                  [("Blighted super restore", "Wilderness/PvP only: restores prayer and drained stats")]),
+            all_("blighted_food", [("Blighted anglerfish", "Wilderness/PvP only: heals 22 and can overheal"),
+                                   ("Blighted manta ray", "Wilderness/PvP only: heals 22")]),
+            first("blighted_karambwan", [("Blighted karambwan", "Wilderness/PvP only: combo food (heals 18)")]),
+        ]),
+    ] + ([section("blighted_sacks", "Blighted spell sacks", "separate", [all_("blighted_sacks", BLIGHTED_SACKS)])]
+         if sacks else [])
+
+
 def prayer_gear(profile):
     """Prayer bonus is situational: the highest-prayer item for every armour slot
     (blessings, god books, Ardougne cloak...), ties going to the better item for
@@ -206,6 +233,7 @@ MELEE = tab("melee", "Melee", "Abyssal whip", kind="gear", sections=[
         first("boost_str", ["Divine super strength potion", "Super strength", "Strength potion"],
               unless=["boost"]),
     ], restores=[all_("spec_restore", [])]),  # Surge potion (unique_uses.py)
+    *blighted_supplies(),
 ])
 
 # ---------------------------------------------------------------- ranged
@@ -346,6 +374,7 @@ RANGED = tab("ranged", "Ranged", "Magic shortbow", kind="gear", sections=[
     combat_supplies([
         first("boost", ["Divine bastion potion", "Divine ranging potion", "Bastion potion", "Ranging potion"]),
     ], restores=[all_("spec_restore", [])], brews=[all_("armadyl_brew", [])]),  # Surge potion, Armadyl brew
+    *blighted_supplies(),
 ])
 
 # ---------------------------------------------------------------- magic
@@ -449,6 +478,7 @@ MAGIC = tab("magic", "Magic", "Mystic air staff", kind="gear", sections=[
                         "Forgotten brew", "Ancient brew"]),
         first("heart", ["Saturated heart", "Imbued heart"]),
     ], restores=[all_("spec_restore", [])]),  # Surge potion (unique_uses.py)
+    *blighted_supplies(sacks=True),
     *enchanting(),
 ])
 

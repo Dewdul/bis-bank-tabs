@@ -27,6 +27,8 @@ import java.util.TreeMap;
  * Everything else follows in row sections, each starting on a fresh row. A
  * "sets" section (cosmetics) also keeps each outfit on one row when it fits,
  * "goods" sections (what a skill makes) come last, after one blank row,
+ * a "separate" section (blighted supplies) gets a blank row above it (one
+ * for a run of them) and keeps each pick on one row when it fits,
  * and runs of "columns" sections (herblore) go in bands of eight herbs: a row
  * each of grimy herbs, clean herbs, secondaries, unfinished potions and
  * potions, with every herb in the same column down its band.
@@ -115,7 +117,8 @@ class LayoutPlanner
 		for (TabBuilder.Section s : tab.getSections())
 		{
 			String l = s.getLayout();
-			if (("rows".equals(l) || "sets".equals(l) || "columns".equals(l) || "goods".equals(l) || "bottom".equals(l))
+			if (("rows".equals(l) || "sets".equals(l) || "columns".equals(l) || "goods".equals(l) || "bottom".equals(l)
+				|| "separate".equals(l))
 				&& !s.getItems().isEmpty())
 			{
 				rowSections.add(s);
@@ -124,16 +127,21 @@ class LayoutPlanner
 		List<String> columns = activeColumns(rowSections);
 		boolean first = !block;
 		boolean goodsStarted = false;
+		boolean lastSeparate = false;
 		for (int i = 0; i < rowSections.size(); i++)
 		{
 			TabBuilder.Section s = rowSections.get(i);
 			// finished goods (skill tabs) and "bottom" sections (magic tab enchanting) close the tab
 			boolean goods = "goods".equals(s.getLayout()) || "bottom".equals(s.getLayout());
+			// a "separate" section (blighted supplies) stands apart without starting the bottom;
+			// back-to-back separate sections (blighted spell sacks) share one block
+			boolean separate = "separate".equals(s.getLayout());
 			// finished goods sit at the bottom after a blank row, whatever the gap setting
-			if (gapRows && !first || goods && !goodsStarted && !first)
+			if (!first && (gapRows || separate && !lastSeparate || goods && !goodsStarted))
 			{
 				row++;
 			}
+			lastSeparate = separate;
 			goodsStarted |= goods;
 			first = false;
 			if ("columns".equals(s.getLayout()))
@@ -147,7 +155,7 @@ class LayoutPlanner
 				i = end;
 				continue;
 			}
-			boolean sets = "sets".equals(s.getLayout()) || "bottom".equals(s.getLayout());
+			boolean sets = "sets".equals(s.getLayout()) || "bottom".equals(s.getLayout()) || separate;
 			int col = 0;
 			List<List<TabBuilder.Placement>> chunks = sets ? groups(s.getItems()) : Arrays.asList(s.getItems());
 			for (List<TabBuilder.Placement> chunk : chunks)
