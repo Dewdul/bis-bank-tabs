@@ -495,7 +495,8 @@ public class UltimateBankTabsPlugin extends Plugin
 			}
 		}
 		else if (UltimateBankTabsConfig.GROUP.equals(event.getGroup()) && !event.getKey().startsWith("tagName_")
-			&& !event.getKey().startsWith(BankTagsWriter.PLANNED_PREFIX) && !INTERNAL_KEYS.contains(event.getKey()))
+			&& !event.getKey().startsWith(BankTagsWriter.PLANNED_PREFIX) && !event.getKey().startsWith(BankTagsWriter.HOME_PREFIX)
+			&& !INTERNAL_KEYS.contains(event.getKey()))
 		{
 			if ("tabIcons".equals(event.getKey()))
 			{
