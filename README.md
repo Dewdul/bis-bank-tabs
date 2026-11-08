@@ -19,6 +19,7 @@ Open the bank and it's done. There's nothing to tag, no setup to build and no ca
 - **An Alchables tab.** It lists what's worth High Alchemy, highest value first. An item only shows when alching beats selling it (or, for ironmen, beats the nature rune). It never suggests gear you use, teleports, charged items or raw materials. Right-click an item and pick *Remove-alch* to keep it off.
 - **Keeps up with you.** The Slayer tab follows your task. Unread prayer scrolls, the Horn of Bran and spell fragments get their own "Unlocks to use" row, and new raid gear lands in the right tab.
 - **Your arrangement stays.** Drag items wherever you like; only a new best-in-slot item takes its cell back. It writes no item tags.
+- **It tells you about clashes.** If a plugin that rearranges the same tabs is on (Auto Bank Sorter, Bank Assistant, Bank Sorter or Sorted Bank), it names that plugin and says what it does, so your tabs don't get fought over.
 
 ## Tabs
 
@@ -80,7 +81,12 @@ Only items you own appear. That means your bank, including placeholders, potion 
   - *Turn plugin off*.
 
   Your items keep their tags, so `tag:` searches still work, and any removed tabs are backed up: *Bring back replaced tabs* in the settings puts them back.
-- Plugins that fight over the same tabs (Auto Bank Sorter, Bank Assistant, Bank Sorter, Sorted Bank) get a warning in chat when you open the bank.
+- **It warns you about plugins that clash with it.** Four hub plugins rearrange the same tabs:
+  - Auto Bank Sorter makes its own skill tabs;
+  - Bank Assistant lays out the bank its own way;
+  - Bank Sorter and Sorted Bank re-sort the items inside tabs.
+
+  If one of them is on, the first-run dialog names it before anything is replaced. After that, the first time you open the bank each time RuneLite starts, a chat message says which plugin it is and what it does. That way you can turn one off before they fight over your tabs.
 - The tab menu options work on the plugin's tabs too:
   - **Rename** keeps the tab working under its new name.
   - **Change icon** keeps your pick. Change the *Tab icons* setting to give icons back to the plugin.
