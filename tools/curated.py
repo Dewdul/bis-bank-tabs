@@ -1,4 +1,4 @@
-"""Hand-curated tab definitions for No Brain Bank Tabs.
+"""Hand-curated tab definitions for BiS Bank Tabs.
 
 Names are OSRS Wiki *page* names (case-insensitive). A page covers every
 version of an item (charges, doses, charged/uncharged), so "Amulet of glory"
@@ -123,8 +123,35 @@ ANTIFIRE = [("Extended super antifire", "Full dragonfire immunity for 6 minutes"
             ("Super antifire potion", "Full dragonfire immunity for 3 minutes"),
             ("Extended antifire", "Partial dragonfire protection for 12 minutes"),
             ("Antifire potion", "Partial dragonfire protection for 6 minutes")]
-RESTORE = [("Super restore", "Restores prayer and stats drained by attacks"), ("Prayer potion", "Restores prayer"),
-           ("Prayer regeneration potion", "Restores prayer gradually over time")]
+RESTORE = [("Super restore", "Restores prayer and stats drained by attacks"),
+           ("Sanfew serum", "A super restore that also cures poison and disease"),
+           ("Prayer potion", "Restores prayer"),
+           ("Prayer regeneration potion", "Restores prayer gradually over time"),
+           ("Menaphite remedy", "Keeps restoring drained stats (not prayer) for a few minutes")]
+
+DIVINE = "Divine: the boost holds for 5 minutes (costs 10 HP)"
+
+
+def melee_boosts():
+    """Every melee boost worth bringing. Divine and regular are a trade-off, so both show. The single-stat
+    potions only show without a super combat, which boosts all three at once; within each kind only the best
+    tier (super attack outranks attack)."""
+    combined = ["boost_divine", "boost"]
+    out = [
+        first("boost_divine", [("Divine super combat potion", DIVINE + ": Attack, Strength and Defence")]),
+        first("boost", [("Super combat potion", "Boosts Attack, Strength and Defence")]),
+    ]
+    for key, divine, tiers_ in [("att", "Divine super attack potion", ["Super attack", "Attack potion"]),
+                                ("str", "Divine super strength potion", ["Super strength", "Strength potion"]),
+                                ("def", "Divine super defence potion", ["Super defence", "Defence potion"])]:
+        out.append(first("boost_%s_divine" % key, [(divine, DIVINE)], unless=combined))
+        # with cheaper alternatives on they show beside a super combat too: it uses them up (and a torstol)
+        out.append(first("boost_" + key, tiers_, unless=combined, budgetKeeps=True))
+    # a combat potion only stands in when nothing above boosts Attack or Strength
+    out.append(first("boost_combat", [("Combat potion", "Boosts Attack and Strength")],
+                     unless=combined + ["boost_att_divine", "boost_att", "boost_str_divine", "boost_str"],
+                     budgetKeeps=True))
+    return out
 
 ELEMENTAL_RUNES = ["Fire rune", "Water rune", "Air rune", "Earth rune"]
 # by Runecraft level
@@ -189,6 +216,23 @@ def prayer_gear(profile):
                 slots=["HEAD", "CAPE", "AMULET", "AMMO", "BODY", "SHIELD", "LEGS", "GLOVES", "BOOTS", "RING"])
 
 
+TRADEOFF_SLOTS = ["HEAD", "CAPE", "AMULET", "BODY", "SHIELD", "LEGS", "GLOVES", "BOOTS", "RING"]
+
+
+def tradeoffs(profile):
+    """Beside each best-in-slot item, what you own that beats it at max hit or at accuracy while giving up the
+    other (a strength amulet beside fury, a bellator ring beside the ultor). TabBuilder.tradeoffs works them out
+    from the item stats; last in the Situational section, so curated picks keep the cells beside the block first."""
+    return dict(key="tradeoffs", mode="tradeoffs", profile=profile, entries=[], slots=TRADEOFF_SLOTS)
+
+
+def one_hand(profile, entries=(), fallback=None):
+    """With a two-handed best weapon and a shield in the set, the best one-handed weapon you own (melee: by the
+    damage model; ranged and magic: the first in the weapon list), unless another pick shows it already."""
+    return dict(key="onehand", mode="onehand", profile=profile, slot="WEAPON", entries=list(entries),
+                fallback=fallback)
+
+
 def situational_common(imbued_only):
     helms = IMBUED_SLAYER_HELMS + ([] if imbued_only else SLAYER_HELMS) + \
         ["Black mask (i)"] + ([] if imbued_only else ["Black mask"])
@@ -230,11 +274,15 @@ MELEE = tab("melee", "Melee", "Abyssal whip", kind="gear", sections=[
                           ("LEGS", ["Obsidian platelegs"]), ("AMULET", ["Berserker necklace"])],
              requires=["Tzhaar-ket-om", "Toktz-xil-ak", "Toktz-xil-ek", "Tzhaar-ket-em"]),
         first("lightbearer", ["Lightbearer"], slot="RING"),
+        first("rondache", [("Rondache", "Tank shield: +8 strength, high defences and +2 flat armour; blocked damage"
+                                        " charges its special attack")], slot="SHIELD"),
+        tradeoffs("melee"),
     ]),
     section("weapons", "Weapons", "rows", [
         weapon("stab", "stab"),
         weapon("slash", "slash"),
         weapon("crush", "crush"),
+        one_hand("melee"),
         first("dragonbane", ["Dragon hunter lance"]),
         first("demonbane", ["Emberlight", "Arclight", "Darklight", "Silverlight"]),
         first("kalphite", ["Keris partisan of breaching", "Keris partisan of the sun", "Keris partisan of corruption",
@@ -243,6 +291,10 @@ MELEE = tab("melee", "Melee", "Abyssal whip", kind="gear", sections=[
         first("leafbladed", ["Leaf-bladed battleaxe", "Leaf-bladed sword", "Leaf-bladed spear"]),
         first("wilderness", ["Ursine chainmace", "Viggora's chainmace"]),
         first("dharok", ["Dharok's greataxe"], requires=["Dharok's helm"]),
+        first("obligator", [("Obligator", "Crush: smash every 3 ticks, or thrust to hit up to three foes; charged, two"
+                                          " damage rolls and +20-40% on big targets")]),
+        first("ascension_shards", [("Ascension shards", "Charge the Obligator (with nature and death runes)")],
+              requires=["Obligator"]),
     ]),
     section("specials", "Special attacks", "rows", [
         # unique_uses.py spec groups take these places: damage, then defence drains, then support
@@ -259,12 +311,7 @@ MELEE = tab("melee", "Melee", "Abyssal whip", kind="gear", sections=[
                        "Bone dagger", "Dragon longsword", "Dragon mace", "Dragon scimitar", "Barrelchest anchor",
                        "Crimson kisten", "Saradomin's blessed sword", "Saradomin sword"]),
     ]),
-    *combat_supplies([
-        first("boost", ["Divine super combat potion", "Super combat potion", "Combat potion"]),
-        first("boost_att", ["Divine super attack potion", "Super attack", "Attack potion"], unless=["boost"]),
-        first("boost_str", ["Divine super strength potion", "Super strength", "Strength potion"],
-              unless=["boost"]),
-    ], restores=[all_("spec_restore", [])]),  # Surge potion (unique_uses.py)
+    *combat_supplies(melee_boosts(), restores=[all_("spec_restore", [])]),  # Surge potion (unique_uses.py)
     *blighted_supplies(),
 ])
 
@@ -297,6 +344,9 @@ ARROWS = ["Dragon arrow", "Amethyst arrow", "Rune arrow", "Adamant arrow", "Seek
 BOLTS = ["Ruby dragon bolts (e)", "Diamond dragon bolts (e)", "Dragonstone dragon bolts (e)", "Onyx dragon bolts (e)",
          "Ruby bolts (e)", "Diamond bolts (e)", "Dragonstone bolts (e)", "Onyx bolts (e)", "Dragon bolts",
          "Runite bolts", "Amethyst broad bolts", "Broad bolts", "Adamant bolts", "Mithril bolts", "Steel bolts", "Iron bolts", "Bronze bolts"]
+# the only ammo the ascension crossbows fire; enchanted effects trigger half as often from them
+ASCENSION_BOLTS = ["Diamond ascension bolts (e)", "Onyx ascension bolts (e)", "Ascension bolts", "Diamond ascension bolts",
+                   "Onyx ascension bolts"]
 JAVELINS = ["Dragon javelin", "Amethyst javelin", "Rune javelin", "Adamant javelin", "Mithril javelin"]
 DARTS = ["Dragon dart", "Amethyst dart", "Rune dart", "Adamant dart", "Mithril dart", "Black dart", "Steel dart"]
 
@@ -305,6 +355,7 @@ DARTS = ["Dragon dart", "Amethyst dart", "Rune dart", "Adamant dart", "Mithril d
 RANGED_WEAPONS = [
     ("Twisted bow", "arrow"),
     ("re:^Bow of Faerdhinen(?: \\(c\\)(?: \\((?:Amlodd|Cadarn|Crwys|Iorwerth|Ithell|Meilyr|Trahaearn)\\))?)?$", None),
+    ("Ascension crossbows", "ascension"),
     ("Zaryte crossbow", "bolt"),
     ("Toxic blowpipe", None),
     ("Blazing blowpipe", None),
@@ -338,6 +389,7 @@ AMMO_CLASSES = {
     "javelin": JAVELINS,
     "atlatl": ["Atlatl dart"],
     "antler": ["Sunlight antler bolts", "Moonlight antler bolts"],
+    "ascension": ASCENSION_BOLTS,
 }
 
 RANGED = tab("ranged", "Ranged", "Magic shortbow", kind="gear", sections=[
@@ -361,8 +413,10 @@ RANGED = tab("ranged", "Ranged", "Magic shortbow", kind="gear", sections=[
                       ("GLOVES", ["Void knight gloves"])], complete=True),
         set_("eclipse_moon", [("HEAD", ["Eclipse Moon helm"]), ("BODY", ["Eclipse Moon chestplate"]),
                               ("LEGS", ["Eclipse Moon tassets"])], requires=["Eclipse atlatl"]),
+        tradeoffs("ranged"),
     ]),
     section("weapons", "Weapons", "rows", [
+        one_hand("ranged", [w for w, _ in RANGED_WEAPONS], fallback="ranged"),
         # keys match unique_uses.py groups so they replace these picks in place
         first("dragonbane_ranged", ["Dragon hunter crossbow"]),
         first("demonbane_ranged", ["Scorching bow"]),
@@ -387,7 +441,7 @@ RANGED = tab("ranged", "Ranged", "Magic shortbow", kind="gear", sections=[
                        "Seercull"]),
     ]),
     section("ammo", "Ammunition", "rows", [
-        first("arrows", ARROWS, requires=BOWS, placed=True),
+        first("arrows", ARROWS, requires=BOWS, placed=True, cheaper=True),
         # every useful bolt you own: enchanted bolts in enchant order (dragon first), broad, plain, silver
         all_("bolts_enchanted", ENCHANTED_BOLTS, requires=CROSSBOWS, placed=True),
         all_("bolts_sapphire", [], requires=CROSSBOWS, placed=True),  # unique_uses.py, already covered above
@@ -397,21 +451,33 @@ RANGED = tab("ranged", "Ranged", "Magic shortbow", kind="gear", sections=[
         all_("bolts", ["Dragon bolts", "Runite bolts", "Adamant bolts", "Mithril bolts", "Steel bolts",
                        "Iron bolts", "Bronze bolts"], requires=CROSSBOWS, placed=True),
         all_("silver_bolts", [("Silver bolts", "Silver bolts: damage vampyres")], requires=CROSSBOWS, placed=True),
+        all_("ascension_bolts", [
+            ("Diamond ascension bolts (e)", "Armour piercing (triggers half as often from ascension crossbows)"),
+            ("Onyx ascension bolts (e)", "Life leech (triggers half as often from ascension crossbows)"),
+            ("Ascension bolts", "Ascension crossbows ammo"),
+            ("Diamond ascension bolts", "Unenchanted: Enchant Crossbow Bolt (Magic 57)"),
+            ("Onyx ascension bolts", "Unenchanted: Enchant Crossbow Bolt (Magic 87)"),
+        ], requires=["Ascension crossbows"], placed=True),
         first("antler_bolts", ["Sunlight antler bolts", "Moonlight antler bolts"],
               requires=["Hunters' sunlight crossbow"], placed=True),
-        first("javelins", JAVELINS, requires=["Heavy ballista", "Light ballista"], placed=True),
-        first("darts", DARTS, requires=["Toxic blowpipe", "Blazing blowpipe"], placed=True),
+        first("javelins", JAVELINS, requires=["Heavy ballista", "Light ballista"], placed=True, cheaper=True),
+        first("darts", DARTS, requires=["Toxic blowpipe", "Blazing blowpipe"], placed=True, cheaper=True),
         first("atlatl_darts", ["Atlatl dart"], requires=["Eclipse atlatl"], placed=True),
     ]),
     *combat_supplies([
-        first("boost", ["Divine bastion potion", "Divine ranging potion", "Bastion potion", "Ranging potion"]),
+        # divine and regular are a trade-off (a boost that holds for 5 minutes for 10 HP), so both show;
+        # bastion is ranging plus defence, so it outranks ranging within each
+        first("boost_divine", [("Divine bastion potion", DIVINE + ": Ranged and Defence"),
+                               ("Divine ranging potion", DIVINE + ": Ranged")]),
+        first("boost", [("Bastion potion", "Boosts Ranged and Defence"), ("Ranging potion", "Boosts Ranged")],
+              cheaper=True),
     ], restores=[all_("spec_restore", [])], brews=[all_("armadyl_brew", [])]),  # Surge potion, Armadyl brew
     *blighted_supplies(),
 ])
 
 # ---------------------------------------------------------------- magic
 
-POWERED_STAVES = ["Tumeken's shadow", "Eye of Ayak", "Holy sanguinesti staff", "Sanguinesti staff",
+POWERED_STAVES = ["Tumeken's shadow", "Eye of Ayak", "Zorya's tome", "Holy sanguinesti staff", "Sanguinesti staff",
                   "Trident of the Swamp (e) (o)", "Trident of the Swamp (e)", "Trident of the Swamp (o)",
                   "Trident of the Swamp", "Warped sceptre", "Trident of the Seas (e) (o)", "Trident of the Seas (e)",
                   "Trident of the Seas (o)", "Trident of the Seas"]
@@ -447,7 +513,9 @@ def enchanting():
             jewellery_groups.append(gem)
     bolts, bolt_groups = [], []
     for gem, level in ENCHANT_BOLTS:
-        for name in ("%s bolts" % gem, "%s dragon bolts" % gem):
+        # the ascension crossbows' bolts come diamond- and onyx-tipped too
+        for name in ("%s bolts" % gem, "%s dragon bolts" % gem) + (("%s ascension bolts" % gem,)
+                                                                     if gem in ("Diamond", "Onyx") else ()):
             bolts.append((name, "Unenchanted: Enchant Crossbow Bolt (Magic %d)" % level))
             bolt_groups.append(gem)
     return [
@@ -481,8 +549,10 @@ MAGIC = tab("magic", "Magic", "Mystic air staff", kind="gear", sections=[
         set_("blue_moon", [("HEAD", ["Blue Moon helm"]), ("BODY", ["Blue Moon chestplate"]),
                            ("LEGS", ["Blue Moon tassets"])], requires=["Blue Moon spear"]),
         all_("tomes", ["Tome of Fire", "Tome of Water", "Tome of Earth"], slot="SHIELD"),
+        tradeoffs("magic"),
     ]),
     section("weapons", "Weapons", "rows", [
+        one_hand("magic", POWERED_STAVES + ANCIENT_STAVES + STANDARD_STAVES, fallback="magic"),
         # keys match unique_uses.py groups so they replace these picks in place
         first("ancients", ANCIENT_STAVES),
         first("standard", STANDARD_STAVES),
@@ -496,7 +566,23 @@ MAGIC = tab("magic", "Magic", "Mystic air staff", kind="gear", sections=[
         # unique_uses.py spec groups take these places; the broader lists come after so their reasons win
         all_("spec_magic_burst", []), all_("spec_magic_def_drain", []), all_("spec_prayer_restore", []),
         all_("power_of_death", []), all_("magic_specs", []),
-        all_("specs", ["Volatile Nightmare staff", "Eldritch Nightmare staff", "Accursed sceptre"]),
+        all_("specs", ["Volatile Nightmare staff", "Eldritch Nightmare staff", "Accursed sceptre",
+                       ("Zorya's tome", "Spec (50%): Zorya's flow, +150% accuracy and +60% damage, then three faster"
+                                        " buffed casts")]),
+    ]),
+    section("unlocks", "Unlocks to use", "rows", [
+        all_("unlocks", [
+            ("Fragment of whispering wind", "Break it: wind spells hit 2 higher, for good"),
+            ("Fragment of deep water", "Break it: water spells hit 2 higher, for good"),
+            ("Fragment of living earth", "Break it: earth spells hit 2 higher, for good"),
+            ("Fragment of burning fire", "Break it: fire spells hit 2 higher, for good"),
+            ("Rite of vile transference", "Read it: Death Charge restores special attack from two targets"),
+            ("Ardougne teleport scroll", "Read it to unlock Ardougne Teleport (51 Magic)"),
+            ("Target teleport scroll", "Read it to unlock Teleport to Target (85 Magic)"),
+            ("Ash covered tome", "Read it: Fertile Soil works like ultracompost"),
+            ("Runescroll of swampbark", "Read it to unlock crafting swampbark armour"),
+            ("Runescroll of bloodbark", "Read it to unlock crafting bloodbark armour"),
+        ]),
     ]),
     # every rune, a row per kind: elemental (and the pouch), then utility with Law under Fire, then the combat
     # runes, then the combination runes, each by Runecraft level
@@ -514,8 +600,14 @@ MAGIC = tab("magic", "Magic", "Mystic air staff", kind="gear", sections=[
         all_("runes_combo", COMBO_RUNES + ["Aether rune"]),
     ]),
     *combat_supplies([
-        first("boost", ["Divine magic potion", "Magic potion", "Divine battlemage potion", "Battlemage potion",
-                        "Forgotten brew", "Ancient brew"]),
+        # divine and regular both show (see ranged); battlemage is magic plus defence. The brews are their own
+        # kind: a bigger Magic boost for melee stats, ancient brew restoring prayer too
+        first("boost_divine", [("Divine battlemage potion", DIVINE + ": Magic and Defence"),
+                               ("Divine magic potion", DIVINE + ": Magic")]),
+        first("boost", [("Battlemage potion", "Boosts Magic and Defence"), ("Magic potion", "Boosts Magic")],
+              cheaper=True),
+        first("brew_magic", [("Forgotten brew", "Boosts Magic more than a magic potion; drains melee stats"),
+                             ("Ancient brew", "Boosts Magic and restores prayer; drains melee stats")], cheaper=True),
         first("heart", ["Saturated heart", "Imbued heart"]),
     ], restores=[all_("spec_restore", [])]),  # Surge potion (unique_uses.py)
     *blighted_supplies(sacks=True),
@@ -600,7 +692,7 @@ TELEPORT_TABLETS = [
 MOVEMENT = tab("movement", "Movement", "Graceful boots", kind="movement", sections=[
     *light_gear(),
     section("run", "Run energy", "rows", [
-        first("energy", ENERGY),
+        first("energy", ENERGY, cheaper=True),
     ]),
     # teleport jewellery like the Crafting tab: silver (jade, red topaz), then gold in gem order
     # (sapphire, emerald, ruby, dragonstone: ring, necklace, bracelet, amulet), then everything else
@@ -642,6 +734,9 @@ MOVEMENT = tab("movement", "Movement", "Graceful boots", kind="movement", sectio
         all_("items", ["Icy basalt", "Stony basalt", "Pharaoh's sceptre"]),
         first("skull", ["Skull sceptre (i)", "Skull sceptre"]),
         first("chronicle", ["Chronicle"]),
+        first("folio", [("Archivist's folio", "Teleports to the Fractured Archive (charged with ascension shards)")]),
+        first("folio_shards", [("Ascension shards", "Five teleport charges each for the archivist's folio")],
+              requires=["Archivist's folio"]),
         first("memoirs", ["Book of the Dead", "Kharedst's memoirs"]),
         first("crystal", ["Eternal teleport crystal", "Teleport crystal"]),
         first("quetzal", ["Perfected quetzal whistle(i)", "Perfected quetzal whistle", "Enhanced quetzal whistle",
@@ -766,6 +861,16 @@ PRAYER = tab("prayer", "Prayer", "Dragon bones", sections=[
         outfit("zealot", [("HEAD", ["Zealot's helm"]), ("BODY", ["Zealot's robe top"]),
                           ("LEGS", ["Zealot's robe bottom"]), ("BOOTS", ["Zealot's boots"])], why=ZEALOT),
     ]),
+    section("unlocks", "Unlocks to use", "rows", [
+        all_("unlocks", [
+            ("Horn of Bran", "Take it to Camelot to unlock the Zeal prayer"),
+            ("Dexterous prayer scroll", "Read it to unlock Rigour (74 Prayer, 70 Defence)"),
+            ("Arcane prayer scroll", "Read it to unlock Augury (77 Prayer, 70 Defence)"),
+            ("Torn prayer scroll", "Read it to unlock Preserve (55 Prayer)"),
+            ("Deadeye prayer scroll", "Read it to unlock Deadeye (62 Prayer)"),
+            ("Mystic vigour prayer scroll", "Read it to unlock Mystic Vigour (63 Prayer)"),
+        ]),
+    ]),
     section("bones", "Bones", "rows", [
         # by Prayer experience, lowest first (tier order, like every other tab)
         all_("bones", ["Bones", "Wolf bones", "Monkey bones", "Bat bones", "Big bones", "Jogre bones",
@@ -870,13 +975,17 @@ SLAYER = tab("slayer", "Slayer", "Enchanted gem", sections=[
         all_("giant_mole", []),
         all_("dks_solo", []),
         all_("gwd_key", []),
+        first("anchoring", [("Teleport anchoring scroll", "Read it: elder chaos druids and abyssal demons can't"
+                                                          " teleport you any more")]),
+        first("saradomins_light", [("Saradomin's light", "Use it to lift the darkness in Zamorak's fortress (God Wars)"
+                                                         " for good")]),
     ]),
     section("cannon", "Cannon", "rows", [
         first("cannon_base", ["Cannon base (or)", "Cannon base"]),
         first("cannon_stand", ["Cannon stand (or)", "Cannon stand"]),
         first("cannon_barrels", ["Cannon barrels (or)", "Cannon barrels"]),
         first("cannon_furnace", ["Cannon furnace (or)", "Cannon furnace"]),
-        first("cannonball", ["Granite cannonball", "Steel cannonball"]),
+        first("cannonball", ["Granite cannonball", "Steel cannonball"], cheaper=True),
     ]),
 ])
 
@@ -1064,7 +1173,7 @@ AGILITY = tab("agility", "Agility", "Graceful hood", sections=[
     # Karamja gloves and the ring of Charos (unique_uses.py) beside the lightest gear
     *light_gear([all_("karamja_gloves", [], slot="GLOVES"), all_("werewolf_course", [], slot="RING")]),
     section("gear", "Gear", "rows", [
-        first("energy", ENERGY),
+        first("energy", ENERGY, cheaper=True),
         first("pie", ["Summer pie"]),
         first("agility_potion", ["Agility potion"]),
     ]),
@@ -1288,20 +1397,93 @@ CONSTRUCTION = tab("construction", "Construction", "Saw", sections=[
     ]),
 ])
 
+# Sailing items from the OSRS Wiki (Sailing category, Sailing collection log and the Facilities page, November 2026)
+SCHEMATICS = ["Salvaging station", "Gale catcher", "Eternal brazier", "Rosewood cargo hold", "Rosewood hull",
+              "Rosewood & cotton sails", "Dragon helm", "Dragon keel", "Dragon salvaging hook", "Dragon cannon",
+              "Ballistic attractor", "Bosun's workbench"]
+BOAT_PAINTS = ["Barracuda paint", "Shark paint", "Inky paint", "Angler's paint", "Salvor's paint", "Armadylean paint",
+               "Zamorakian paint", "Guthixian paint", "Saradominist paint", "Merchant's paint", "Sandy paint"]
+SEA_RELICS = ["Rusty locket", "Mouldy block", "Dull knife", "Broken compass", "Rusty coin", "Broken sextant",
+              "Mouldy doll", "Smashed mirror"]
+CLAM_PEARLS = ["Tiny pearl", "Small pearl", "Shiny pearl", "Bright pearl", "Big pearl", "Huge pearl", "Enormous pearl",
+               "Shimmering pearl", "Glistening pearl", "Brilliant pearl", "Radiant pearl"]
+TRAWLING_TROPHIES = ["Giant blue krill", "Golden haddock", "Orangefin", "Huge halibut", "Purplefin", "Swift marlin"]
+
 SAILING = tab("sailing", "Sailing", "Rope", sections=[
     section("gear", "Gear", "rows", [
         first("hammer", ["Imcando hammer", "Hammer"]),
         *SAWS,
         cape("Sailing cape"),
+        first("hood", [("Sailing hood", "Sailing skillcape hood")]),
+        first("narwhal_knife", [("Narwhal horn knife", "Builds a chum spreader on your boat; works as a knife too")]),
+    ]),
+    # Barracuda Trials rewards that build a boat facility and are never used up
+    section("facility_parts", "Facility parts", "rows", [
+        all_("facility_parts", [
+            ("Barrel stand", "Reusable: builds a keg on your boat (Tempor Tantrum)"),
+            ("Captured wind mote", "Reusable: builds a wind catcher or gale catcher (Jubbly Jive)"),
+            ("Heart of Ithell", "Reusable: builds a crystal extractor (Gwenith Glide)"),
+            ("Ralph's fabric roll", "Reusable: builds a storm chaser's flag (Tempor Tantrum)"),
+            ("Gurtob's fabric roll", "Reusable: builds a swamp cruiser's flag (Jubbly Jive)"),
+            ("Gwyna's fabric roll", "Reusable: builds a crystal glider's flag (Gwenith Glide)"),
+        ]),
+    ]),
+    # rare drops a facility uses up, one each
+    section("facility_drops", "Facility drops", "rows", [
+        all_("facility_drops", [
+            ("Bottled storm", "Builds a greater teleport focus (armoured and vampyre krakens)"),
+            ("Swift albatross feather", "Five build a gale catcher (albatrosses)"),
+            ("Echo pearl", "Builds a fathom pearl (dolphins and orcas)"),
+            ("Ray barbs", "Build hemp and cotton trawling nets (rays)"),
+            ("Broken dragon hook", "Builds a dragon salvaging hook (great white sharks)"),
+            ("Dragon cannon barrel", "Builds a dragon cannon (opulent salvage, veiled krakens)"),
+            ("Narwhal horn", "Craft it into a narwhal horn knife (51 Crafting, chisel)"),
+        ]),
+    ]),
+    section("schematics", "Lost schematics", "rows", [
+        all_("schematics", [(n + " schematic", "Lost schematic: read it to unlock building the " + n[0].lower() + n[1:])
+                            for n in SCHEMATICS]),
+    ]),
+    section("paints", "Boat paints", "rows", [
+        all_("paints", [(p, "Boat paint: trims your boat at the shipyard (25 Sailing, 20 Construction)")
+                        for p in BOAT_PAINTS]),
+    ]),
+    section("keys", "Trial keys", "rows", [
+        all_("trial_keys", [
+            ("Stormy key", "Opens the chest in Pandemonium Cave: the storm cruiser's outfit"),
+            ("Fetid key", "Opens the chest on Anglers' Retreat (52 Agility): the swamp cruiser's outfit"),
+            ("Serrated key", "Opens the chest on Laguna Aurorae (61 Agility)"),
+        ]),
     ]),
     section("outfit", "Outfit", "rows", [
         outfit("glider", [("HEAD", ["Crystal glider's hat"]), ("BODY", ["Crystal glider's jacket"]),
                           ("LEGS", ["Crystal glider's trousers"]), ("BOOTS", ["Crystal glider's shoes"])]),
+        outfit("storm_cruiser", [("HEAD", ["Storm cruiser's hat"]), ("BODY", ["Storm cruiser's coat"]),
+                                 ("LEGS", ["Storm cruiser's trousers"])]),
+        outfit("swamp_cruiser", [("HEAD", ["Swamp cruiser's hat"]), ("BODY", ["Swamp cruiser's jacket"]),
+                                 ("LEGS", ["Swamp cruiser's trousers"])]),
+    ]),
+    section("treasures", "Sea treasures", "rows", [
+        all_("medallion", [("Medallion fragment", "Eight of them make the Medallion of the Deep")]),
+        all_("relics", [(n, "Relic: hand it to Curator Haig Halen at the Varrock Museum (Kudos, antique lamp)")
+                        for n in SEA_RELICS]),
+        all_("pearls", [(n, "Giant clam pearl (collection log)") for n in CLAM_PEARLS]),
+        all_("trophies", [(n, "Rare catch: the Canifis taxidermist stuffs it for your house")
+                          for n in TRAWLING_TROPHIES]),
+        first("squid_beak", [("Squid beak", "Wooden blowpipe material")]),
+        first("salvage_lamp", [("Antique lamp (salvaging)", "XP lamp from handing in sea relics: rub it for XP")]),
     ]),
 ])
 
+# Items worth alching, built in game from live prices (TabBuilder.alch): what you hold that no other tab uses,
+# where High Alchemy beats selling, highest High Alch value first. Nothing to curate.
+ALCHABLES = tab("alchables", "Alchables", "Nature rune", kind="alch", sections=[
+    section("alch", "Alchables", "rows", []),
+])
+
 TABS = [MELEE, RANGED, MAGIC, MOVEMENT, PRAYER, SLAYER, AGILITY, THIEVING, HERBLORE, CRAFTING, FLETCHING, HUNTER,
-        MINING, SMITHING, FISHING, COOKING, FIREMAKING, WOODCUTTING, FARMING, RUNECRAFT, CONSTRUCTION, SAILING]
+        MINING, SMITHING, FISHING, COOKING, FIREMAKING, WOODCUTTING, FARMING, RUNECRAFT, CONSTRUCTION, SAILING,
+        ALCHABLES]
 
 
 # ---------------------------------------------------------------- unique uses
@@ -1514,7 +1696,7 @@ SUPPLY_RULES = [
         ("Ores", r"(?i) ore$|^Coal$",
          ["Copper ore", "Tin ore", "Blurite ore", "Iron ore", "Silver ore", "Lead ore", "Coal", "Gold ore",
           "Lovakite ore", "Mithril ore", "Adamantite ore", "Nickel ore", "Runite ore"]),
-        ("Bars", r"(?i) bar$"),
+        ("Bars", r"(?i) bar$|ingot$"),
     ]),
     ("Cooking", "cooking", [
         # by Cooking level; then crab meat, Camdozaal offering fish, and minigame-only fish
@@ -1610,7 +1792,6 @@ SUPPLY_RULES = [
          ["Swamp tar", "Lead bar", "Cupronickel bar"]),
         ("Yarn & sail cloth", r"(?i)^(Bolt of (linen|canvas|cotton)|.* yarn)$",
          ["Linen yarn", "Hemp yarn", "Cotton yarn", "Bolt of linen", "Bolt of canvas", "Bolt of cotton"]),
-        ("Fabric rolls", r"(?i) fabric roll$", ["Ralph's fabric roll", "Gurtob's fabric roll", "Gwyna's fabric roll"]),
     ]),
 ]
 
@@ -1632,6 +1813,48 @@ SITUATIONAL_ONLY = [
     "re:^(Holy book|Unholy book|Book of (Balance|Law|War|Darkness)|Damaged book)",
     r"re:^Ardougne (cloak \d|max cape)",
 ]
+
+# Gear that uses charges up, or degrades, as you fight or skill with it, and what keeping it going costs. From the
+# OSRS Wiki's "Items with charges" category and its Barrows equipment pages (checked November 2026). Left out:
+# teleport and utility charges (jewellery, recoil, bracelets), charges that only feed a side effect (Iban Blast, the
+# slayer's staff's Magic Dart, a dragonfire ward's special), and gear that still works uncharged (Dizana's quiver,
+# the venator bow, Tonalztics of Ralos, the toxic staff of the dead). With cheaper alternatives on, the best item
+# that needs none stands beside one of these (TabBuilder.uncharged).
+_BARROWS = ["Ahrim's hood", "Ahrim's robetop", "Ahrim's robeskirt", "Ahrim's staff", "Dharok's helm",
+            "Dharok's platebody", "Dharok's platelegs", "Dharok's greataxe", "Guthan's helm", "Guthan's platebody",
+            "Guthan's chainskirt", "Guthan's warspear", "Karil's coif", "Karil's leathertop", "Karil's leatherskirt",
+            "Karil's crossbow", "Torag's helm", "Torag's platebody", "Torag's platelegs", "Torag's hammers",
+            "Verac's helm", "Verac's brassard", "Verac's plateskirt", "Verac's flail"]
+_CRYSTAL = ["Blade of Saeldor", "Bow of Faerdhinen", "Crystal bow", "Crystal halberd", "Crystal helm", "Crystal body",
+            "Crystal legs", "Crystal shield", "Crystal axe", "Crystal felling axe",
+            "Crystal pickaxe", "Crystal harpoon"]
+_ETHER = ["Craw's bow", "Webweaver bow", "Viggora's chainmace", "Ursine chainmace", "Thammaron's sceptre",
+          "Thammaron's sceptre (a)", "Accursed sceptre", "Accursed sceptre (a)", "Bracelet of ethereum"]
+_SCALES = ["Toxic blowpipe", "Blazing blowpipe", "Serpentine helm", "Tanzanite helm", "Magma helm"]
+CHARGED = [
+    ("Scythe of Vitur", "blood runes and vials of blood"), ("Holy scythe of vitur", "blood runes and vials of blood"),
+    ("Sanguine scythe of vitur", "blood runes and vials of blood"),
+    ("Sanguinesti staff", "blood runes"), ("Holy sanguinesti staff", "blood runes"),
+    ("Tumeken's shadow", "soul and chaos runes"),
+    ("Trident of the Seas", "death, chaos and fire runes and coins"),
+    ("Trident of the Seas (e)", "death, chaos and fire runes and coins"),
+    ("Trident of the Swamp", "death, chaos and fire runes and zulrah's scales"),
+    ("Trident of the Swamp (e)", "death, chaos and fire runes and zulrah's scales"),
+    ("Warped sceptre", "earth and chaos runes"),
+    ("Eye of Ayak", "demon tears, or death and chaos runes"),
+    ("Zorya's tome", "astral and nature runes"),
+    ("Obligator", "ascension shards and nature and death runes"),
+    ("Bone staff", "chaos runes"),
+    ("Abyssal tentacle", "a new kraken tentacle every 10,000 hits"),
+    ("Amulet of blood fury", "blood shards"),
+    ("Arclight", "ancient shards"),
+    ("Tome of Fire", "burnt pages"), ("Tome of Water", "soaked pages"), ("Tome of Earth", "soiled pages"),
+    ("Infernal axe", "smouldering stones"), ("Infernal pickaxe", "smouldering stones"),
+    ("Infernal harpoon", "smouldering stones"),
+] + [(n, "zulrah's scales" + (" and darts" if "blowpipe" in n else "")) for n in _SCALES] \
+  + [(n, "crystal shards") for n in _CRYSTAL] \
+  + [(n, "revenant ether") for n in _ETHER] \
+  + [(n, "repairs (coins) as it degrades") for n in _BARROWS]
 
 # Melee weapons kept out of the damage-model picks (situational picks cover them).
 EXCLUDE_MELEE_WEAPON = [
@@ -1656,7 +1879,13 @@ MELEE_DOUBLE_ACCURACY = ["Osmumten's fang"]
 # ---------------------------------------------------------------- cosmetics
 # The cosmetics tab is generated from wiki categories and zero-stat clothing
 # (see cosmetics_tab in generate_data.py); these rules steer it.
+# Never offered for alching: items you keep for their charges (teleport jewellery, recoil rings, binding necklaces,
+# slaughter bracelets...). Every page of these OSRS Wiki categories.
+NEVER_ALCH_CATEGORIES = ["Items with charges"]
+
 COSMETIC_ICON = "Red partyhat"
+# not wearable, but belongs with the cosmetics it unlocks
+COSMETIC_EXTRA = ["Archive key"]
 COSMETIC_CATEGORIES = ["Event rewards", "Cosmetics", "Ornament kits", "Random event rewards", "Treasure Trails rewards"]
 # clue rewards with combat stats only count when they are a cosmetic variant
 COSMETIC_VARIANT = r"\((?:g|t|h\d|gold|trimmed)\)$|^Gilded |^3rd Age |^Ring of 3rd age"
@@ -1764,5 +1993,8 @@ GOODS_LISTS = {
 }
 # supply sections that are really finished goods (moved to the goods area)
 GOODS_FROM_SUPPLIES = {"herblore": ["Potions"]}
+# supply rules that also take what the skill makes: a smelted bar is a Smithing supply even when only another skill
+# uses it (silver for Crafting, lead and cupronickel for Sailing), never a finished good
+SUPPLIES_FROM_PRODUCTS = {"smithing": ["Bars"]}
 # never finished goods: failed products, and raid/minigame-only items you can't bank
-EXCLUDE_GOODS = r"(?i)^(Burnt |Corrupted |Crystal paddlefish|Paddlefish|Token|Bridge section|Pipe section|Lumber patch|"                 r"Servery |Guanic bat|Prael bat|Giral bat|Phluxia bat|Kryket bat|Murng bat|Psykk bat|Pysk fish|"                 r"Suphi fish|Leckish fish|Brawk fish|Mycil fish|Roqed fish|Kyren fish|Refined tephra|.*\(Gauntlet\)|"                 r"Blade of Saeldor|Bow of Faerdhinen|Crystal (?:shield|halberd|helm|body|legs|bow|crown)|Godsword|"                 r"Zombie (?:axe|helmet)|Belle's folly|Torva |Elemental (?:helmet|shield)|"                 r"Mind (?:helmet|shield)|Enhanced crystal key|Escape crystal|Guardian essence|Bronze key)"
+EXCLUDE_GOODS = r"(?i)^(Burnt |Corrupted |Crystal paddlefish|Paddlefish|Token|Bridge section|Pipe section|Lumber patch|"                 r"Servery |Guanic bat|Prael bat|Giral bat|Phluxia bat|Kryket bat|Murng bat|Psykk bat|Pysk fish|"                 r"Suphi fish|Leckish fish|Brawk fish|Mycil fish|Roqed fish|Kyren fish|Refined tephra|.*\(Gauntlet\)|"                 r"Blade of Saeldor|Bow of Faerdhinen|Crystal (?:shield|halberd|helm|body|legs|bow|crown)|Godsword|"                 r"Zombie (?:axe|helmet)|Belle's folly|Torva |Elemental (?:helmet|shield)|"                 r"Mind (?:helmet|shield)|Enhanced crystal key|Escape crystal|Guardian essence|Bronze key|Guthix d'hide shield)"

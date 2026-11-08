@@ -72,6 +72,13 @@ ITEMS = [
     "Dragonfire ward", "Super antifire potion", "Leaf-bladed sword",
     # foods ranked by what they heal
     "Potato with cheese", "Lobster",
+    # trade-offs beside best in slot, and every potion worth bringing
+    "Amulet of fury", "Amulet of power", "Bellator ring", "Divine super combat potion", "Super attack",
+    "Super strength", "Divine super strength potion", "Divine ranging potion", "Bastion potion", "Ranging potion",
+    "Sanfew serum", "Combat potion",
+    # The Fractured Archive (raid, October 2026)
+    "Ascension crossbows", "Ascension bolts", "Diamond ascension bolts (e)", "Zorya's tome", "Rondache", "Obligator",
+    "Horn of Bran", "Fragment of whispering wind", "Archivist's folio", "Ascension shards",
 ]
 STAT_FIELDS = ["stab_attack_bonus", "slash_attack_bonus", "crush_attack_bonus", "range_attack_bonus",
                "magic_attack_bonus", "strength_bonus", "ranged_strength_bonus", "magic_damage_bonus", "prayer_bonus"]

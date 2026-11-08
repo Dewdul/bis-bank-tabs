@@ -79,6 +79,39 @@ final class Scoring
 		return score + 0.02 * s.getDefence();
 	}
 
+	/** The max-hit half of a style's profile: strength, ranged strength or magic damage (%). */
+	static double damage(String profile, EquipStats s)
+	{
+		switch (profile)
+		{
+			case MELEE:
+				return s.getStr();
+			case RANGED:
+				return s.getRstr();
+			case MAGIC:
+				return s.getMdmg();
+			default:
+				return 0;
+		}
+	}
+
+	/** The accuracy half of a style's profile; melee follows the main weapon's style, or averages all three. */
+	static double accuracy(String profile, EquipStats s, String meleeStyle)
+	{
+		switch (profile)
+		{
+			case MELEE:
+				return "any".equals(meleeStyle) ? (s.getStab() + s.getSlash() + s.getCrush()) / 3.0
+					: styleBonus(s, meleeStyle);
+			case RANGED:
+				return s.getRanged();
+			case MAGIC:
+				return s.getMagic();
+			default:
+				return 0;
+		}
+	}
+
 	static boolean isMeleeWeapon(EquipStats s)
 	{
 		return s != null && s.getSlot() == net.runelite.api.EquipmentInventorySlot.WEAPON.getSlotIdx()

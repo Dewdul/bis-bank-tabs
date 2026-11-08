@@ -37,6 +37,40 @@ class TabBuilder
 		boolean blightedSupplies = true;
 		/** how many foods the combat tabs show */
 		int foodCount = 6;
+		/** beside each best-in-slot item, what the player owns that does one thing better (more max hit...) */
+		boolean tradeoffs = true;
+		/**
+		 * cheaper options that save the best (an ironman's way to play): the next tier of a potion or ammo, more
+		 * food, and gear that needs no charges beside gear that does
+		 */
+		boolean budget;
+
+		// ---- the Alchables tab (live prices, so the plugin hands them in)
+		/** what High Alchemy gives for an item (0 = can't be alched) */
+		IntUnaryOperator highAlch = id -> 0;
+		/** what an item sells for on the Grand Exchange (0 = no price known) */
+		IntUnaryOperator gePrice = id -> 0;
+		/** only tradeable items are ever suggested: untradeables are quest items and gear you can't get back */
+		java.util.function.IntPredicate tradeable = id -> false;
+		/** the price of the nature rune each cast uses */
+		int natureRune;
+		/** can't sell on the Grand Exchange: alching only has to beat the rune */
+		boolean ironman;
+		/** what is in the bank right now and how many, placeholders left out: only what you hold can be alched */
+		Map<Integer, Integer> held = Collections.emptyMap();
+		/** gear you only ever use one of (equipable, not stackable): spare copies of one in use can be alched */
+		java.util.function.IntPredicate single = id -> false;
+		/**
+		 * kept for what you do with it: opened for what's inside (bird nests, caskets, impling jars) or a teleport
+		 * (jewellery you rub, tablets you break, scrolls you read): never alched
+		 */
+		java.util.function.IntPredicate forUse = id -> false;
+		/** what other tabs show outside their finished goods: gear and supplies in use, never suggested */
+		Set<Integer> inUse = Collections.emptySet();
+		/** what the player took off the tab with Remove-alch */
+		Set<Integer> notAlch = Collections.emptySet();
+		/** the least profit (over selling, after the rune) an item must make */
+		int alchMinProfit = 100;
 		/** items other tabs already show; the cosmetics tab leaves them out */
 		Set<Integer> shownElsewhere = Collections.emptySet();
 		/** the player's current slayer task: the Slayer tab leads with its setup */
@@ -103,8 +137,23 @@ class TabBuilder
 		List<Section> sections;
 		/** best item to use as the tab icon, or -1 */
 		int hero;
+		/** item id -> a second reason for an item another pick already placed (a trade-off that is prayer gear) */
+		Map<Integer, String> notes;
 
-		/** item id -> why it is in the tab (an item shown twice lists both reasons) */
+		Built(TabData.Tab def, List<Section> sections, int hero, Map<Integer, String> notes)
+		{
+			this.def = def;
+			this.sections = sections;
+			this.hero = hero;
+			this.notes = notes;
+		}
+
+		Built(TabData.Tab def, List<Section> sections, int hero)
+		{
+			this(def, sections, hero, Collections.emptyMap());
+		}
+
+		/** item id -> why it is in the tab (an item shown twice, or noted twice, lists both reasons) */
 		Map<Integer, String> reasons()
 		{
 			Map<Integer, String> reasons = new HashMap<>();
@@ -112,11 +161,22 @@ class TabBuilder
 			{
 				for (Placement p : s.items)
 				{
-					reasons.merge(p.itemId, p.reason == null ? "" : p.reason,
-						(a, b) -> a.isEmpty() || a.contains(b) ? (a.isEmpty() ? b : a) : a + "; " + b);
+					reasons.merge(p.itemId, p.reason == null ? "" : p.reason, Built::both);
 				}
 			}
+			notes.forEach((id, note) ->
+			{
+				if (reasons.containsKey(id))
+				{
+					reasons.merge(id, note, Built::both);
+				}
+			});
 			return reasons;
+		}
+
+		private static String both(String a, String b)
+		{
+			return a.isEmpty() || a.contains(b) ? (a.isEmpty() ? b : a) : a + "; " + b;
 		}
 
 		Set<Integer> itemIds()
@@ -150,6 +210,16 @@ class TabBuilder
 	private final Set<Integer> notFood;
 	/** ingredients (onions, cheese, potatoes) heal 1-2: not food to bring */
 	private static final int MIN_FOOD_HEAL = 3;
+	/** with cheaper alternatives on, every food that heals at least this share of your best one shows... */
+	private static final double BUDGET_FOOD_SHARE = 0.5;
+	/** ...up to two rows of it */
+	private static final int BUDGET_FOOD_MAX = 16;
+	/** an item's in-game name for hover text, or null (tests) */
+	private final IntFunction<String> names;
+	/** gear that spends charges or degrades -> what keeping it going costs */
+	private final Map<Integer, String> charged = new HashMap<>();
+	/** kept for their charges (teleport jewellery, recoil rings...): never in the Alchables tab */
+	private final Set<Integer> neverAlch;
 
 	TabBuilder(TabData data, IntFunction<EquipStats> stats)
 	{
@@ -158,9 +228,17 @@ class TabBuilder
 
 	TabBuilder(TabData data, IntFunction<EquipStats> stats, IntUnaryOperator heals)
 	{
+		this(data, stats, heals, id -> null);
+	}
+
+	TabBuilder(TabData data, IntFunction<EquipStats> stats, IntUnaryOperator heals, IntFunction<String> names)
+	{
 		this.data = data;
 		this.stats = stats;
 		this.heals = heals;
+		this.names = names;
+		data.charged.forEach((id, uses) -> charged.put(Integer.parseInt(id), uses));
+		this.neverAlch = new HashSet<>(data.neverAlch);
 		this.notFood = new HashSet<>(data.notFood);
 		this.excludeAuto = new HashSet<>(data.excludeAuto);
 		this.situationalOnly = new HashSet<>(data.situationalOnly);
@@ -173,6 +251,10 @@ class TabBuilder
 
 	Built build(TabData.Tab tab, Set<Integer> owned, Options options)
 	{
+		if (tab.isAlch())
+		{
+			return alch(tab, options);
+		}
 		if (tab.isCosmetic() && !options.shownElsewhere.isEmpty())
 		{
 			owned = new HashSet<>(owned);
@@ -200,10 +282,13 @@ class TabBuilder
 				continue;
 			}
 			List<Placement> items = new ArrayList<>();
-			// the weapon goes first (armour follows its attack style) and ammo last (it follows the launcher)
+			// the weapon goes first (armour follows its attack style) and ammo last (it follows the launcher);
+			// trade-offs and the one-handed weapon after every curated pick, which keep their own reasons
 			List<TabData.Pick> picks = new ArrayList<>(def.picks);
-			picks.sort(Comparator.comparing(p -> "weapon".equals(p.mode) ? 0 : "ammo".equals(p.mode) ? 2 : 1));
+			picks.sort(Comparator.comparing(p -> "weapon".equals(p.mode) ? 0 : "ammo".equals(p.mode) ? 2
+				: "tradeoffs".equals(p.mode) || "onehand".equals(p.mode) ? 3 : 1));
 			ctx.sectionTitle = def.title;
+			ctx.sectionKey = def.key;
 			ctx.sectionSlots.clear();
 			boolean holdsFiller = false;
 			for (TabData.Pick pick : picks)
@@ -247,7 +332,58 @@ class TabBuilder
 		{
 			hero = sections.stream().flatMap(s -> s.items.stream()).map(Placement::getItemId).findFirst().orElse(-1);
 		}
-		return new Built(tab, sections, hero);
+		return new Built(tab, sections, hero, ctx.notes);
+	}
+
+	/**
+	 * The Alchables tab: everything held that no other tab uses (finished goods may still be alched) where High
+	 * Alchemy beats selling by at least the minimum, after the nature rune; for an ironman, who can't sell, where
+	 * the alch beats the rune. Gear another tab uses counts when you hold spares (keep one, alch the rest).
+	 * Tradeable items only, and never what you open for its contents. Highest High Alch value first.
+	 */
+	private Built alch(TabData.Tab tab, Options o)
+	{
+		List<int[]> rows = new ArrayList<>();
+		for (Map.Entry<Integer, Integer> held : o.held.entrySet())
+		{
+			int id = held.getKey();
+			int count = held.getValue();
+			if (o.notAlch.contains(id) || neverAlch.contains(id) || !o.tradeable.test(id) || o.forUse.test(id)
+				|| o.inUse.contains(id) && (count < 2 || !o.single.test(id)))
+			{
+				continue;
+			}
+			int alch = o.highAlch.applyAsInt(id);
+			int price = o.gePrice.applyAsInt(id);
+			if (alch <= 0 || !o.ironman && price <= 0)
+			{
+				// can't be alched, or no price to weigh it against
+				continue;
+			}
+			int profit = alch - o.natureRune - (o.ironman ? 0 : price);
+			if (profit >= Math.max(1, o.alchMinProfit))
+			{
+				rows.add(new int[]{id, alch, profit, o.inUse.contains(id) ? count - 1 : 0});
+			}
+		}
+		rows.sort(Comparator.<int[]>comparingInt(r -> -r[1]).thenComparingInt(r -> -r[2]).thenComparingInt(r -> r[0]));
+		List<Placement> items = new ArrayList<>();
+		for (int[] r : rows)
+		{
+			String why = (r[3] > 0 ? "Spare" + (r[3] == 1 ? "" : "s") + ": you have " + (r[3] + 1)
+				+ " and another tab uses one, so alch " + r[3] + ". " : "")
+				+ "High Alch " + gp(r[1]) + ": " + gp(r[2]) + (o.ironman ? " after the nature rune"
+				: " more than selling it, after the nature rune");
+			items.add(new Placement(r[0], null, "alch", why));
+		}
+		String title = tab.sections.isEmpty() ? tab.name : tab.sections.get(0).title;
+		List<Section> sections = Collections.singletonList(new Section("alch", title, "rows", items));
+		return new Built(tab, sections, items.isEmpty() ? -1 : items.get(0).getItemId());
+	}
+
+	private static String gp(int coins)
+	{
+		return String.format(java.util.Locale.ENGLISH, "%,d gp", coins);
 	}
 
 	/** bane picks of the combat tabs, by style and task category */
@@ -318,6 +454,10 @@ class TabBuilder
 		styleOptions.foodCount = options.foodCount;
 		styleOptions.combatSupplies = options.combatSupplies;
 		styleOptions.blightedSupplies = false;
+		// the task block takes the style's best-in-slot set and prayer gear, never its trade-offs
+		styleOptions.tradeoffs = false;
+		// cheaper potions and food reach the task's supplies
+		styleOptions.budget = options.budget;
 		// every Krystilia task is in the Wilderness (its weapons win, so last), whatever the task's own
 		// categories say; no other master's is
 		List<String> categories = new ArrayList<>(task.categories);
@@ -790,6 +930,11 @@ class TabBuilder
 		/** pick key -> every item the pick settled on, including ones placed earlier */
 		final Map<String, List<Integer>> resolved = new HashMap<>();
 		String sectionTitle;
+		String sectionKey;
+		/** equipment slot -> the best-in-slot set's item there (trade-offs and the one-handed pick compare to it) */
+		final Map<String, Integer> bis = new HashMap<>();
+		/** item id -> a second reason for an item already placed (see {@link Built#notes}) */
+		final Map<Integer, String> notes = new HashMap<>();
 		/** equipment slots something in the current section already fills */
 		final Set<String> sectionSlots = new HashSet<>();
 		/** attack style of the main melee weapon; melee armour accuracy follows it */
@@ -812,13 +957,21 @@ class TabBuilder
 				return Collections.emptyList();
 			}
 		}
+		// the best item of the pick that would have hidden this one: a cheaper option saves it
+		int saves = -1;
 		for (String other : pick.unless)
 		{
-			if (!ctx.resolved.getOrDefault(other, Collections.emptyList()).isEmpty())
+			List<Integer> got = ctx.resolved.getOrDefault(other, Collections.emptyList());
+			if (!got.isEmpty())
 			{
-				return Collections.emptyList();
+				if (!(ctx.options.budget && pick.budgetKeeps))
+				{
+					return Collections.emptyList();
+				}
+				saves = saves == -1 ? got.get(0) : saves;
 			}
 		}
+		final int saved = saves;
 
 		List<Placement> out = new ArrayList<>();
 		List<Integer> chosen = new ArrayList<>();
@@ -829,14 +982,23 @@ class TabBuilder
 				// a pick that shows several on purpose (top foods) doesn't call the extras backups
 				boolean food = "food".equals(pick.key);
 				int take = food ? ctx.options.foodCount : pick.take;
-				List<List<Integer>> got = food ? foods(pick, ctx, take)
-					: ownedEntries(pick.entries, ctx, take > 0 ? take : 1 + ctx.options.backups);
+				int base = take > 0 ? take : 1 + ctx.options.backups;
+				// on a budget, one more: the next tier down, which saves the best (amethyst arrows beside dragon)
+				boolean cheaper = !food && ctx.options.budget && pick.cheaper;
+				List<List<Integer>> got = food ? foods(pick, ctx, take, ctx.options.budget)
+					: ownedEntries(pick.entries, ctx, base + (cheaper ? 1 : 0));
+				int top = got.isEmpty() || got.get(0).isEmpty() ? -1 : got.get(0).get(0);
 				for (int i = 0; i < got.size(); i++)
 				{
 					boolean best = i == 0 || take > 0;
+					boolean saving = cheaper && i >= base || food && i >= take;
 					chosen.addAll(got.get(i));
-					add(out, got.get(i), pick.slot, pick.key, ctx, id -> food ? foodReason(pick, id, ctx)
-						: best ? entryReason(pick, id, ctx) : backupOf(entryReason(pick, id, ctx)));
+					add(out, got.get(i), pick.slot, pick.key, ctx, id ->
+					{
+						String why = food ? foodReason(pick, id, ctx) : entryReason(pick, id, ctx);
+						return saved != -1 ? cheaperReason(why, saved) : saving ? cheaperReason(why, top)
+							: food || best ? why : backupOf(why);
+					});
 				}
 				if (chosen.isEmpty() && pick.fallback != null)
 				{
@@ -920,11 +1082,263 @@ class TabBuilder
 			case "prayerset":
 				prayerSet(pick, ctx, out, chosen);
 				break;
+			case "tradeoffs":
+				if (ctx.options.tradeoffs)
+				{
+					tradeoffs(pick, ctx, out, chosen);
+				}
+				break;
+			case "onehand":
+				if (ctx.options.tradeoffs)
+				{
+					oneHand(pick, ctx, out, chosen);
+				}
+				break;
 			default:
 				break;
 		}
+		if (ctx.options.budget && !chosen.isEmpty() && charged.containsKey(chosen.get(0))
+			&& ("first".equals(pick.mode) && !"food".equals(pick.key) || "auto".equals(pick.mode) || "weapon".equals(pick.mode)))
+		{
+			// the best uses charges up: the best that doesn't stands beside it
+			int best = chosen.get(0);
+			List<Integer> alt = uncharged(pick, ctx);
+			if (!alt.isEmpty())
+			{
+				String of = name(best);
+				String reason = "No charges to keep up (your " + (of != null ? of : "best") + " needs "
+					+ charged.get(best) + ")";
+				chosen.addAll(alt);
+				if (ctx.placed.contains(alt.get(0)))
+				{
+					ctx.notes.merge(alt.get(0), reason, (was, more) -> was + "; " + more);
+				}
+				else
+				{
+					add(out, alt, pick.slot != null ? pick.slot : "weapon".equals(pick.mode) ? "WEAPON" : null, pick.key,
+						ctx, id -> reason);
+				}
+			}
+		}
 		ctx.resolved.put(pick.key, chosen);
+		if ("main".equals(ctx.sectionKey) && pick.slot != null && !chosen.isEmpty())
+		{
+			ctx.bis.putIfAbsent(pick.slot, chosen.get(0));
+		}
 		return out;
+	}
+
+	/** The pick's best owned item that needs no charges, ranked the way the pick ranks, or nothing. */
+	private List<Integer> uncharged(TabData.Pick pick, Context ctx)
+	{
+		switch (pick.mode)
+		{
+			case "first":
+				for (List<Integer> entry : pick.entries)
+				{
+					for (int id : ownedOf(entry, ctx))
+					{
+						if (!charged.containsKey(id))
+						{
+							return Collections.singletonList(id);
+						}
+					}
+				}
+				if (pick.fallback != null)
+				{
+					List<Integer> candidates = new ArrayList<>(slotCandidates("WEAPON", ctx));
+					candidates.removeIf(charged::containsKey);
+					ToDoubleFunction<Integer> score = Scoring.RANGED.equals(pick.fallback)
+						? id -> Scoring.rangedWeapon(stats.apply(id))
+						: id -> Scoring.magicWeapon(stats.apply(id));
+					return bestBy(candidates, score, 1);
+				}
+				return Collections.emptyList();
+			case "auto":
+			{
+				List<Integer> candidates = new ArrayList<>(slotCandidates(pick.slot, ctx));
+				candidates.removeIf(charged::containsKey);
+				return bestBy(candidates, id -> Scoring.armour(pick.profile, stats.apply(id), ctx.meleeStyle), 1);
+			}
+			case "weapon":
+				return rankMelee(pick.style, ctx, id -> !charged.containsKey(id), 1);
+			default:
+				return Collections.emptyList();
+		}
+	}
+
+	/** "Cheaper: boosts Attack and Strength; saves your Super combat potion" */
+	private String cheaperReason(String reason, int best)
+	{
+		String of = best == -1 ? null : name(best);
+		String why = reason == null || reason.isEmpty() ? "" : reason.substring(0, 1).toLowerCase() + reason.substring(1);
+		return "Cheaper" + (why.isEmpty() ? "" : ": " + why) + "; saves your " + (of != null ? of : "best");
+	}
+
+	/** The item's name without a dose or charge count, or null. */
+	private String name(int id)
+	{
+		String n = names.apply(id);
+		return n == null || n.isEmpty() ? null : n.replaceAll("\\s*\\(\\d+\\)$", "");
+	}
+
+	/** an alternative must score at least this share of the best-in-slot item: still a real option */
+	private static final double MIN_TRADEOFF_SHARE = 0.75;
+	private static final int MAX_TRADEOFFS_PER_SLOT = 2;
+
+	/**
+	 * For each slot, what the player owns that beats the best-in-slot item at one half of the style's
+	 * profile (max hit or accuracy) while giving up the other: a strength amulet beside fury, a bellator ring
+	 * beside the ultor. Only items no other owned item matches or beats on both halves count (the best of
+	 * each trade-off), and only ones still worth wearing ({@link #MIN_TRADEOFF_SHARE} of the best's score).
+	 */
+	private void tradeoffs(TabData.Pick pick, Context ctx, List<Placement> out, List<Integer> chosen)
+	{
+		String profile = pick.profile;
+		String style = ctx.meleeStyle;
+		for (String slot : pick.slots)
+		{
+			Integer best = ctx.bis.get(slot);
+			EquipStats b = best == null ? null : stats.apply(best);
+			double bestScore = Scoring.armour(profile, b, style);
+			if (b == null || bestScore <= 0)
+			{
+				continue;
+			}
+			Map<Integer, double[]> cands = new HashMap<>();
+			for (int id : slotCandidates(slot, ctx))
+			{
+				EquipStats s = stats.apply(id);
+				double score = Scoring.armour(profile, s, style);
+				if (score > 0)
+				{
+					cands.put(id, new double[]{Scoring.damage(profile, s), Scoring.accuracy(profile, s, style), score});
+				}
+			}
+			double[] bv = {Scoring.damage(profile, b), Scoring.accuracy(profile, b, style), bestScore};
+			List<Integer> front = new ArrayList<>();
+			for (Map.Entry<Integer, double[]> x : cands.entrySet())
+			{
+				double[] xv = x.getValue();
+				// it must beat the best item at something, and still be worth wearing
+				if (x.getKey().equals(best) || xv[0] <= bv[0] && xv[1] <= bv[1] || xv[2] < MIN_TRADEOFF_SHARE * bestScore)
+				{
+					continue;
+				}
+				boolean beaten = false;
+				for (Map.Entry<Integer, double[]> y : cands.entrySet())
+				{
+					double[] yv = y.getValue();
+					if (!y.getKey().equals(x.getKey()) && yv[0] >= xv[0] && yv[1] >= xv[1]
+						&& (yv[0] > xv[0] || yv[1] > xv[1] || yv[2] > xv[2] || yv[2] == xv[2] && y.getKey() < x.getKey()))
+					{
+						beaten = true;
+						break;
+					}
+				}
+				if (!beaten)
+				{
+					front.add(x.getKey());
+				}
+			}
+			front.sort(Comparator.<Integer>comparingDouble(id -> -cands.get(id)[2]).thenComparing(Comparator.naturalOrder()));
+			for (int i = 0; i < front.size() && i < MAX_TRADEOFFS_PER_SLOT; i++)
+			{
+				int id = front.get(i);
+				String reason = tradeoffReason(profile, style, slot, cands.get(id), bv);
+				chosen.add(id);
+				if (ctx.placed.contains(id))
+				{
+					// already in the tab for another reason (prayer gear...): its hover says this too
+					ctx.notes.merge(id, reason, (was, more) -> was + "; " + more);
+					continue;
+				}
+				// each its own group: a lone item goes beside its slot rather than forming a set
+				add(out, Collections.singletonList(id), slot, pick.key + "_" + slot + "_" + i, ctx, x -> reason);
+			}
+		}
+	}
+
+	private static String tradeoffReason(String profile, String style, String slot, double[] x, double[] best)
+	{
+		String damage = Scoring.MELEE.equals(profile) ? "strength" : Scoring.RANGED.equals(profile) ? "ranged strength"
+			: "magic damage";
+		String accuracy = Scoring.MELEE.equals(profile) ? ("any".equals(style) ? "accuracy" : style + " accuracy")
+			: profile + " accuracy";
+		String unit = Scoring.MAGIC.equals(profile) ? "%" : "";
+		String dmg = "+" + number(x[0]) + unit + " " + damage + " vs +" + number(best[0]) + unit;
+		String acc = "+" + number(x[1]) + " " + accuracy + " vs +" + number(best[1]);
+		if (x[0] > best[0] && x[1] < best[1])
+		{
+			return "Trade-off: more max hit than your best " + slotName(slot) + " (" + dmg + "), less accurate (" + acc + ")";
+		}
+		if (x[1] > best[1] && x[0] < best[0])
+		{
+			return "Trade-off: more accurate than your best " + slotName(slot) + " (" + acc + "), less max hit (" + dmg + ")";
+		}
+		return "Trade-off: " + (x[0] > best[0] ? dmg : acc) + " on your best " + slotName(slot);
+	}
+
+	private static String number(double v)
+	{
+		return v == Math.rint(v) ? String.valueOf((long) v) : String.valueOf(Math.round(v * 10) / 10.0);
+	}
+
+	/**
+	 * With a two-handed best weapon and a shield (or defender) in the set, the best one-handed weapon the
+	 * player owns, ready to wield with it. Nothing when another pick already shows it.
+	 */
+	private void oneHand(TabData.Pick pick, Context ctx, List<Placement> out, List<Integer> chosen)
+	{
+		Integer main = ctx.bis.get("WEAPON");
+		if (main == null || !twoHanded(main) || !ctx.bis.containsKey("SHIELD"))
+		{
+			return;
+		}
+		List<Integer> best = new ArrayList<>();
+		if (Scoring.MELEE.equals(pick.profile))
+		{
+			List<Integer> candidates = new ArrayList<>();
+			for (int id : ctx.owned)
+			{
+				EquipStats s = stats.apply(id);
+				if (!excludeMeleeWeapon.contains(id) && !excludeAuto.contains(id) && Scoring.isMeleeWeapon(s)
+					&& !s.isTwoHanded())
+				{
+					candidates.add(id);
+				}
+			}
+			best.addAll(bestBy(candidates, id -> scoring.meleeWeapon(id, stats.apply(id), "any"), 1));
+		}
+		else
+		{
+			for (List<Integer> entry : pick.entries)
+			{
+				for (int id : ownedOf(entry, ctx))
+				{
+					if (best.isEmpty() && !twoHanded(id))
+					{
+						best.add(id);
+					}
+				}
+			}
+			if (best.isEmpty() && pick.fallback != null)
+			{
+				List<Integer> candidates = new ArrayList<>(slotCandidates("WEAPON", ctx));
+				candidates.removeIf(this::twoHanded);
+				ToDoubleFunction<Integer> score = Scoring.RANGED.equals(pick.fallback)
+					? id -> Scoring.rangedWeapon(stats.apply(id))
+					: id -> Scoring.magicWeapon(stats.apply(id));
+				best.addAll(bestBy(candidates, score, 1));
+			}
+		}
+		if (best.isEmpty() || ctx.placed.contains(best.get(0)))
+		{
+			return;
+		}
+		chosen.addAll(best);
+		add(out, best, "WEAPON", pick.key, ctx, id -> "Best one-handed weapon: wield it with your shield instead of the"
+			+ " two-handed one");
 	}
 
 	private static void add(List<Placement> out, Collection<Integer> ids, String slot, String group, Context ctx,
@@ -966,7 +1380,7 @@ class TabBuilder
 	 * that follows a few seconds later, then by HP per inventory slot, then the list's order. Without live
 	 * numbers the wiki's decide.
 	 */
-	private List<List<Integer>> foods(TabData.Pick pick, Context ctx, int take)
+	private List<List<Integer>> foods(TabData.Pick pick, Context ctx, int take, boolean budget)
 	{
 		List<List<Integer>> foods = new ArrayList<>();
 		List<double[]> keys = new ArrayList<>();
@@ -1007,6 +1421,14 @@ class TabBuilder
 		}
 		order.sort(Comparator.<Integer>comparingDouble(i -> -keys.get(i)[0])
 			.thenComparingDouble(i -> -keys.get(i)[1]).thenComparingDouble(i -> keys.get(i)[2]));
+		if (budget && !order.isEmpty())
+		{
+			// cheaper food that saves the best: everything still worth eating in a fight (half your best heal),
+			// past the usual count if need be
+			double floor = keys.get(order.get(0))[0] * BUDGET_FOOD_SHARE;
+			long worth = order.stream().filter(i -> keys.get(i)[0] >= floor).count();
+			take = (int) Math.max(take, Math.min(BUDGET_FOOD_MAX, worth));
+		}
 		return order.stream().limit(take).map(foods::get).collect(Collectors.toList());
 	}
 
@@ -1152,6 +1574,18 @@ class TabBuilder
 
 	private List<Integer> bestMeleeWeapons(String style, Context ctx)
 	{
+		List<Integer> best = rankMelee(style, ctx, id -> true, 1 + ctx.options.backups);
+		// a role whose best weapon is already in the tab adds nothing
+		if (!"any".equals(style) && !best.isEmpty() && ctx.placed.contains(best.get(0)))
+		{
+			return Collections.emptyList();
+		}
+		return best;
+	}
+
+	/** The top {@code count} owned melee weapons for a style that pass the filter. */
+	private List<Integer> rankMelee(String style, Context ctx, java.util.function.IntPredicate keep, int count)
+	{
 		boolean any = "any".equals(style);
 		List<Integer> candidates = new ArrayList<>();
 		for (int id : ctx.owned)
@@ -1160,22 +1594,16 @@ class TabBuilder
 			// a role only considers weapons built for it: the fang's slash is a defensive
 			// style nobody trains with, so it never counts as a slash weapon
 			if (!excludeMeleeWeapon.contains(id) && !excludeAuto.contains(id) && Scoring.isMeleeWeapon(s)
-				&& (any || Scoring.styleBonus(s, style) >= s.bestMelee()))
+				&& (any || Scoring.styleBonus(s, style) >= s.bestMelee()) && keep.test(id))
 			{
 				candidates.add(id);
 			}
 		}
 		// role picks compare raw single-target damage; only the overall pick
 		// credits passives like the scythe's extra hits
-		List<Integer> best = bestBy(candidates,
+		return bestBy(candidates,
 			id -> any ? scoring.meleeWeapon(id, stats.apply(id), style) : scoring.meleeWeaponPlain(id, stats.apply(id), style),
-			1 + ctx.options.backups);
-		// a role whose best weapon is already in the tab adds nothing
-		if (!any && !best.isEmpty() && ctx.placed.contains(best.get(0)))
-		{
-			return Collections.emptyList();
-		}
-		return best;
+			count);
 	}
 
 	private List<Integer> fallbackWeapon(String profile, Context ctx)

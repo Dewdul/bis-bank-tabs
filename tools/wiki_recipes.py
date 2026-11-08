@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fetch wiki recipes for No Brain Bank Tabs (shared with Material Checklist).
+"""Fetch wiki recipes for BiS Bank Tabs (shared with Material Checklist).
 
 Pulls structured recipe data from the OSRS Wiki's Bucket API and joins
 material/product names to item ids. Run before each release; the output is

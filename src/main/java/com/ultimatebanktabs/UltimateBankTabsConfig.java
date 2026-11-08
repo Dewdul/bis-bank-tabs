@@ -30,7 +30,46 @@ public interface UltimateBankTabsConfig extends Config
 		return true;
 	}
 
-	@ConfigItem(keyName = "backups", name = "Backups per slot", position = 1, section = contents,
+	@ConfigItem(keyName = "tradeoffs", name = "Trade-offs beside best in slot", position = 1, section = contents,
+		description = "Also show what you own that beats a best-in-slot item at one thing while giving up another:"
+			+ " more max hit or more accuracy (a strength amulet beside fury), or a one-handed weapon to wield with"
+			+ " your defender beside a two-handed one")
+	default boolean tradeoffs()
+	{
+		return true;
+	}
+
+	enum Cheaper
+	{
+		IRONMEN("Ironmen only"),
+		ALWAYS("Always"),
+		NEVER("Never");
+
+		private final String label;
+
+		Cheaper(String label)
+		{
+			this.label = label;
+		}
+
+		@Override
+		public String toString()
+		{
+			return label;
+		}
+	}
+
+	@ConfigItem(keyName = "cheaper", name = "Cheaper alternatives", position = 2, section = contents,
+		description = "Also show cheaper options that save your best: a combat potion beside super combats, the next"
+			+ " ammo down, every food worth eating (not just the best few), and gear that needs no charges beside gear"
+			+ " that does (a weapon beside the scythe, a helm beside the serpentine helm). Ironmen only: on for every"
+			+ " kind of ironman account")
+	default Cheaper cheaper()
+	{
+		return Cheaper.IRONMEN;
+	}
+
+	@ConfigItem(keyName = "backups", name = "Backups per slot", position = 3, section = contents,
 		description = "Also show the next best items you own for each slot and pick (0 shows only the best)")
 	@Range(max = 3)
 	default int backups()
@@ -38,29 +77,29 @@ public interface UltimateBankTabsConfig extends Config
 		return 0;
 	}
 
-	@ConfigItem(keyName = "combatSupplies", name = "Potions & food in combat tabs", position = 2, section = contents,
+	@ConfigItem(keyName = "combatSupplies", name = "Potions & food in combat tabs", position = 4, section = contents,
 		description = "Add your best boosting potions, restores, brews and food to the melee, ranged and magic tabs")
 	default boolean combatSupplies()
 	{
 		return true;
 	}
 
-	@ConfigItem(keyName = "foodCount", name = "Food items", position = 3, section = contents,
+	@ConfigItem(keyName = "foodCount", name = "Food items", position = 5, section = contents,
 		description = "How many of your best foods the melee, ranged and magic tabs and the slayer task show")
-	@Range(min = 1, max = 8)
+	@Range(min = 1, max = 16)
 	default int foodCount()
 	{
 		return 6;
 	}
 
-	@ConfigItem(keyName = "skillSupplies", name = "Supplies in skill tabs", position = 6, section = contents,
+	@ConfigItem(keyName = "skillSupplies", name = "Supplies in skill tabs", position = 8, section = contents,
 		description = "Add the materials you own for each skill (herbs, logs, bars, seeds...) below its tools")
 	default boolean skillSupplies()
 	{
 		return true;
 	}
 
-	@ConfigItem(keyName = "blightedSupplies", name = "Blighted supplies", position = 4, section = contents,
+	@ConfigItem(keyName = "blightedSupplies", name = "Blighted supplies", position = 6, section = contents,
 		description = "Add your blighted food, potions and (magic tab) spell sacks, which only work in the Wilderness"
 			+ " and PvP areas, to the melee, ranged and magic tabs, in their own section below the other supplies")
 	default boolean blightedSupplies()
@@ -68,7 +107,7 @@ public interface UltimateBankTabsConfig extends Config
 		return true;
 	}
 
-	@ConfigItem(keyName = "skillGoods", name = "Finished goods in skill tabs", position = 5, section = contents,
+	@ConfigItem(keyName = "skillGoods", name = "Finished goods in skill tabs", position = 7, section = contents,
 		description = "Add what each skill makes (potions, jewellery, bows, bars, cooked food, logs, ores...) at the"
 			+ " bottom of its tab, after a blank row")
 	default boolean skillGoods()
@@ -76,7 +115,7 @@ public interface UltimateBankTabsConfig extends Config
 		return true;
 	}
 
-	@ConfigItem(keyName = "gapRows", name = "Blank row between sections", position = 7, section = contents,
+	@ConfigItem(keyName = "gapRows", name = "Blank row between sections", position = 9, section = contents,
 		description = "Leave an empty row between groups in each tab")
 	default boolean gapRows()
 	{
@@ -102,7 +141,7 @@ public interface UltimateBankTabsConfig extends Config
 		}
 	}
 
-	@ConfigItem(keyName = "tabIcons", name = "Tab icons", position = 8, section = contents,
+	@ConfigItem(keyName = "tabIcons", name = "Tab icons", position = 10, section = contents,
 		description = "Skill icons (Attack for melee, Run for movement), or your best item for each tab (best weapon,"
 			+ " food, bones, herb...). An icon you pick with a tab's Change icon option is kept; change this setting to"
 			+ " hand icons back to the plugin")
@@ -111,14 +150,14 @@ public interface UltimateBankTabsConfig extends Config
 		return IconStyle.SKILL;
 	}
 
-	@ConfigItem(keyName = "showReasons", name = "Show why on hover", position = 9, section = contents,
+	@ConfigItem(keyName = "showReasons", name = "Show why on hover", position = 11, section = contents,
 		description = "Hovering an item in one of these tabs shows why it is there, e.g. \"Demonbane: +60% vs demons\"")
 	default boolean showReasons()
 	{
 		return true;
 	}
 
-	@ConfigItem(keyName = "removeOnStop", name = "Remove tabs when turned off", position = 10, section = contents,
+	@ConfigItem(keyName = "removeOnStop", name = "Remove tabs when turned off", position = 12, section = contents,
 		description = "Take the tabs this plugin made out of the bank when the plugin is turned off. They come back,"
 			+ " as you arranged them, when it is turned on again")
 	default boolean removeOnStop()
@@ -126,7 +165,7 @@ public interface UltimateBankTabsConfig extends Config
 		return true;
 	}
 
-	@ConfigItem(keyName = "restoreTabs", name = "Bring back replaced tabs", position = 11, section = contents,
+	@ConfigItem(keyName = "restoreTabs", name = "Bring back replaced tabs", position = 13, section = contents,
 		description = "Puts back the bank tabs you had before this plugin replaced them, next to its own tabs."
 			+ " Switches itself off again once done")
 	default boolean restoreTabs()
@@ -270,7 +309,33 @@ public interface UltimateBankTabsConfig extends Config
 		return true;
 	}
 
-	@ConfigItem(keyName = TAB_PREFIX + "cosmetics", name = "Cosmetics", position = 38, section = skillTabs,
+	@ConfigItem(keyName = TAB_PREFIX + "alchables", name = "Alchables", position = 38, section = skillTabs,
+		description = "What you hold that's worth High Alchemy, highest alch value first: items no other tab uses,"
+			+ " where alching beats selling (for ironmen: beats the nature rune). Right-click an item there and pick"
+			+ " Remove-alch to keep it off")
+	default boolean alchables()
+	{
+		return true;
+	}
+
+	@ConfigItem(keyName = "alchMinProfit", name = "Alch profit at least", position = 39, section = skillTabs,
+		description = "How much more an item must give from High Alchemy than from selling it (after the nature rune)"
+			+ " to show in the Alchables tab. Ironmen can't sell, so for them it's the alch value after the rune")
+	@Range(max = 1_000_000)
+	default int alchMinProfit()
+	{
+		return 100;
+	}
+
+	@ConfigItem(keyName = "restoreAlch", name = "Bring back removed alchables", position = 40, section = skillTabs,
+		description = "Puts every item you took off the Alchables tab with Remove-alch back on it, for this account."
+			+ " Switches itself off again once done")
+	default boolean restoreAlch()
+	{
+		return false;
+	}
+
+	@ConfigItem(keyName = TAB_PREFIX + "cosmetics", name = "Cosmetics", position = 41, section = skillTabs,
 		description = "Purely visual items no other tab shows: holiday items, trimmed and gilded clue rewards, spare"
 			+ " graceful colours, ornament kits...")
 	default boolean cosmetics()

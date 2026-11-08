@@ -1,4 +1,4 @@
-# No Brain Bank Tabs: design
+# BiS Bank Tabs: design
 
 Started 2026-10-04. The request was an "ultimate bank plugin" that does three things. It makes tabs with best-in-slot gear for each combat style, for movement, and for every skill. It works entirely from what is in the bank, including placeholders. Its tabs can hold several weapons or armour sets when each is best for something. The layout of each tab is optimised automatically.
 
@@ -71,7 +71,31 @@ Started 2026-10-04. The request was an "ultimate bank plugin" that does three th
   - `curated.FOOD` ranks the 179 that heal at least 3 and are not random, harmful, restricted or `NEVER_FOOD` (a strawberry basket, holiday rares).
   - For each food it gives the page versions, the hover note, a heal that follows a few seconds later, and the HP per inventory slot that breaks ties. Its own heal numbers rank the foods only when RuneLite has none (in tests, or a food RuneLite doesn't know).
   - `notFood` (random, harmful, raid-only, blighted and `NEVER_FOOD`) is never shown as food even when RuneLite counts it, so blighted food stays in its Wilderness section. Anything healing under 3 (onions, cheese) is left out too.
-- **How many.** Six by default (the "Food items" setting, 1-8). RuneLite saves defaults, so a stored 4 is moved to 6 once (`sixFoods`).
+- **How many.** Six by default (the "Food items" setting, 1-16). RuneLite saves defaults, so a stored 4 is moved to 6 once (`sixFoods`).
+
+## Alchables
+
+- **Data.** A tab of kind `alch` with no picks (`curated.ALCHABLES`, after Sailing). `TabBuilder.alch` builds it from live numbers the plugin hands in: `highAlch` (`ItemComposition.getHaPrice`), `gePrice` (`ItemManager.getItemPrice`), `tradeable`, and the nature rune's price.
+- **Rule.** Only items held in the bank count, with a quantity, so placeholders are out. That set is kept as a third part of the `owned` snapshot, so the tab builds at login too. Untradeables are never suggested (quest items, gear you can't get back). The item must make at least `alchMinProfit` (default 100):
+  - most accounts: High Alch − GE price − nature rune;
+  - ironmen (`VarbitID.IRONMAN` > 0), who can't sell: High Alch − nature rune.
+- **Left out:**
+  - Anything another tab shows outside a `goods` section (`Options.inUse`), so gear, supplies, food, potions and cosmetics in use are never suggested, but finished goods are.
+  - Anything kept for what you do with it, judged by its inventory actions (`USE_ACTIONS`):
+    - opened for its contents (Open, Search, Loot): bird nests, caskets, impling jars;
+    - a teleport (Rub, Break, Read, Teleport): jewellery, tablets, scrolls.
+  - Every item in the wiki's "Items with charges" category (`curated.NEVER_ALCH_CATEGORIES`, emitted as `neverAlch`): recoil rings, binding necklaces, slaughter bracelets and the like.
+  - Gathering skills' goods (logs, ores, gems, raw fish, hunter catches, nests). They are `gathered` sections, counted as in use: raw materials, not things made.
+- **Spare copies.** Gear another tab uses still counts when more than one is held (`Options.single`: equipable, not stackable). The hover says how many to alch.
+  - Supplies never count this way: 500 lobsters stay out.
+  - The `held` snapshot stores `id:count`.
+- **Build and order.** It is built after every other tab, then published in data order. It is sorted by High Alch value, then profit.
+- **Remove-alch.** A `RUNELITE` menu entry, added just above Examine on the Alchables tab (no `menuAction`), stores the item in the per-account `alchRemoved` key. "Bring back removed alchables" clears that key and switches itself off.
+- **Placement.** A tab the plugin has never placed goes after the nearest of the plugin's earlier tabs in the list (`BankTagsWriter.placeOf`), so Alchables lands under Sailing, above Cosmetics.
+
+## Items the player adds
+
+Dragging an item onto a plugin tab makes Bank Tags tag it with the tab's name, and the tab shows it next to the plugin's picks (the registered tag and item tags combine). Remove-tag is stripped only for items the plugin itself shows in the tab (`BankTagsWriter.shows`), so an item the player added can be taken back out.
 
 ## Ownership
 
@@ -100,6 +124,23 @@ Pick modes (`TabBuilder`):
 - **set**: a group of slot pieces, shown when any piece is owned, or only when all are (Void). `requires` gates it on owning a related item; `requiresPlaced` gates it on that item being in the tab (ammo).
 - **outfit**: graceful. The colour with the most owned pieces wins, and any gap falls back to the lightest weight-reducing item for that slot.
 - **unless**: skip a pick when another pick resolved. For example, there is no separate super strength potion when there is a super combat potion, and no earmuffs when there is a slayer helmet.
+- **tradeoffs** (last in each combat tab's Situational section; setting "Trade-offs beside best in slot", default on): for every armour and jewellery slot, the owned items that beat the best-in-slot item at one half of the style's profile (max hit: strength, ranged strength or magic damage; accuracy: the main weapon's melee style, ranged or magic) while giving up the other.
+  - Only the best of each trade-off counts: an item another owned item matches or beats on both halves is left out (fury beats glory and the power amulet at both).
+  - It must score at least 75% of the best item (`MIN_TRADEOFF_SHARE`), so a +1 strength dragonfire shield beside a dragon defender, or a brimstone ring beside a berserker ring, stays out. At most two per slot.
+  - Each is its own group, so it goes beside its slot (or to the "other gear" row) rather than forming a set.
+  - It resolves after every curated situational pick, which keep their cells and reasons. An item already shown for another reason (the prayer set's +1 prayer power amulet) adds the trade-off to its hover instead (`Built.notes`).
+  - Real cases (wiki stats): strength amulet beside fury; glory, else the power amulet, beside a strength amulet; ultor and bellator beside each other with a slash weapon; torva helm and legs beside oathplate; Saika's shroud beside the ancestral hat.
+- **onehand** (weapons sections, same setting): when the best weapon is two-handed and the set has a shield, the best one-handed weapon: melee by the damage model, ranged and magic the first one-handed entry of the weapon list (the Armadyl crossbow beside a twisted bow and buckler). Nothing when another pick already shows it (the fang as the stab pick). Resolves last in its section.
+- **Cheaper alternatives** (`Options.budget`; the setting is "Ironmen only" by default, read from `VarbitID.IRONMAN` > 0, which covers every ironman type including group). Ironmen keep their best for when it counts, so on a budget:
+  - **`cheaper` picks** (ranging/bastion, magic/battlemage, the magic brews, arrows, darts, javelins, energy, cannonballs) also take the next owned entry after the best: "Cheaper: …; saves your <best>". Item names come from a names function, `ItemComposition` in game; without one the text says "your best".
+  - **`budgetKeeps` picks** ignore their `unless`: super attack, strength and defence, and the combat potion, show beside a super combat (which uses them up, plus a torstol).
+  - **Food** shows every food healing at least half the best one (`BUDGET_FOOD_SHARE`), past the "Food items" count, up to 16 (`BUDGET_FOOD_MAX`). The ones past the count say what they save.
+  - **Charge-free alternative.** When a `first`, `auto` or `weapon` pick's best item is in `charged`, the pick also shows its best owned item that isn't, ranked the same way (`uncharged`): "No charges to keep up (your <best> needs <cost>)". If another pick already shows it, the text becomes a hover note.
+    - `charged` is `curated.CHARGED`: the wiki's "Items with charges" category, cut to gear whose charges fighting or skilling uses up, plus the Barrows pages.
+    - Left out: teleport and recoil charges, charges that only feed a side effect (Iban Blast, Magic Dart, a ward's special), and gear that still works uncharged (Dizana's quiver, the venator bow, Tonalztics of Ralos, the toxic staff of the dead).
+    - The corrupted Blade of Saeldor (c) and Bow of Faerdhinen (c) are separate pages, so they are not charged.
+  - The Slayer task's supplies follow the setting too.
+- **Potions**: divine and regular versions are a trade-off (a boost that holds for 5 minutes, for 10 HP), so each kind has a divine pick and a regular pick. Within one, only the best tier shows (bastion over ranging, super attack over attack). Melee attack, strength and defence singles only show without a super combat; a combat potion only without any of those. Restores show every kind owned: super restore, sanfew serum, prayer potion, prayer regeneration, Menaphite remedy.
 
 Excluded from auto and weapon picks: ancient warrior equipment (PvP) and the Wilderness champion amulet. Wilderness, dragonbane, demonbane, kalphite, vampyre and leaf-bladed weapons are also kept out of the main and role weapon picks, but each has its own situational pick.
 
@@ -126,10 +167,28 @@ Catch-alls were removed for the other skills because they pulled in costume-room
 ## Known gaps
 
 - Ranged and magic weapon rankings are hand-ordered. Weapons released after the data was made fall back to a stat score only for accounts with no curated weapon. Regenerate `tabs.json` after big releases.
-- There are no tank or defensive sets yet.
-- The Sailing tab is thin. Wiki data for Sailing gear is still sparse, so it mostly holds supplies from recipes.
+- There are no tank or defensive sets yet. Trade-offs only weigh max hit against accuracy, so defence never makes an item a trade-off.
+- Recipe-built supplies only see what a skill's recipes *use*. That missed reusable items that aren't ingredients, like the Barracuda Trials facility parts, and smelted bars only another skill uses. Sailing is now curated from the wiki's Sailing category, collection log and Facilities page (November 2026): facility parts, facility drops, lost schematics, boat paints, trial keys, outfits and sea treasures. Smithing's Bars rule also takes what Smithing smelts (`curated.SUPPLIES_FROM_PRODUCTS`), so silver, lead and cupronickel bars and chromium ingots sit with the other bars instead of in finished goods.
+- **New content needs a refresh and a curation pass.** The wiki data was refreshed on 8 November 2026 for The Fractured Archive raid (20 October 2026). Armour and melee weapons rank themselves from stats, but these need curating by hand:
+  - Ranged and magic weapons: the ascension crossbows rank under the Bow of Faerdhinen with their own bolt class; Zorya's tome ranks under the Eye of Ayak.
+  - Items whose value isn't in their stats:
+    - the Rondache, a tank shield the Avernic outranks;
+    - the Obligator, whose 3-tick smash and double rolls the 5-tick stats miss;
+    - charged gear;
+    - teleports (the archivist's folio).
+  - Single-use unlocks (the wiki's "Single-use ability unlock items") get an "Unlocks to use" section in the tab whose ability they unlock: Prayer (prayer scrolls, Horn of Bran), Magic (spell fragments and scrolls) or Slayer (teleport anchoring, Saradomin's light).
+- Wiki recipe data has mistakes. A Sailing keel recipe carries the Guthix d'hide shield's item id, so that shield is excluded from finished goods (`EXCLUDE_GOODS`).
 
 ## Hub overlap
+
+**Refreshed 8 November 2026, with hub install counts:**
+- **Bank organizers** sort everything into categories or skill tabs: Bank Organizer (17k), Bank Tab Organizer (16.6k), Bank Tag Generation (13.9k), Auto Bank Sorter (10.9k: 22 skill tabs, a task-following Slayer tab, Sailing), Bank Assistant (1k) and Smart Bank Sorter (15, which claims "best-in-slot outfits").
+- **Best-gear calculators** work out one boss at a time in a panel: Loadout Lab (5.4k), Best Gear Setup (4.1k), BiS Gear (2.9k), Banked BiS, GearForge, My BiS Finder and Gear Upgrade.
+- **Alch tools** guard the cast: Alch Blocker (11.8k), No Bad Alchs (9.5k), ABC Alchemy (6.8k). Alchemiser (2.3k) is a side panel of bank items sorted by alch value.
+- None of them offer standing best-owned tabs per style and skill, trade-offs, ironman cheaper and charge-free picks, a profit-aware alch tab, or a list of unused unlocks.
+- For the Hub PR: credit Auto Bank Sorter and lead with those features.
+
+**Earlier research:**
 
 The closest existing hub plugin is **Auto Bank Sorter** (`bank-skill-sorting`, about 8k installs). It makes 22 skill tabs with sectioned layouts, a melee/range/mage tab of all gear by slot, and a task-aware slayer tab.
 
@@ -146,8 +205,8 @@ Other related hub plugins are Bank Assistant, BiS Gear, GearForge, Wiki Gear Set
 
 ## Hub submission
 
-The plugin-hub file (`plugins/no-brain-bank-tabs`) should include an install warning, for example:
+The plugin-hub file (`plugins/bis-bank-tabs`) should include an install warning, for example:
 
 ```
-warning=No Brain Bank Tabs adds its own bank tag tabs. If you already have tabs, it asks whether to replace them or keep them, and it backs up any it removes so you can bring them back from its settings.
+warning=BiS Bank Tabs adds its own bank tag tabs. If you already have tabs, it asks whether to replace them or keep them, and it backs up any it removes so you can bring them back from its settings.
 ```

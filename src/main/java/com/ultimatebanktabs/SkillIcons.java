@@ -45,6 +45,7 @@ class SkillIcons
 		SPRITES.put("woodcutting", SpriteID.Staticons.WOODCUTTING);
 		SPRITES.put("farming", SpriteID.Staticons2.FARMING);
 		SPRITES.put("runecraft", SpriteID.Staticons2.RUNECRAFT);
+		SPRITES.put("alchables", SpriteID.Magicon.HIGH_LEVEL_ALCHEMY);
 		SPRITES.put("construction", SpriteID.Staticons2.CONSTRUCTION);
 		SPRITES.put("sailing", SpriteID.Staticons2.SAILING);
 	}

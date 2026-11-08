@@ -33,6 +33,10 @@ class TabData
 	List<Integer> superAntifire = Collections.emptyList();
 	/** random, harmful, raid-only and blighted food: never shown as food, even when RuneLite counts it */
 	List<Integer> notFood = Collections.emptyList();
+	/** items kept for their charges (teleport jewellery, recoil rings, binding necklaces...): never offered for alching */
+	List<Integer> neverAlch = Collections.emptyList();
+	/** gear that spends charges or degrades as you use it -> what keeping it going costs (blood runes...) */
+	Map<String, String> charged = Collections.emptyMap();
 
 	/** What a slayer task wants (tools/slayer_tasks.py, from the OSRS Wiki). */
 	static class SlayerTaskData
@@ -81,6 +85,12 @@ class TabData
 			return "gear".equals(kind);
 		}
 
+		/** Built in game from live prices: what is worth alching (TabBuilder.alch). */
+		boolean isAlch()
+		{
+			return "alch".equals(kind);
+		}
+
 		/** Leftovers tab: shows only what no other tab already shows. */
 		boolean isCosmetic()
 		{
@@ -96,6 +106,8 @@ class TabData
 		String layout;
 		/** generated from wiki recipes rather than curated */
 		boolean supplies;
+		/** goods a gathering skill brings in (logs, ores, raw fish, nests): raw material, never alch fodder */
+		boolean gathered;
 		List<Pick> picks = Collections.emptyList();
 	}
 
@@ -120,6 +132,10 @@ class TabData
 		boolean one;
 		/** "outfit" picks: only fill the slots the section left empty */
 		boolean fill;
+		/** "first" picks: with cheaper alternatives on, also the next owned entry, a cheaper tier that saves the best */
+		boolean cheaper;
+		/** with cheaper alternatives on, shown even when an "unless" pick resolved (a combat potion beside super combats) */
+		boolean budgetKeeps;
 		/** hover text: one per entry (may be shorter than entries), else the label */
 		List<String> reasons = Collections.emptyList();
 		/** "all" picks: the outfit/set each entry belongs to, kept together on one row by the "sets" layout */

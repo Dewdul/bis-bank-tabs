@@ -108,6 +108,14 @@ class BankTagsWriter
 			.findFirst().orElse(null);
 	}
 
+	/** Whether the plugin itself puts the item in this tab, rather than only the player's own tag on it. */
+	boolean shows(String tag, int itemId)
+	{
+		String key = keyOf(tag);
+		Set<Integer> items = key == null ? null : members.get(names.get(key));
+		return items != null && items.contains(canonicalize.applyAsInt(itemId));
+	}
+
 	private static boolean same(String a, String b)
 	{
 		return a != null && b != null && Text.standardize(a).equals(Text.standardize(b));
@@ -180,6 +188,8 @@ class BankTagsWriter
 			}
 
 			int added = 0;
+			// the plugin's tabs before this one, in its own order: a brand-new tab goes after the nearest listed
+			List<String> earlier = new ArrayList<>();
 			for (Map.Entry<String, Tab> e : tabs.entrySet())
 			{
 				String key = e.getKey();
@@ -198,9 +208,10 @@ class BankTagsWriter
 				final String tag = name;
 				if (tagTabs.stream().noneMatch(t -> same(t, tag)))
 				{
-					tagTabs.add(placeOf(name, tagTabs), name);
+					tagTabs.add(placeOf(name, tagTabs, earlier), name);
 					added++;
 				}
+				earlier.add(name);
 				String custom = configManager.getConfiguration(UltimateBankTabsConfig.GROUP, CUSTOM_ICON_PREFIX + key);
 				String icon = custom != null ? custom : String.valueOf(tab.icon);
 				// started with the bank open: Bank Tags holds what the config had
@@ -704,8 +715,12 @@ class BankTagsWriter
 		configManager.setConfiguration(UltimateBankTabsConfig.GROUP, ORDER_KEY, Text.toCSV(merged));
 	}
 
-	/** Where a tab coming back goes: right after the tab before it in the remembered order, else at the end. */
-	private int placeOf(String name, List<String> tagTabs)
+	/**
+	 * Where a tab coming back goes: right after the tab before it in the remembered order. A tab never placed
+	 * before (a new kind of tab) goes after the nearest listed tab before it in the plugin's own order (Alchables
+	 * under Sailing), else at the end.
+	 */
+	private int placeOf(String name, List<String> tagTabs, List<String> earlier)
 	{
 		List<String> order = Text.fromCSV(Objects.toString(
 			configManager.getConfiguration(UltimateBankTabsConfig.GROUP, ORDER_KEY), ""));
@@ -719,6 +734,16 @@ class BankTagsWriter
 		}
 		if (i < 0)
 		{
+			for (int k = earlier.size() - 1; k >= 0; k--)
+			{
+				for (int t = 0; t < tagTabs.size(); t++)
+				{
+					if (same(tagTabs.get(t), earlier.get(k)))
+					{
+						return t + 1;
+					}
+				}
+			}
 			return tagTabs.size();
 		}
 		for (int k = i - 1; k >= 0; k--)

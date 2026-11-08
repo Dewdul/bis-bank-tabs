@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build tabs.json for the No Brain Bank Tabs RuneLite plugin.
+"""Build tabs.json for the BiS Bank Tabs RuneLite plugin.
 
 Resolves the hand-curated tab definitions in curated.py (OSRS Wiki page
 names) to item ids, adds per-skill supplies from the wiki's recipe data, and
@@ -32,7 +32,7 @@ OUT = ROOT / "src/main/resources/com/ultimatebanktabs/tabs.json"
 VARIATIONS_URL = "https://raw.githubusercontent.com/runelite/runelite/master/runelite-client/src/main/resources/item_variations.json"
 
 # Pages that are never real bank items (minigame/arena loadouts, betas, leagues echoes...)
-SKIP_PAGE = re.compile(r"Last Man Standing|\(beta\)|unobtainable|\(Deadman|\(deadman\)|\(nz\)|\(bh\)|^Echo (?!boots|crystal)|"
+SKIP_PAGE = re.compile(r"Last Man Standing|\(beta\)|unobtainable|\(Deadman|\(deadman\)|\(nz\)|\(bh\)|^Echo (?!boots|crystal|pearl)|"
                        r"interface item|animation item|\(The Gauntlet\)|Emir's Arena|\(Leagues|Clue scroll|"
                        r"\(discontinued\)|note$|"
                        r"^(?:Corrupted|Crystal) (?:body|helm|legs|bow|halberd|staff) \((?:basic|attuned|perfected)\)$")
@@ -262,7 +262,7 @@ def slayer_tasks(res):
 def build_pick(res, pick):
     out = {"key": pick["key"], "mode": pick["mode"]}
     for k in ("slot", "profile", "style", "launcher", "fallback", "complete", "fill", "unless", "take", "groups", "repeat",
-              "one", "slots"):
+              "one", "slots", "cheaper", "budgetKeeps"):
         if pick.get(k):
             out[k] = pick[k]
     if pick.get("why"):
@@ -338,9 +338,13 @@ def supply_sections(wiki, recipes, uses, skill, rules, taken):
     """Group the recipe materials of a skill into titled sections. A rule is
     (title, regex[, order]); regexes match the in-game name. A ".*" rule is a
     catch-all that only takes items this skill uses most. Items are ordered by
-    the lowest level that uses them, or by position in the rule's order list."""
+    the lowest level that uses them, or by position in the rule's order list.
+    Rules named in curated.SUPPLIES_FROM_PRODUCTS also take what the skill makes
+    (every smelted bar is a Smithing supply, even one only Crafting or Sailing uses)."""
     level = {}
     tools = set()
+    from_products = [re.compile(rule[1]) for rule in rules
+                     if rule[0] in curated.SUPPLIES_FROM_PRODUCTS.get(skill.lower(), [])]
     for r in recipes:
         if (r.get("skill") or "").lower() != skill.lower():
             continue
@@ -350,6 +354,9 @@ def supply_sections(wiki, recipes, uses, skill, rules, taken):
             page = wiki.id_page.get(ing["itemId"])
             if page:
                 level[page] = min(level.get(page, 999), r.get("level") or 1)
+        page = wiki.id_page.get(r.get("productId") or 0)
+        if page and any(rx.search(wiki.id_name.get(r["productId"], wiki.page_name[page])) for rx in from_products):
+            level[page] = min(level.get(page, 999), r.get("level") or 1)
     exclude = re.compile(curated.EXCLUDE_SUPPLIES)
     tool_pages = {wiki.id_page.get(t) for t in tools}
     groups = defaultdict(list)
@@ -400,7 +407,7 @@ def fetch_bonuses():
 
 def fetch_categories():
     out = {}
-    for cat in curated.COSMETIC_CATEGORIES:
+    for cat in curated.COSMETIC_CATEGORIES + curated.NEVER_ALCH_CATEGORIES:
         titles, cont = [], {}
         while True:
             q = {"action": "query", "list": "categorymembers", "cmtitle": "Category:" + cat, "cmlimit": "500",
@@ -476,7 +483,8 @@ def cosmetics_tab(wiki, res, elsewhere):
         ("random", "Random events", [p for p in cats.get("Random event rewards", []) if equipable(p)]),
         ("graceful", "Graceful recolours", [p for p in wiki.pages if p.startswith("Graceful ") and equipable(p)]),
         ("other", "Other cosmetics",
-         [p for p in wiki.pages if equipable(p) and zero_stats(p) and slot(p) in curated.COSMETIC_ZERO_STAT_SLOTS]),
+         [p for p in wiki.pages if equipable(p) and zero_stats(p) and slot(p) in curated.COSMETIC_ZERO_STAT_SLOTS]
+         + curated.COSMETIC_EXTRA),
         ("kits", "Ornament kits", [p for p in cats.get("Ornament kits", []) if not equipable(p)]),
     ]
     sections = []
@@ -531,7 +539,7 @@ def add_goods(wiki, recipes, res, tab, gear):
     for title, names in curated.GOODS_LISTS.get(key, []):
         entries = [ids for ids in res.entries(names, split_regex=True) if not any(i in taken for i in ids)]
         if entries:
-            goods.append(goods_section(key, title, entries))
+            goods.append(goods_section(key, title, entries, gathered=True))
 
     section_of = {}
     for s in tab["sections"]:
@@ -579,10 +587,15 @@ def add_goods(wiki, recipes, res, tab, gear):
     tab["sections"] += goods
 
 
-def goods_section(tab_key, title, entries):
+def goods_section(tab_key, title, entries, gathered=False):
+    """gathered: a gathering skill's haul (logs, ores, raw fish, nests), raw material for other skills rather than
+    something made, so the Alchables tab never offers it"""
     slug = re.sub(r"\W+", "_", title.lower()).strip("_")
-    return {"key": "goods_" + slug, "title": "Finished goods: " + title.lower(), "layout": "goods",
-            "picks": [{"key": "goods_" + slug, "mode": "all", "entries": entries}]}
+    out = {"key": "goods_" + slug, "title": "Finished goods: " + title.lower(), "layout": "goods",
+           "picks": [{"key": "goods_" + slug, "mode": "all", "entries": entries}]}
+    if gathered:
+        out["gathered"] = True
+    return out
 
 
 def main():
@@ -625,6 +638,14 @@ def main():
             # owning none of them falls back to the default icon, not to whatever comes first
             t["iconStrict"] = t["key"] not in curated.ICON_FALLBACK_TO_FIRST_ITEM
 
+    cats = cached("categories.json", fetch_categories)
+    if any(c not in cats for c in curated.COSMETIC_CATEGORIES + curated.NEVER_ALCH_CATEGORIES):
+        # a category added since the cache was made
+        cats = fetch_categories()
+        (CACHE / "categories.json").write_text(json.dumps(cats), encoding="utf-8")
+    never_alch = sorted({i for c in curated.NEVER_ALCH_CATEGORIES for p in cats.get(c, [])
+                         for i in wiki.page_ids.get(p.lower(), [])})
+
     launcher_ammo = {}
     for name, cls in curated.LAUNCHER_AMMO.items():
         for i in res.flat([name]):
@@ -645,6 +666,10 @@ def main():
         # full dragonfire immunity: with one, a dragonfire shield is a choice, not a need
         "superAntifire": res.flat(["Extended super antifire", "Super antifire potion"]),
         "notFood": res.flat(curated.NOT_FOOD),
+        # items kept for their charges (teleport jewellery, recoil rings...): never offered for alching
+        "neverAlch": never_alch,
+        # gear that uses charges up: with cheaper alternatives on, the best item that doesn't stands beside it
+        "charged": {str(i): uses for name, uses in curated.CHARGED for i in res.flat([name])},
     }
     if res.errors:
         print("\n".join(sorted(set(res.errors))))

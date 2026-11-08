@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
 import javax.inject.Inject;
@@ -29,6 +30,7 @@ import net.runelite.api.GameState;
 import net.runelite.api.Item;
 import net.runelite.api.ItemContainer;
 import net.runelite.api.ScriptID;
+import net.runelite.api.MenuAction;
 import net.runelite.api.MenuEntry;
 import net.runelite.api.events.BeforeRender;
 import net.runelite.api.events.MenuEntryAdded;
@@ -42,6 +44,7 @@ import net.runelite.api.events.WidgetLoaded;
 import net.runelite.api.gameval.InterfaceID;
 import net.runelite.api.gameval.InventoryID;
 import net.runelite.api.gameval.ItemID;
+import net.runelite.api.gameval.VarbitID;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.chat.ChatMessageManager;
 import net.runelite.client.chat.QueuedMessage;
@@ -74,10 +77,12 @@ import net.runelite.client.util.Text;
 @PluginDependency(BankTagsPlugin.class)
 @PluginDependency(ItemStatPlugin.class)
 @PluginDescriptor(
-	name = "No Brain Bank Tabs",
-	description = "Automatic bank tag tabs with your best-in-slot gear for each combat style, movement and every skill,"
-		+ " laid out for you",
-	tags = {"bank", "tags", "tabs", "bis", "best in slot", "gear", "layout", "skilling", "teleports", "organize"}
+	name = "BiS Bank Tabs",
+	description = "Self-updating bank tabs with your best gear for every combat style and skill, laid out like the"
+		+ " equipment screen, plus what's better at something else, cheaper picks that save your best, and an"
+		+ " Alchables tab",
+	tags = {"bank", "tags", "tabs", "bis", "best in slot", "gear", "layout", "skilling", "teleports", "organize",
+		"ironman", "alch", "high alchemy"}
 )
 public class UltimateBankTabsPlugin extends Plugin
 {
@@ -87,6 +92,11 @@ public class UltimateBankTabsPlugin extends Plugin
 	/** the tabs it replaced (JSON), for "Bring back replaced tabs" */
 	private static final String REPLACED_KEY = "replacedTabs";
 	private static final String RESTORE_KEY = "restoreTabs";
+	/** per account: items the player took off the Alchables tab (Remove-alch) */
+	private static final String ALCH_REMOVED_KEY = "alchRemoved";
+	private static final String RESTORE_ALCH_KEY = "restoreAlch";
+	private static final String ALCH_TAB = "alchables";
+	private static final String REMOVE_ALCH = "Remove-alch";
 	/** the player agreed with the bank open: the takeover waits for the next bank open */
 	private static final String REPLACE_PENDING_KEY = "replacePending";
 	/** the food count default went from 4 to 6 */
@@ -162,6 +172,8 @@ public class UltimateBankTabsPlugin extends Plugin
 	private boolean accepted;
 	/** the player's current slayer task, or null */
 	private SlayerTask slayerTask;
+	/** the account type the tabs were last built for (0 normal, any other an ironman of some kind), or -1 */
+	private int accountType = -1;
 	/** conflicting plugins already mentioned this session */
 	private final Set<String> warned = new HashSet<>();
 	/** tab key -> item id -> why the item is in that tab */
@@ -170,6 +182,8 @@ public class UltimateBankTabsPlugin extends Plugin
 	/** canonical ids in the bank (items and placeholders) and potion storage */
 	private Set<Integer> stored = new HashSet<>();
 	private Set<Integer> potions = new HashSet<>();
+	/** canonical ids actually in the bank and how many (placeholders left out): what can be alched */
+	private Map<Integer, Integer> held = new HashMap<>();
 	private boolean bankOpen;
 	private boolean dirty;
 	private boolean potionsDirty;
@@ -193,7 +207,8 @@ public class UltimateBankTabsPlugin extends Plugin
 			}
 			configManager.setConfiguration(UltimateBankTabsConfig.GROUP, SIX_FOODS_KEY, true);
 		}
-		builder = new TabBuilder(data, id -> EquipStats.of(itemManager.getItemStats(id)), this::heals);
+		builder = new TabBuilder(data, id -> EquipStats.of(itemManager.getItemStats(id)), this::heals,
+			id -> itemManager.getItemComposition(id).getName());
 		writer = new BankTagsWriter(configManager, tagManager, layoutManager, bankTagsService, itemManager::canonicalize);
 		writer.restore(data.tabs.stream().map(t -> t.key).collect(Collectors.toList()));
 		// what Bank Tags holds now (the bank may be open); BANKMAIN_INIT refreshes it on every bank open
@@ -247,7 +262,7 @@ public class UltimateBankTabsPlugin extends Plugin
 			data.tabs.stream().filter(t -> enabled(t.key)).map(t -> t.name).collect(Collectors.toList()));
 		List<String> conflicts = conflicts();
 		StringBuilder msg = new StringBuilder("<html><body style='width: 360px'>")
-			.append("<b>No Brain Bank Tabs adds its own bank tabs.</b> You have ").append(others.size())
+			.append("<b>BiS Bank Tabs adds its own bank tabs.</b> You have ").append(others.size())
 			.append(others.size() == 1 ? " tab" : " tabs").append(" already: <i>")
 			.append(others.stream().limit(12).collect(Collectors.joining(", ")))
 			.append(others.size() > 12 ? ", ..." : "").append("</i><br><br>")
@@ -269,7 +284,7 @@ public class UltimateBankTabsPlugin extends Plugin
 		SwingUtilities.invokeLater(() ->
 		{
 			// owned by the game window so it can't open behind it; keeping is the default
-			int choice = JOptionPane.showOptionDialog(client.getCanvas(), message, "No Brain Bank Tabs",
+			int choice = JOptionPane.showOptionDialog(client.getCanvas(), message, "BiS Bank Tabs",
 				JOptionPane.YES_NO_CANCEL_OPTION, JOptionPane.WARNING_MESSAGE, null, options, options[1]);
 			if (choice == 0)
 			{
@@ -306,7 +321,7 @@ public class UltimateBankTabsPlugin extends Plugin
 		{
 			// Bank Tags holds the open bank's tab list and would write the old tabs back: finish on the next open
 			configManager.setConfiguration(UltimateBankTabsConfig.GROUP, REPLACE_PENDING_KEY, Text.toCSV(agreed));
-			chat("No Brain Bank Tabs: close your bank and open it again to finish replacing " + tabsNamed(agreed) + ".");
+			chat("BiS Bank Tabs: close your bank and open it again to finish replacing " + tabsNamed(agreed) + ".");
 		}
 		else
 		{
@@ -320,7 +335,7 @@ public class UltimateBankTabsPlugin extends Plugin
 		if (bankOpen && agreed.isEmpty())
 		{
 			// Bank Tags loaded this bank's tab list before ours existed: they show from the next open
-			chat("No Brain Bank Tabs: close your bank and open it again to see its tabs.");
+			chat("BiS Bank Tabs: close your bank and open it again to see its tabs.");
 		}
 	}
 
@@ -355,7 +370,7 @@ public class UltimateBankTabsPlugin extends Plugin
 			configManager.setConfiguration(UltimateBankTabsConfig.GROUP, REPLACED_KEY, gson.toJson(all, SAVED_TABS));
 			if (client.getGameState() == GameState.LOGGED_IN)
 			{
-				chat("No Brain Bank Tabs: replaced " + tabsNamed(saved.stream().map(t -> t.name).collect(Collectors.toList()))
+				chat("BiS Bank Tabs: replaced " + tabsNamed(saved.stream().map(t -> t.name).collect(Collectors.toList()))
 					+ ". Bring back replaced tabs in the plugin settings puts " + (saved.size() == 1 ? "it" : "them") + " back.");
 			}
 		}
@@ -370,7 +385,7 @@ public class UltimateBankTabsPlugin extends Plugin
 		}
 		catch (PluginInstantiationException e)
 		{
-			log.warn("could not turn No Brain Bank Tabs off", e);
+			log.warn("could not turn BiS Bank Tabs off", e);
 		}
 	}
 
@@ -392,7 +407,7 @@ public class UltimateBankTabsPlugin extends Plugin
 		{
 			// Bank Tags holds the open bank's tab list and would write it back over the restored tabs; the
 			// setting stays on until the next bank open does it
-			chat("No Brain Bank Tabs: close your bank and open it again to bring back your replaced tabs.");
+			chat("BiS Bank Tabs: close your bank and open it again to bring back your replaced tabs.");
 			return;
 		}
 		// a replacement still waiting for the bank is called off: those tabs never leave
@@ -403,10 +418,10 @@ public class UltimateBankTabsPlugin extends Plugin
 		writer.restoreOthers(saved);
 		configManager.unsetConfiguration(UltimateBankTabsConfig.GROUP, REPLACED_KEY);
 		configManager.setConfiguration(UltimateBankTabsConfig.GROUP, RESTORE_KEY, false);
-		chat(!saved.isEmpty() ? "No Brain Bank Tabs: brought back " + tabsNamed(saved.stream().map(t -> t.name)
+		chat(!saved.isEmpty() ? "BiS Bank Tabs: brought back " + tabsNamed(saved.stream().map(t -> t.name)
 			.collect(Collectors.toList())) + "." + (atBankInit ? "" : " Open your bank to see them.")
-			: cancelled ? "No Brain Bank Tabs: kept your tabs; none will be replaced."
-			: "No Brain Bank Tabs: there are no replaced tabs to bring back.");
+			: cancelled ? "BiS Bank Tabs: kept your tabs; none will be replaced."
+			: "BiS Bank Tabs: there are no replaced tabs to bring back.");
 	}
 
 	/** Enabled plugins that fight over the same tabs, as "Name (what it does)". */
@@ -439,7 +454,7 @@ public class UltimateBankTabsPlugin extends Plugin
 		{
 			if (warned.add(conflict))
 			{
-				chat("No Brain Bank Tabs: " + conflict + " is also on. Turn one of them off so they don't fight over"
+				chat("BiS Bank Tabs: " + conflict + " is also on. Turn one of them off so they don't fight over"
 					+ " your bank tabs.");
 			}
 		}
@@ -497,6 +512,11 @@ public class UltimateBankTabsPlugin extends Plugin
 	@Subscribe
 	public void onVarbitChanged(VarbitChanged event)
 	{
+		if (event.getVarbitId() == VarbitID.IRONMAN && event.getValue() != accountType && accountType != -1)
+		{
+			// the account type arrived after the first build (or a group ironman left the group): cheaper picks follow
+			dirty = true;
+		}
 		if (SlayerTask.affects(event.getVarpId(), event.getVarbitId()))
 		{
 			// later, so every value of the same server update has landed (as the core Slayer plugin does)
@@ -602,8 +622,9 @@ public class UltimateBankTabsPlugin extends Plugin
 	}
 
 	/**
-	 * Bank Tags' Remove-tag can't take an item out of these tabs (the plugin decides what they hold), but it
-	 * does take it out of the layout, after which Bank Tags drops it in the first empty cell for good.
+	 * Bank Tags' Remove-tag can't take an item the plugin shows out of these tabs (the plugin decides what they
+	 * hold), but it does take it out of the layout, after which Bank Tags drops it in the first empty cell for
+	 * good. An item the player dragged onto the tab themselves keeps it, so they can take it back out.
 	 */
 	@Subscribe(priority = -1)
 	public void onMenuEntryAdded(MenuEntryAdded event)
@@ -611,8 +632,14 @@ public class UltimateBankTabsPlugin extends Plugin
 		// Bank Tags adds Remove-tag with createMenuEntry, which posts no event of its own, right after the game's
 		// Examine (Withdraw-All-but-1 in potion storage), so strip it on that entry's event
 		String option = event.getOption();
+		String tag = bankTagsService.getActiveTag();
 		if (writer == null || !("Examine".equals(option) || "Withdraw-All-but-1".equals(option))
-			|| writer.keyOf(bankTagsService.getActiveTag()) == null)
+			|| writer.keyOf(tag) == null)
+		{
+			return;
+		}
+		int itemId = event.getMenuEntry().getItemId();
+		if (itemId > 0 && !writer.shows(tag, itemId))
 		{
 			return;
 		}
@@ -623,6 +650,60 @@ public class UltimateBankTabsPlugin extends Plugin
 				client.getMenu().removeMenuEntry(entry);
 			}
 		}
+		if (itemId > 0 && ALCH_TAB.equals(writer.keyOf(tag)))
+		{
+			// just above Examine, like Bank Tags' own Remove-tag
+			int item = itemManager.canonicalize(itemId);
+			client.getMenu().createMenuEntry(-1)
+				.setOption(REMOVE_ALCH)
+				.setTarget(event.getTarget())
+				.setType(MenuAction.RUNELITE)
+				.onClick(e -> removeAlch(item));
+		}
+	}
+
+	/** what you do with an item you keep: open it for what's inside, or teleport with it */
+	private static final Set<String> USE_ACTIONS = new HashSet<>(Arrays.asList(
+		"open", "search", "loot", "rub", "break", "read", "teleport"));
+
+	/**
+	 * Kept for what you do with it: opened for what's inside (a bird nest's Search, a casket's Open, an impling
+	 * jar's Loot) or a teleport (jewellery you Rub, a tablet you Break, a scroll you Read).
+	 */
+	private static boolean forUse(String[] actions)
+	{
+		if (actions != null)
+		{
+			for (String a : actions)
+			{
+				if (a != null && USE_ACTIONS.contains(a.toLowerCase()))
+				{
+					return true;
+				}
+			}
+		}
+		return false;
+	}
+
+	/** Items the player took off the Alchables tab, for this account. */
+	private Set<Integer> alchRemoved()
+	{
+		Set<Integer> ids = new HashSet<>();
+		parse(Objects.toString(configManager.getRSProfileConfiguration(UltimateBankTabsConfig.GROUP, ALCH_REMOVED_KEY), ""),
+			ids);
+		return ids;
+	}
+
+	private void removeAlch(int itemId)
+	{
+		Set<Integer> ids = alchRemoved();
+		if (ids.add(itemId))
+		{
+			configManager.setRSProfileConfiguration(UltimateBankTabsConfig.GROUP, ALCH_REMOVED_KEY, join(ids));
+			chat("BiS Bank Tabs: " + itemManager.getItemComposition(itemId).getName() + " is off the Alchables tab."
+				+ " \"Bring back removed alchables\" in the settings puts it back.");
+		}
+		dirty = true;
 	}
 
 	/** Bank Tags rebuilds and scrolls its tab widgets at will, so skill icons go back on before every frame. */
@@ -651,7 +732,16 @@ public class UltimateBankTabsPlugin extends Plugin
 	@Subscribe
 	public void onConfigChanged(ConfigChanged event)
 	{
-		if (UltimateBankTabsConfig.GROUP.equals(event.getGroup()) && RESTORE_KEY.equals(event.getKey()))
+		if (UltimateBankTabsConfig.GROUP.equals(event.getGroup()) && RESTORE_ALCH_KEY.equals(event.getKey()))
+		{
+			if (Boolean.parseBoolean(event.getNewValue()))
+			{
+				configManager.unsetRSProfileConfiguration(UltimateBankTabsConfig.GROUP, ALCH_REMOVED_KEY);
+				configManager.setConfiguration(UltimateBankTabsConfig.GROUP, RESTORE_ALCH_KEY, false);
+				dirty = true;
+			}
+		}
+		else if (UltimateBankTabsConfig.GROUP.equals(event.getGroup()) && RESTORE_KEY.equals(event.getKey()))
 		{
 			if (Boolean.parseBoolean(event.getNewValue()) && writer != null)
 			{
@@ -737,24 +827,31 @@ public class UltimateBankTabsPlugin extends Plugin
 		{
 			configManager.setConfiguration(UltimateBankTabsConfig.GROUP, UltimateBankTabsConfig.TAB_PREFIX + key, false);
 			String name = data.tabs.stream().filter(t -> t.key.equals(key)).map(t -> t.name).findFirst().orElse(key);
-			chat("No Brain Bank Tabs: the " + name + " tab is off now. Turn it back on in the plugin settings.");
+			chat("BiS Bank Tabs: the " + name + " tab is off now. Turn it back on in the plugin settings.");
 		}
 	}
 
 	private void readBank(ItemContainer bank)
 	{
 		Set<Integer> ids = new HashSet<>();
+		Map<Integer, Integer> have = new HashMap<>();
 		for (Item item : bank.getItems())
 		{
 			int id = item.getId();
 			if (id > 0 && id != ItemID.BANK_FILLER && id != ItemID.BLANKOBJECT)
 			{
 				ids.add(itemManager.canonicalize(id));
+				if (item.getQuantity() > 0)
+				{
+					// a placeholder holds nothing to alch
+					have.merge(itemManager.canonicalize(id), item.getQuantity(), Integer::sum);
+				}
 			}
 		}
-		if (!ids.equals(stored))
+		if (!ids.equals(stored) || !have.equals(held))
 		{
 			stored = ids;
+			held = have;
 			saveSnapshot();
 		}
 	}
@@ -802,6 +899,7 @@ public class UltimateBankTabsPlugin extends Plugin
 	{
 		Set<Integer> bank = new HashSet<>();
 		Set<Integer> pots = new HashSet<>();
+		Map<Integer, Integer> have = new HashMap<>();
 		String csv = configManager.getRSProfileConfiguration(UltimateBankTabsConfig.GROUP, OWNED_KEY);
 		if (csv != null && !csv.isEmpty())
 		{
@@ -811,9 +909,14 @@ public class UltimateBankTabsPlugin extends Plugin
 			{
 				parse(parts[1], pots);
 			}
+			if (parts.length > 2)
+			{
+				parseCounts(parts[2], have);
+			}
 		}
 		stored = bank;
 		potions = pots;
+		held = have;
 	}
 
 	private static void parse(String csv, Set<Integer> into)
@@ -836,8 +939,29 @@ public class UltimateBankTabsPlugin extends Plugin
 
 	private void saveSnapshot()
 	{
-		String csv = join(stored) + "|" + join(potions);
+		String csv = join(stored) + "|" + join(potions) + "|" + new TreeMap<>(held).entrySet().stream()
+			.map(e -> e.getKey() + ":" + e.getValue()).collect(Collectors.joining(","));
 		configManager.setRSProfileConfiguration(UltimateBankTabsConfig.GROUP, OWNED_KEY, csv);
+	}
+
+	/** "id:count,..." (an id alone counts one) */
+	private static void parseCounts(String csv, Map<Integer, Integer> into)
+	{
+		for (String s : csv.split(","))
+		{
+			String[] kv = s.trim().split(":");
+			try
+			{
+				if (!kv[0].isEmpty())
+				{
+					into.put(Integer.parseInt(kv[0]), kv.length > 1 ? Integer.parseInt(kv[1]) : 1);
+				}
+			}
+			catch (NumberFormatException ignored)
+			{
+				// skip junk
+			}
+		}
 	}
 
 	private static String join(Set<Integer> ids)
@@ -916,28 +1040,71 @@ public class UltimateBankTabsPlugin extends Plugin
 		Set<Integer> owned = owned();
 		TabBuilder.Options options = new TabBuilder.Options();
 		options.backups = config.backups();
+		options.tradeoffs = config.tradeoffs();
+		accountType = client.getVarbitValue(VarbitID.IRONMAN);
+		options.budget = config.cheaper() == UltimateBankTabsConfig.Cheaper.ALWAYS
+			|| config.cheaper() == UltimateBankTabsConfig.Cheaper.IRONMEN && accountType > 0;
 		options.skillSupplies = config.skillSupplies();
 		options.skillGoods = config.skillGoods();
 		options.combatSupplies = config.combatSupplies();
 		options.blightedSupplies = config.blightedSupplies();
 		options.slayerTask = slayerTask;
 		options.foodCount = config.foodCount();
+		options.highAlch = id -> itemManager.getItemComposition(id).getHaPrice();
+		options.gePrice = id -> (int) Math.min(Integer.MAX_VALUE, itemManager.getItemPrice(id));
+		options.tradeable = id -> itemManager.getItemComposition(id).isTradeable();
+		options.natureRune = (int) Math.min(Integer.MAX_VALUE, itemManager.getItemPrice(ItemID.NATURERUNE));
+		options.ironman = accountType > 0;
+		options.held = held;
+		options.single = id ->
+		{
+			EquipStats stats = EquipStats.of(itemManager.getItemStats(id));
+			return stats != null && stats.getSlot() >= 0 && !itemManager.getItemComposition(id).isStackable();
+		};
+		options.forUse = id -> forUse(itemManager.getItemComposition(id).getInventoryActions());
+		options.notAlch = alchRemoved();
+		options.alchMinProfit = config.alchMinProfit();
 
 		Map<String, BankTagsWriter.Tab> tabs = new LinkedHashMap<>();
 		Map<String, String> titles = new HashMap<>();
 		Map<String, Map<Integer, String>> why = new HashMap<>();
 		Set<String> hidden = new HashSet<>();
 		Set<Integer> shown = new HashSet<>();
+		// the Alchables tab is built last: it leaves out what every other tab uses (all but finished goods)
+		Map<String, TabBuilder.Built> builtTabs = new HashMap<>();
+		Set<Integer> inUse = new HashSet<>();
 		for (TabData.Tab def : data.tabs)
 		{
 			titles.put(def.key, def.name);
-			if (!enabled(def.key))
+			if (!enabled(def.key) || def.isAlch())
 			{
 				continue;
 			}
 			options.shownElsewhere = shown;
 			TabBuilder.Built built = builder.build(def, owned, options);
 			shown.addAll(built.itemIds());
+			// made goods may be alched (bows, platebodies); gathered ones (logs, ores, nests) feed other skills
+			Set<String> gathered = def.sections.stream().filter(sec -> sec.gathered).map(sec -> sec.key)
+				.collect(Collectors.toSet());
+			built.getSections().stream().filter(sec -> !"goods".equals(sec.getLayout()) || gathered.contains(sec.getKey()))
+				.forEach(sec -> sec.getItems().forEach(p -> inUse.add(p.getItemId())));
+			builtTabs.put(def.key, built);
+		}
+		options.inUse = inUse;
+		for (TabData.Tab def : data.tabs)
+		{
+			if (enabled(def.key) && def.isAlch())
+			{
+				builtTabs.put(def.key, builder.build(def, owned, options));
+			}
+		}
+		for (TabData.Tab def : data.tabs)
+		{
+			TabBuilder.Built built = builtTabs.get(def.key);
+			if (built == null)
+			{
+				continue;
+			}
 			if (built.isEmpty())
 			{
 				// nothing for this account (yet): hide the tab but keep its layout
@@ -969,7 +1136,7 @@ public class UltimateBankTabsPlugin extends Plugin
 		tabSprites = sprites;
 		if (added > 0 && announce)
 		{
-			chat("No Brain Bank Tabs: " + added + (added == 1 ? " new tab is" : " new tabs are")
+			chat("BiS Bank Tabs: " + added + (added == 1 ? " new tab is" : " new tabs are")
 				+ " ready. Close and reopen your bank to see " + (added == 1 ? "it." : "them."));
 		}
 		log.debug("rebuilt {} tabs from {} owned items", tabs.size(), owned.size());

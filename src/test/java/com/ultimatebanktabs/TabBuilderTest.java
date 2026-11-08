@@ -7,6 +7,7 @@ import java.io.Reader;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -170,6 +171,248 @@ public class TabBuilderTest
 		options.backups = 1;
 		TabBuilder.Built built = builder.build(tab("melee"), own(MAXED_MELEE), options);
 		assertTrue(built.itemIds().containsAll(own("Fire cape", "Dragon defender", "Barrows gloves")));
+	}
+
+	@Test
+	public void aStrengthAmuletStandsBesideFury()
+	{
+		TabBuilder.Built built = build("melee", own("Abyssal whip", "Amulet of fury", "Amulet of strength",
+			"Amulet of glory", "Amulet of power"));
+		assertEquals(id("Amulet of fury"), (int) bySlot(section(built, "main")).get("AMULET"));
+		Set<Integer> situational = items(section(built, "situational"));
+		assertTrue("more max hit than fury", situational.contains(id("Amulet of strength")));
+		assertTrue(built.reasons().get(id("Amulet of strength")).contains("Trade-off: more max hit"));
+		assertFalse("fury beats glory at both", built.itemIds().contains(id("Amulet of glory")));
+		assertFalse("and power", built.itemIds().contains(id("Amulet of power")));
+	}
+
+	@Test
+	public void aPowerAmuletIsTheAccurateChoiceBesideStrength()
+	{
+		TabBuilder.Built built = build("melee", own("Abyssal whip", "Amulet of strength", "Amulet of power"));
+		assertEquals(id("Amulet of strength"), (int) bySlot(section(built, "main")).get("AMULET"));
+		assertTrue(items(section(built, "situational")).contains(id("Amulet of power")));
+		// the power amulet is also the prayer gear's amulet (+1): its hover gives both reasons
+		assertTrue(built.reasons().get(id("Amulet of power")).contains("Trade-off: more accurate"));
+
+		// a glory is as strong as the power amulet and more accurate: it takes the place
+		TabBuilder.Built glory = build("melee", own("Abyssal whip", "Amulet of strength", "Amulet of power",
+			"Amulet of glory"));
+		assertTrue(glory.itemIds().contains(id("Amulet of glory")));
+		assertFalse(glory.itemIds().contains(id("Amulet of power")));
+	}
+
+	@Test
+	public void tradeoffsSkipWhatTheBestBeatsAtBoth()
+	{
+		Set<Integer> owned = own(MAXED_MELEE);
+		owned.addAll(own("Amulet of strength", "Amulet of fury", "Bellator ring"));
+		TabBuilder.Built built = build("melee", owned);
+		// with a slash weapon the two rings are close: whichever wins, the other stands beside it
+		assertTrue(built.itemIds().containsAll(own("Ultor ring", "Bellator ring")));
+		assertTrue(built.reasons().get(id("Ultor ring")).startsWith("Trade-off: more max hit")
+			|| built.reasons().get(id("Bellator ring")).startsWith("Trade-off: more accurate"));
+		assertFalse("rancour beats the strength amulet at both", built.itemIds().contains(id("Amulet of strength")));
+		assertFalse("fury shows only as prayer gear", built.reasons().get(id("Amulet of fury")).contains("Trade-off"));
+		assertFalse("torva beats the bandos chestplate at both", built.itemIds().contains(id("Bandos chestplate")));
+
+		TabBuilder.Options off = new TabBuilder.Options();
+		off.tradeoffs = false;
+		Set<Integer> without = builder.build(tab("melee"), owned, off).itemIds();
+		assertTrue("turned off, only the best ring", without.contains(id("Ultor ring")) != without.contains(id("Bellator ring")));
+	}
+
+	@Test
+	public void aOneHandedWeaponForTheShieldBesideATwoHandedBest()
+	{
+		TabBuilder.Built built = build("ranged", own("Twisted bow", "Dragon arrow", "Twisted buckler",
+			"Armadyl crossbow", "Ruby dragon bolts (e)"));
+		assertEquals(id("Twisted bow"), (int) bySlot(section(built, "main")).get("WEAPON"));
+		assertTrue(items(section(built, "weapons")).contains(id("Armadyl crossbow")));
+		assertTrue(built.reasons().get(id("Armadyl crossbow")).startsWith("Best one-handed weapon"));
+		assertTrue("its bolts come with it", built.itemIds().contains(id("Ruby dragon bolts (e)")));
+
+		// no shield to hold: the two-handed weapon is all there is to it
+		assertFalse(build("ranged", own("Twisted bow", "Dragon arrow", "Armadyl crossbow")).reasons()
+			.getOrDefault(id("Armadyl crossbow"), "").startsWith("Best one-handed weapon"));
+	}
+
+	@Test
+	public void divineAndRegularPotionsBothShow()
+	{
+		TabBuilder.Built built = build("melee", own("Abyssal whip", "Divine super combat potion", "Super combat potion",
+			"Super strength", "Super restore", "Sanfew serum"));
+		Set<Integer> supplies = items(section(built, "supplies"));
+		assertTrue(supplies.containsAll(own("Divine super combat potion", "Super combat potion", "Super restore",
+			"Sanfew serum")));
+		assertFalse("a super combat already boosts strength", supplies.contains(id("Super strength")));
+
+		Set<Integer> singles = items(section(build("melee", own("Abyssal whip", "Super attack", "Super strength",
+			"Divine super strength potion")), "supplies"));
+		assertEquals(own("Super attack", "Super strength", "Divine super strength potion"), singles);
+
+		Set<Integer> ranged = items(section(build("ranged", own("Twisted bow", "Divine ranging potion",
+			"Bastion potion", "Ranging potion")), "supplies"));
+		assertEquals("bastion is ranging plus defence", own("Divine ranging potion", "Bastion potion"), ranged);
+	}
+
+	static TabBuilder.Options budget()
+	{
+		TabBuilder.Options options = new TabBuilder.Options();
+		options.budget = true;
+		return options;
+	}
+
+	@Test
+	public void cheaperPotionsSaveTheSuperCombats()
+	{
+		Set<Integer> owned = own("Abyssal whip", "Super combat potion", "Combat potion", "Super attack", "Super strength");
+		Set<Integer> normal = items(section(build("melee", owned), "supplies"));
+		assertEquals("only the super combat", own("Super combat potion"), normal);
+
+		TabBuilder.Built built = builder.build(tab("melee"), owned, budget());
+		assertEquals(owned.size() - 1, items(section(built, "supplies")).size());
+		assertTrue(items(section(built, "supplies")).containsAll(own("Combat potion", "Super attack", "Super strength")));
+		assertTrue(built.reasons().get(id("Combat potion")).startsWith("Cheaper: boosts Attack and Strength; saves your"));
+	}
+
+	@Test
+	public void cheaperAmmoAndFood()
+	{
+		Set<Integer> ranged = own("Twisted bow", "Dragon arrow", "Amethyst arrow");
+		assertFalse(build("ranged", ranged).itemIds().contains(id("Amethyst arrow")));
+		TabBuilder.Built built = builder.build(tab("ranged"), ranged, budget());
+		assertTrue(built.itemIds().contains(id("Amethyst arrow")));
+		assertTrue(built.reasons().get(id("Amethyst arrow")).startsWith("Cheaper"));
+
+		Set<Integer> foods = own("Abyssal whip", "Anglerfish", "Shark", "Lobster", "Potato with cheese");
+		TabBuilder.Options one = budget();
+		one.foodCount = 1;
+		Set<Integer> shown = items(section(builder.build(tab("melee"), foods, one), "supplies_food"));
+		assertTrue("every food worth eating, past the count", shown.containsAll(own("Anglerfish", "Shark", "Lobster")));
+	}
+
+	@Test
+	public void gearThatNeedsNoChargesBesideGearThatDoes()
+	{
+		Set<Integer> owned = own("Scythe of Vitur", "Abyssal whip", "Abyssal tentacle");
+		assertFalse(build("melee", owned).reasons().getOrDefault(id("Abyssal whip"), "").contains("No charges"));
+		TabBuilder.Built built = builder.build(tab("melee"), owned, budget());
+		assertEquals(id("Scythe of Vitur"), (int) bySlot(section(built, "main")).get("WEAPON"));
+		assertTrue("the tentacle degrades too: the whip, not it",
+			built.reasons().get(id("Abyssal whip")).contains("No charges to keep up (your best needs blood runes"));
+		assertFalse(built.reasons().getOrDefault(id("Abyssal tentacle"), "").contains("No charges"));
+
+		// already shown for another reason: the hover says this too
+		TabBuilder.Built magic = builder.build(tab("magic"), own("Tumeken's shadow", "Kodai wand"), budget());
+		assertTrue(magic.reasons().get(id("Kodai wand")).contains("No charges to keep up"));
+
+		TabBuilder.Built woodcutting = builder.build(tab("woodcutting"), own("Crystal axe", "Dragon axe"), budget());
+		assertTrue("a dragon axe for when the crystal axe runs dry", woodcutting.itemIds().contains(id("Dragon axe")));
+		assertFalse(build("woodcutting", own("Crystal axe", "Dragon axe")).itemIds().contains(id("Dragon axe")));
+	}
+
+	@Test
+	public void theFracturedArchivesItemsGoWhereTheyAreUsed()
+	{
+		TabBuilder.Built ranged = build("ranged", own("Ascension crossbows", "Ascension bolts", "Diamond ascension bolts (e)",
+			"Rune crossbow", "Runite bolts"));
+		assertEquals("they out-damage every other crossbow", id("Ascension crossbows"),
+			(int) bySlot(section(ranged, "main")).get("WEAPON"));
+		assertEquals("they fire only their own bolts", id("Diamond ascension bolts (e)"),
+			(int) bySlot(section(ranged, "main")).get("AMMO"));
+		assertTrue(items(section(ranged, "ammo")).contains(id("Ascension bolts")));
+
+		TabBuilder.Built magic = build("magic", own("Zorya's tome", "Kodai wand", "Fragment of whispering wind"));
+		assertEquals(id("Zorya's tome"), (int) bySlot(section(magic, "main")).get("WEAPON"));
+		assertTrue(items(section(magic, "unlocks")).contains(id("Fragment of whispering wind")));
+
+		Set<Integer> owned = own(MAXED_MELEE);
+		owned.addAll(own("Rondache", "Obligator", "Ascension shards"));
+		TabBuilder.Built melee = build("melee", owned);
+		assertTrue("a tank shield the avernic outranks on stats", items(section(melee, "situational")).contains(id("Rondache")));
+		assertTrue(melee.itemIds().containsAll(own("Obligator", "Ascension shards")));
+
+		assertTrue(items(section(build("prayer", own("Horn of Bran")), "unlocks")).contains(id("Horn of Bran")));
+		assertTrue(build("movement", own("Archivist's folio")).itemIds().contains(id("Archivist's folio")));
+	}
+
+	/** prices for the alch tests: item -> {High Alch, Grand Exchange}; one of each held */
+	static TabBuilder.Options alchOptions(Map<Integer, int[]> prices, Set<Integer> held)
+	{
+		TabBuilder.Options o = new TabBuilder.Options();
+		o.highAlch = id -> prices.containsKey(id) ? prices.get(id)[0] : 0;
+		o.gePrice = id -> prices.containsKey(id) ? prices.get(id)[1] : 0;
+		o.tradeable = prices::containsKey;
+		o.natureRune = 100;
+		o.held = held.stream().collect(Collectors.toMap(id -> id, id -> 1));
+		o.single = id -> STATS.containsKey(id) && STATS.get(id).getSlot() >= 0;
+		o.alchMinProfit = 100;
+		return o;
+	}
+
+	@Test
+	public void spareGearIsAlchableAndWhatYouOpenNeverIs()
+	{
+		Map<Integer, int[]> prices = new HashMap<>();
+		prices.put(id("Dragon dagger"), new int[]{18_000, 16_000});
+		prices.put(id("Lobster"), new int[]{160, 50});
+		Set<Integer> held = own("Dragon dagger", "Lobster");
+		TabBuilder.Options o = alchOptions(prices, held);
+		o.inUse = own("Dragon dagger", "Lobster");
+		assertTrue("one dragon dagger, and the melee tab uses it", alchOrder(builder.build(tab("alchables"), held, o)).isEmpty());
+
+		o.held = new HashMap<>(o.held);
+		o.held.put(id("Dragon dagger"), 3);
+		o.held.put(id("Lobster"), 500);
+		TabBuilder.Built built = builder.build(tab("alchables"), held, o);
+		assertEquals("spare gear, but never spare supplies", Collections.singletonList(id("Dragon dagger")), alchOrder(built));
+		assertTrue(built.reasons().get(id("Dragon dagger")).startsWith("Spares: you have 3 and another tab uses one, so alch 2."));
+
+		// a bird nest, casket or impling jar is opened for what's inside; a teleport tablet is broken
+		o.forUse = id -> id == id("Dragon dagger");
+		assertTrue(alchOrder(builder.build(tab("alchables"), held, o)).isEmpty());
+
+		// kept for its charges (the wiki's Items with charges): a ring of dueling, however well it alchs
+		prices.put(id("Ring of dueling"), new int[]{5_000, 500});
+		TabBuilder.Options rings = alchOptions(prices, own("Ring of dueling"));
+		assertTrue(alchOrder(builder.build(tab("alchables"), own("Ring of dueling"), rings)).isEmpty());
+	}
+
+	static List<Integer> alchOrder(TabBuilder.Built built)
+	{
+		return section(built, "alch").getItems().stream().map(TabBuilder.Placement::getItemId).collect(Collectors.toList());
+	}
+
+	@Test
+	public void alchablesAreWhatAlchingBeatsSellingHighestAlchFirst()
+	{
+		Map<Integer, int[]> prices = new HashMap<>();
+		prices.put(id("Rune platebody"), new int[]{39_000, 38_000});   // +900 over selling
+		prices.put(id("Rune full helm"), new int[]{12_672, 12_000});   // +572
+		prices.put(id("Rune kiteshield"), new int[]{32_640, 32_600});  // +40: under the minimum
+		prices.put(id("Rune platelegs"), new int[]{38_400, 39_000});   // selling pays more
+		prices.put(id("Rune scimitar"), new int[]{15_360, 14_000});    // +1,260, but the melee tab uses it
+		Set<Integer> held = own("Rune platebody", "Rune full helm", "Rune kiteshield", "Rune platelegs", "Rune scimitar",
+			"Dragon defender");
+		TabBuilder.Options o = alchOptions(prices, held);
+		o.inUse = own("Rune scimitar");
+		TabBuilder.Built built = builder.build(tab("alchables"), held, o);
+		assertEquals("highest High Alch first", Arrays.asList(id("Rune platebody"), id("Rune full helm")), alchOrder(built));
+		assertEquals("High Alch 39,000 gp: 900 gp more than selling it, after the nature rune",
+			built.reasons().get(id("Rune platebody")));
+		assertEquals(id("Rune platebody"), built.getHero());
+
+		o.notAlch = own("Rune platebody");
+		assertEquals("Remove-alch keeps it off", Collections.singletonList(id("Rune full helm")),
+			alchOrder(builder.build(tab("alchables"), held, o)));
+
+		// an ironman can't sell: whatever beats the rune, untradeables (the defender) never
+		TabBuilder.Options iron = alchOptions(prices, held);
+		iron.ironman = true;
+		iron.inUse = own("Rune scimitar");
+		assertEquals(Arrays.asList(id("Rune platebody"), id("Rune platelegs"), id("Rune kiteshield"), id("Rune full helm")),
+			alchOrder(builder.build(tab("alchables"), held, iron)));
 	}
 
 	@Test
