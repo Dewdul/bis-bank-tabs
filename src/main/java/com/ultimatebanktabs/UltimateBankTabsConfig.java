@@ -335,11 +335,37 @@ public interface UltimateBankTabsConfig extends Config
 		return false;
 	}
 
-	@ConfigItem(keyName = TAB_PREFIX + "cosmetics", name = "Cosmetics", position = 41, section = skillTabs,
+	@ConfigItem(keyName = TAB_PREFIX + "clues", name = "Clues", position = 41, section = skillTabs,
+		description = "Treasure Trails: your clues and caskets by tier, the spade and navigation tools, the items each"
+			+ " tier's emote steps ask for (each step's together), graceful and your teleports")
+	default boolean clues()
+	{
+		return true;
+	}
+
+	@ConfigItem(keyName = TAB_PREFIX + "cosmetics", name = "Cosmetics", position = 42, section = skillTabs,
 		description = "Purely visual items no other tab shows: holiday items, trimmed and gilded clue rewards, spare"
 			+ " graceful colours, ornament kits...")
 	default boolean cosmetics()
 	{
 		return true;
+	}
+
+	@ConfigItem(keyName = TAB_PREFIX + "junk", name = "Junk", position = 43, section = skillTabs,
+		description = "What you could sell, drop or destroy: items no tab uses (even with everything switched on),"
+			+ " grouped into quest leftovers, outclassed gear and other leftovers, with your cosmetics at the bottom."
+			+ " Never what a quest you haven't finished needs. Right-click an item there and pick Not junk to keep"
+			+ " it off")
+	default boolean junk()
+	{
+		return true;
+	}
+
+	@ConfigItem(keyName = "restoreJunk", name = "Bring back removed junk", position = 44, section = skillTabs,
+		description = "Puts every item you took off the Junk tab with Not junk back on it, for this account."
+			+ " Switches itself off again once done")
+	default boolean restoreJunk()
+	{
+		return false;
 	}
 }

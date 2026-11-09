@@ -93,6 +93,52 @@ Started 2026-10-04. The request was an "ultimate bank plugin" that does three th
 - **Remove-alch.** A `RUNELITE` menu entry, added just above Examine on the Alchables tab (no `menuAction`), stores the item in the per-account `alchRemoved` key. "Bring back removed alchables" clears that key and switches itself off.
 - **Placement.** A tab the plugin has never placed goes after the nearest of the plugin's earlier tabs in the list (`BankTagsWriter.placeOf`), so Alchables lands under Sailing, above Cosmetics.
 
+## Junk
+
+- **Data.** A tab of kind `junk` (`curated.JUNK`) that `generate_data` appends after Cosmetics, plus:
+  - `quests` and `questItems`: each item's quests, from its infobox "quest" field and from every quest bucket "Items required" list that links it. A quest item with no linked quest gets "", which never counts as finished.
+  - `junkKeep` (never junk):
+    - the wiki categories in `JUNK_KEEP_CATEGORIES`: money, clues, pets, XP items and storage, plus materials and supplies (seeds, herbs, secondaries, ores, logs, gems, bones, fish, food, potions, tools, ammo, hunter, fossils, light sources, greegrees);
+    - every page in each subcategory of "Minigames";
+    - every recipe's ingredients and tools;
+    - Keys that no quest uses;
+    - functional clothing (`COSMETIC_EXCLUDE`) and `curated.JUNK_KEEP`.
+
+    Every version of a kept item's page is kept too. `junkKeepNames` repeats `JUNK_KEEP` for matching in-game names, which catches clue steps (the wiki's clue scroll pages are skipped). Ammo-slot items are never junk.
+  - `questNeeds`: what a quest's "Items required" lists (a bucket, a hammer), kept only while that quest is unfinished. Quest leftovers are `questItems` only, which come from the infobox "quest" field.
+  - Costumes are worn items with no attack, strength, damage or prayer bonus and total defence of 10 or less, in a clothing or shield slot. They join the cosmetics at the bottom, even when they are quest items.
+  - `questAliases`: the few wiki quest names that need help to match RuneLite's.
+- **Kept set.** `buildJunk` (plugin) counts as kept everything a built tab shows (Alchables included), plus everything every non-special tab would show with "wide" options:
+  - tabs that are switched off still count;
+  - all supplies and goods, 16 foods and trade-offs on;
+  - the player's own backups and cheaper-alternatives settings.
+
+  Hiding a tab or its supplies never turns them into junk. The Cosmetics tab is built against that set, and its items close the Junk tab.
+- **Quests.** `Quest.getState(client)` decides whether a quest is done, memoised per rebuild. Wiki names map to RuneLite's:
+  - `questKey` drops "The", "Freeing", "Defeating", "Miniquest", "Quest", "Full" and "Guide", so "Lost Tribe" matches The Lost Tribe and "Recipe for Disaster/Freeing Evil Dave" matches its subquest;
+  - otherwise a name that is the start of exactly one RuneLite quest matches it;
+  - otherwise the quest is unknown, which counts as unfinished, so the item is kept.
+- **Left out** as well: neverAlch (charged items), `keptForUse` (inventory actions Open, Search, Loot, Rub, Break, Teleport, Fill, Check; Read is excluded so quest books still count), and Not junk choices.
+- **Sections** (empty ones dropped):
+  - `junk_quest` "sets", grouped by first quest and sorted by quest then name;
+  - `junk_gear` (has an equipment slot), by slot then name;
+  - `junk_sell` (tradeable), by stack value;
+  - `junk_other`;
+  - `junk_cosmetic` "bottom".
+- **Not junk.** Works the same way as Remove-alch, through the per-account `junkRemoved` key and "Bring back removed junk".
+
+## Clues
+
+- **Place.** Under Alchables (`curated.CLUES`, kind `movement`). The icon is a fixed item id (19835, Clue scroll (master)): a tab icon given as an int becomes a strict one-entry `iconEntries`, so it is never the first item shown.
+- **Sections, in order:**
+  - the shared `light_gear()` graceful block;
+  - one section per tier (`clues_<tier>`), each holding one `named` pick. That new pick mode matches owned items by in-game name with a regex, because every clue step is its own item id. It sorts by name;
+  - puzzle and light boxes;
+  - the tools: spade, sextant, watch and chart;
+  - deep copies of the Movement tab's teleport sections (`generate_data`);
+  - `emote_<tier>` "sets" sections from the wiki buckets `clue_equipment` and `clue_info` (cached as `tools/cache/clues.json`). Each emote step's items share a group (`step<clue_id>`), so they stay together, and the hover names the emotes and the place.
+- **Variant groups.** An item placed once is never placed again in another charge or degrade state by a later pick (`Context.families`, ItemVariationMapping), since Bank Tags would draw the one banked copy in both cells.
+
 ## Items the player adds
 
 Dragging an item onto a plugin tab makes Bank Tags tag it with the tab's name, and the tab shows it next to the plugin's picks (the registered tag and item tags combine). Remove-tag is stripped only for items the plugin itself shows in the tab (`BankTagsWriter.shows`), so an item the player added can be taken back out.

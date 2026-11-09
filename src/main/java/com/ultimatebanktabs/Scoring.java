@@ -62,12 +62,17 @@ final class Scoring
 			case MELEE:
 				score = 3 * s.getStr() + ("any".equals(meleeStyle)
 					? (s.getStab() + s.getSlash() + s.getCrush()) / 3.0 : styleBonus(s, meleeStyle));
+				if (rangedScore(s) > score || magicScore(s) > score)
+				{
+					// made for another style: the Eclipse Moon set's melee strength is for the atlatl, a ranged weapon
+					return 0;
+				}
 				break;
 			case RANGED:
-				score = 3 * s.getRstr() + s.getRanged();
+				score = rangedScore(s);
 				break;
 			case MAGIC:
-				score = 4 * s.getMdmg() + s.getMagic();
+				score = magicScore(s);
 				break;
 			case WEIGHT:
 				return -s.getWeight();
@@ -77,6 +82,16 @@ final class Scoring
 		// a small defence term ranks pure armour (rune platebody...) for low-level
 		// accounts and breaks ties, without outweighing a single strength point
 		return score + 0.02 * s.getDefence();
+	}
+
+	private static double rangedScore(EquipStats s)
+	{
+		return 3 * s.getRstr() + s.getRanged();
+	}
+
+	private static double magicScore(EquipStats s)
+	{
+		return 4 * s.getMdmg() + s.getMagic();
 	}
 
 	/** The max-hit half of a style's profile: strength, ranged strength or magic damage (%). */

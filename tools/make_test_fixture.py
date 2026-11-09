@@ -58,6 +58,12 @@ ITEMS = [
     "Penance gloves", "Spottier cape", "Agility cape", "Graceful cape (Arceuus)", "Ring of endurance",
     "Spirit angler headband", "Spirit angler top", "Angler hat", "Angler top", "Angler waders", "Angler boots",
     "Rogue mask", "Rogue gloves", "Gloves of silence", "Thieving cape", "Max cape",
+    # gear made for another style: the Eclipse Moon set is ranged gear with melee strength
+    "Guthan's chainskirt", "Eclipse Moon tassets", "Obsidian platelegs",
+    # the junk tab: quest leftovers and what is never junk
+    "Rotten tomato", "Goblin symbol book", "Ghostspeak amulet", "Crystal key",
+    # the clues tab
+    "Spade", "Sextant",
     # mining rewards
     "Golden nugget", "Stardust",
     # smithing alternatives

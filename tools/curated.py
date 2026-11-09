@@ -269,7 +269,8 @@ MELEE = tab("melee", "Melee", "Abyssal whip", kind="gear", sections=[
         set_("void", [("HEAD", ["Void melee helm"]), ("BODY", VOID_TOP), ("LEGS", VOID_ROBE),
                       ("GLOVES", ["Void knight gloves"])], complete=True),
         set_("blood_moon", [("HEAD", ["Blood Moon helm"]), ("BODY", ["Blood Moon chestplate"]),
-                            ("LEGS", ["Blood Moon tassets"])], requires=["Dual macuahuitl"]),
+                            ("LEGS", ["Blood Moon tassets"])],
+             why="Blood Moon set: its effect needs the dual macuahuitl"),
         set_("obsidian", [("HEAD", ["Obsidian helmet"]), ("BODY", ["Obsidian platebody"]),
                           ("LEGS", ["Obsidian platelegs"]), ("AMULET", ["Berserker necklace"])],
              requires=["Tzhaar-ket-om", "Toktz-xil-ak", "Toktz-xil-ek", "Tzhaar-ket-em"]),
@@ -412,7 +413,8 @@ RANGED = tab("ranged", "Ranged", "Magic shortbow", kind="gear", sections=[
         set_("void", [("HEAD", ["Void ranger helm"]), ("BODY", VOID_TOP), ("LEGS", VOID_ROBE),
                       ("GLOVES", ["Void knight gloves"])], complete=True),
         set_("eclipse_moon", [("HEAD", ["Eclipse Moon helm"]), ("BODY", ["Eclipse Moon chestplate"]),
-                              ("LEGS", ["Eclipse Moon tassets"])], requires=["Eclipse atlatl"]),
+                              ("LEGS", ["Eclipse Moon tassets"])],
+             why="Eclipse Moon set: its melee strength powers the Eclipse atlatl"),
         tradeoffs("ranged"),
     ]),
     section("weapons", "Weapons", "rows", [
@@ -547,7 +549,8 @@ MAGIC = tab("magic", "Magic", "Mystic air staff", kind="gear", sections=[
         set_("void", [("HEAD", ["Void mage helm"]), ("BODY", VOID_TOP), ("LEGS", VOID_ROBE),
                       ("GLOVES", ["Void knight gloves"])], complete=True),
         set_("blue_moon", [("HEAD", ["Blue Moon helm"]), ("BODY", ["Blue Moon chestplate"]),
-                           ("LEGS", ["Blue Moon tassets"])], requires=["Blue Moon spear"]),
+                           ("LEGS", ["Blue Moon tassets"])],
+             why="Blue Moon set: its effect needs the Blue Moon spear"),
         all_("tomes", ["Tome of Fire", "Tome of Water", "Tome of Earth"], slot="SHIELD"),
         tradeoffs("magic"),
     ]),
@@ -561,6 +564,8 @@ MAGIC = tab("magic", "Magic", "Mystic air staff", kind="gear", sections=[
         first("wilderness_magic", ["Accursed sceptre", "Thammaron's sceptre"]),
         first("blue_moon_spear", ["Blue Moon spear"]),
         first("ahrim", ["Ahrim's staff"], requires=["Ahrim's hood"]),
+        all_("god_staves", ["Saradomin staff", "Guthix staff", "Zamorak staff", "Void knight mace"],
+             why="Casts its god spell (Mage Arena)"),
     ]),
     section("specials", "Special attacks", "rows", [
         # unique_uses.py spec groups take these places; the broader lists come after so their reasons win
@@ -1477,13 +1482,77 @@ SAILING = tab("sailing", "Sailing", "Rope", sections=[
 
 # Items worth alching, built in game from live prices (TabBuilder.alch): what you hold that no other tab uses,
 # where High Alchemy beats selling, highest High Alch value first. Nothing to curate.
+# ---------------------------------------------------------------- clues
+CLUE_TIERS = ["beginner", "easy", "medium", "hard", "elite", "master"]
+
+
+def clue_row(tier):
+    """Every clue item of one tier the player owns, matched by in-game name in game: each clue step is its own
+    item, and the wiki doesn't list them all."""
+    return dict(key="clue_" + tier, mode="named", why="Treasure Trail (%s)" % tier,
+                pattern=r"(?i)^(?:Clue scroll|Challenge scroll|Reward casket|Scroll box|Clue bottle|Clue geode|"
+                        r"Clue nest|Puzzle box|Casket) \(%s\)$" % tier)
+
+
+# Graceful, the clues by tier, the tools, then (from generate_data) the items each tier's emote steps ask for and
+# the Movement tab's teleports
+# the icon is a clue scroll by item id: the wiki's clue scroll pages are skipped (each step is its own item)
+CLUE_SCROLL_ICON = 19835  # Clue scroll (master)
+CLUES = tab("clues", "Clues", CLUE_SCROLL_ICON, kind="movement", sections=[
+    *light_gear(),
+    # a row per tier
+    *[section("clues_" + t, t.capitalize() + " clues", "rows", [clue_row(t)]) for t in CLUE_TIERS],
+    section("clue_puzzles", "Puzzles", "rows", [
+        dict(key="clue_puzzles", mode="named", why="Treasure Trail puzzle",
+             pattern=r"(?i)^(?:Puzzle box|Light box|Strange device)$"),
+    ]),
+    section("clue_tools", "Tools", "rows", [
+        all_("clue_tools", [("Spade", "Digs up dig and coordinate steps"), ("Sextant", "Reads coordinate clues"),
+                            ("Watch", "Reads coordinate clues"), ("Chart", "Reads coordinate clues")]),
+    ]),
+])
+
 ALCHABLES = tab("alchables", "Alchables", "Nature rune", kind="alch", sections=[
     section("alch", "Alchables", "rows", []),
 ])
 
 TABS = [MELEE, RANGED, MAGIC, MOVEMENT, PRAYER, SLAYER, AGILITY, THIEVING, HERBLORE, CRAFTING, FLETCHING, HUNTER,
         MINING, SMITHING, FISHING, COOKING, FIREMAKING, WOODCUTTING, FARMING, RUNECRAFT, CONSTRUCTION, SAILING,
-        ALCHABLES]
+        ALCHABLES, CLUES]
+
+# ---------------------------------------------------------------- junk
+# The Junk tab is built in game (TabBuilder.junk): what you hold that no other tab would ever show, grouped (quest
+# leftovers, outclassed gear, tradeable and other leftovers), with the cosmetics at the bottom. It goes after the
+# Cosmetics tab, which generate_data appends.
+JUNK = dict(key="junk", name="Junk", icon="Rotten tomato", kind="junk", sections=[])
+# Never junk, whatever the tabs show: money, clue steps, pets, XP rewards and storage (looting bag, seed box...)
+JUNK_KEEP_CATEGORIES = ["Currency", "Clue scrolls", "Pets", "Experience items", "Storage items",
+                        # materials, supplies and tools: what you make things with is never junk
+                        "Seeds", "Herbs", "Herblore secondaries", "Ores", "Logs", "Gems", "Bones", "Fish", "Food",
+                        "Potions", "Tools", "Ammunition", "Hunter", "Fossils", "Light sources", "Monkey greegrees"]
+# every item of every minigame (each subcategory of this one): tickets, points items, minigame gear and rewards
+JUNK_KEEP_CATEGORY_TREES = ["Minigames"]
+# loot keys (crystal, brimstone, Larran's...) are kept; a quest's keys follow the quest instead
+JUNK_KEEP_UNLESS_QUEST_CATEGORIES = ["Keys"]
+# quest rewards with a lasting use that no tab shows
+JUNK_KEEP = (r"(?i)^(Old school bond.*|Ghostspeak amulet|Dramen staff|Lunar staff|Ring of charos.*|"
+             r"Ring of visibility|Seal of passage|Ectophial|Enchanted lyre.*|Holy wrench|Book of the dead|"
+             r"Kharedst's memoirs|Bonecrusher.*|Ash sanctifier|Soul bearer|Spiny helmet|Witchwood icon|"
+             r"Mirror shield|Insulated boots|Fungicide spray.*|Rock hammer|Bag of salt|Ice cooler|Slayer bell|"
+             # clue steps and their containers
+             r"Clue scroll.*|Challenge scroll.*|Reward casket.*|Clue (?:bottle|geode|nest).*|Scroll box.*|"
+             r"Puzzle box.*|Light box|"
+             # still useful once the quest is done
+             r"Snake charm|Salve shard|Excalibur|Insect repellent|Rogue kit|Tattered .* page|.*greegree|"
+             # exchanged for something (XP, rewards, planks)
+             r".* ticket|Sawmill coupon.*|Long bone|Curved bone|Granite dust|Hespori seed|Bird's egg|"
+             # boosts and food the categories miss, and tools
+             r"Dwarven stout.*|Purple sweets|Rock pick|Empty spice shaker)$")
+# wiki quest names RuneLite spells differently (the rest match after dropping "The", "Freeing"...)
+QUEST_ALIASES = {
+    "Recipe for Disaster/Freeing the Goblin generals": "Recipe for Disaster - Wartface & Bentnoze",
+    "Desert Treasure II": "Desert Treasure II - The Fallen Empire",
+}
 
 
 # ---------------------------------------------------------------- unique uses

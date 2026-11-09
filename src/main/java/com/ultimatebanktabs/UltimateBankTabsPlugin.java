@@ -32,6 +32,8 @@ import net.runelite.api.ItemContainer;
 import net.runelite.api.ScriptID;
 import net.runelite.api.MenuAction;
 import net.runelite.api.MenuEntry;
+import net.runelite.api.Quest;
+import net.runelite.api.QuestState;
 import net.runelite.api.events.BeforeRender;
 import net.runelite.api.events.MenuEntryAdded;
 import net.runelite.api.events.VarbitChanged;
@@ -79,10 +81,10 @@ import net.runelite.client.util.Text;
 @PluginDescriptor(
 	name = "BiS Bank Tabs",
 	description = "Self-updating bank tabs with your best gear for every combat style and skill, laid out like the"
-		+ " equipment screen, plus what's better at something else, cheaper picks that save your best, and an"
-		+ " Alchables tab",
+		+ " equipment screen, plus what's better at something else, cheaper picks that save your best, and"
+		+ " Alchables, Clues and Junk tabs",
 	tags = {"bank", "tags", "tabs", "bis", "best in slot", "gear", "layout", "skilling", "teleports", "organize",
-		"ironman", "alch", "high alchemy"}
+		"ironman", "alch", "high alchemy", "clue", "treasure trails", "junk"}
 )
 public class UltimateBankTabsPlugin extends Plugin
 {
@@ -97,6 +99,13 @@ public class UltimateBankTabsPlugin extends Plugin
 	private static final String RESTORE_ALCH_KEY = "restoreAlch";
 	private static final String ALCH_TAB = "alchables";
 	private static final String REMOVE_ALCH = "Remove-alch";
+	/** per account: items the player took off the Junk tab (Not junk) */
+	private static final String JUNK_REMOVED_KEY = "junkRemoved";
+	private static final String RESTORE_JUNK_KEY = "restoreJunk";
+	private static final String JUNK_TAB = "junk";
+	private static final String NOT_JUNK = "Not junk";
+	/** the most foods a combat tab can show: the Junk tab never calls a food junk */
+	private static final int MAX_FOODS = 16;
 	/** the player agreed with the bank open: the takeover waits for the next bank open */
 	private static final String REPLACE_PENDING_KEY = "replacePending";
 	/** the food count default went from 4 to 6 */
@@ -650,15 +659,27 @@ public class UltimateBankTabsPlugin extends Plugin
 				client.getMenu().removeMenuEntry(entry);
 			}
 		}
-		if (itemId > 0 && ALCH_TAB.equals(writer.keyOf(tag)))
+		String key = writer.keyOf(tag);
+		if (itemId > 0 && (ALCH_TAB.equals(key) || JUNK_TAB.equals(key)))
 		{
 			// just above Examine, like Bank Tags' own Remove-tag
 			int item = itemManager.canonicalize(itemId);
+			boolean alch = ALCH_TAB.equals(key);
 			client.getMenu().createMenuEntry(-1)
-				.setOption(REMOVE_ALCH)
+				.setOption(alch ? REMOVE_ALCH : NOT_JUNK)
 				.setTarget(event.getTarget())
 				.setType(MenuAction.RUNELITE)
-				.onClick(e -> removeAlch(item));
+				.onClick(e ->
+				{
+					if (alch)
+					{
+						removeAlch(item);
+					}
+					else
+					{
+						notJunk(item);
+					}
+				});
 		}
 	}
 
@@ -683,6 +704,153 @@ public class UltimateBankTabsPlugin extends Plugin
 			}
 		}
 		return false;
+	}
+
+	/** what you do with an item you keep that the Junk tab respects: open it, teleport with it, fill it */
+	private static final Set<String> KEEP_ACTIONS = new HashSet<>(Arrays.asList(
+		"open", "search", "loot", "rub", "break", "teleport", "fill", "check"));
+
+	/** Kept for what you do with it: a casket you open, jewellery you rub, a sack you fill. Books you read aren't. */
+	private static boolean keptForUse(String[] actions)
+	{
+		if (actions != null)
+		{
+			for (String a : actions)
+			{
+				if (a != null && KEEP_ACTIONS.contains(a.toLowerCase()))
+				{
+					return true;
+				}
+			}
+		}
+		return false;
+	}
+
+	/** Items the player took off the Junk tab, for this account. */
+	private Set<Integer> junkRemoved()
+	{
+		Set<Integer> ids = new HashSet<>();
+		parse(Objects.toString(configManager.getRSProfileConfiguration(UltimateBankTabsConfig.GROUP, JUNK_REMOVED_KEY), ""),
+			ids);
+		return ids;
+	}
+
+	private void notJunk(int itemId)
+	{
+		Set<Integer> ids = junkRemoved();
+		if (ids.add(itemId))
+		{
+			configManager.setRSProfileConfiguration(UltimateBankTabsConfig.GROUP, JUNK_REMOVED_KEY, join(ids));
+			chat("BiS Bank Tabs: " + itemManager.getItemComposition(itemId).getName() + " is off the Junk tab."
+				+ " \"Bring back removed junk\" in the settings puts it back.");
+		}
+		dirty = true;
+	}
+
+	/** wiki quest-name words RuneLite leaves out ("The Lost Tribe" is "Lost Tribe" on the wiki, and so on) */
+	private static final Set<String> QUEST_FILLER = new HashSet<>(Arrays.asList(
+		"the", "freeing", "defeating", "miniquest", "quest", "full", "guide"));
+	private static final Map<String, Quest> QUESTS = new HashMap<>();
+
+	static
+	{
+		for (Quest q : Quest.values())
+		{
+			QUESTS.putIfAbsent(questKey(q.getName()), q);
+		}
+	}
+
+	static String questKey(String name)
+	{
+		StringBuilder out = new StringBuilder();
+		for (String word : name.toLowerCase().replace("&", " and ").split("[^a-z0-9]+"))
+		{
+			if (!word.isEmpty() && !QUEST_FILLER.contains(word))
+			{
+				out.append(word).append(' ');
+			}
+		}
+		return out.toString().trim();
+	}
+
+	/**
+	 * RuneLite's quest for a wiki quest name: the same words once "The", "Freeing"... are dropped, or else the one
+	 * quest whose name starts with them ("Desert Treasure II" is "Desert Treasure II - The Fallen Empire"). Null for
+	 * events, diaries and anything else RuneLite doesn't track.
+	 */
+	static Quest quest(String wikiName, Map<String, String> aliases)
+	{
+		String key = questKey(aliases.getOrDefault(wikiName, wikiName));
+		Quest exact = QUESTS.get(key);
+		if (exact != null || key.isEmpty())
+		{
+			return exact;
+		}
+		Quest only = null;
+		for (Map.Entry<String, Quest> q : QUESTS.entrySet())
+		{
+			if (q.getKey().startsWith(key + " "))
+			{
+				if (only != null)
+				{
+					return null;
+				}
+				only = q.getValue();
+			}
+		}
+		return only;
+	}
+
+	private boolean questFinished(String wikiName)
+	{
+		Quest quest = quest(wikiName, data.questAliases);
+		return quest != null && quest.getState(client) == QuestState.FINISHED;
+	}
+
+	/**
+	 * The Junk tab leaves out everything another tab shows, and everything one would show with all its content on
+	 * (tabs switched off, supplies and goods hidden, every food and trade-off), so hiding something never makes it
+	 * junk. Its cosmetics are the Cosmetics tab's, whether that tab is on or not.
+	 */
+	private TabBuilder.Built buildJunk(TabData.Tab def, Set<Integer> owned, TabBuilder.Options options,
+		Map<String, TabBuilder.Built> builtTabs)
+	{
+		TabBuilder.Options wide = new TabBuilder.Options();
+		wide.backups = options.backups;
+		wide.budget = options.budget;
+		wide.foodCount = MAX_FOODS;
+		wide.slayerTask = options.slayerTask;
+		Set<Integer> kept = new HashSet<>();
+		TabData.Tab cosmetics = null;
+		for (TabData.Tab t : data.tabs)
+		{
+			if (t.isCosmetic())
+			{
+				cosmetics = t;
+				continue;
+			}
+			TabBuilder.Built built = builtTabs.get(t.key);
+			if (built != null)
+			{
+				kept.addAll(built.itemIds());
+			}
+			if (!t.isAlch() && !t.isJunk())
+			{
+				kept.addAll(builder.build(t, owned, wide).itemIds());
+			}
+		}
+		options.kept = kept;
+		if (cosmetics != null)
+		{
+			wide.shownElsewhere = kept;
+			options.cosmetics = builder.build(cosmetics, owned, wide).getSections().stream()
+				.flatMap(s -> s.getItems().stream()).collect(Collectors.toList());
+		}
+		Map<String, Boolean> done = new HashMap<>();
+		options.questDone = q -> done.computeIfAbsent(q, this::questFinished);
+		options.notJunk = junkRemoved();
+		options.keepForUse = id -> keptForUse(itemManager.getItemComposition(id).getInventoryActions());
+		return builder.build(def, owned, options);
 	}
 
 	/** Items the player took off the Alchables tab, for this account. */
@@ -732,12 +900,14 @@ public class UltimateBankTabsPlugin extends Plugin
 	@Subscribe
 	public void onConfigChanged(ConfigChanged event)
 	{
-		if (UltimateBankTabsConfig.GROUP.equals(event.getGroup()) && RESTORE_ALCH_KEY.equals(event.getKey()))
+		if (UltimateBankTabsConfig.GROUP.equals(event.getGroup())
+			&& (RESTORE_ALCH_KEY.equals(event.getKey()) || RESTORE_JUNK_KEY.equals(event.getKey())))
 		{
 			if (Boolean.parseBoolean(event.getNewValue()))
 			{
-				configManager.unsetRSProfileConfiguration(UltimateBankTabsConfig.GROUP, ALCH_REMOVED_KEY);
-				configManager.setConfiguration(UltimateBankTabsConfig.GROUP, RESTORE_ALCH_KEY, false);
+				boolean alch = RESTORE_ALCH_KEY.equals(event.getKey());
+				configManager.unsetRSProfileConfiguration(UltimateBankTabsConfig.GROUP, alch ? ALCH_REMOVED_KEY : JUNK_REMOVED_KEY);
+				configManager.setConfiguration(UltimateBankTabsConfig.GROUP, event.getKey(), false);
 				dirty = true;
 			}
 		}
@@ -1076,7 +1246,7 @@ public class UltimateBankTabsPlugin extends Plugin
 		for (TabData.Tab def : data.tabs)
 		{
 			titles.put(def.key, def.name);
-			if (!enabled(def.key) || def.isAlch())
+			if (!enabled(def.key) || def.isAlch() || def.isJunk())
 			{
 				continue;
 			}
@@ -1096,6 +1266,14 @@ public class UltimateBankTabsPlugin extends Plugin
 			if (enabled(def.key) && def.isAlch())
 			{
 				builtTabs.put(def.key, builder.build(def, owned, options));
+			}
+		}
+		// the Junk tab comes last of all: it leaves out what every other tab uses or would use
+		for (TabData.Tab def : data.tabs)
+		{
+			if (enabled(def.key) && def.isJunk())
+			{
+				builtTabs.put(def.key, buildJunk(def, owned, options, builtTabs));
 			}
 		}
 		for (TabData.Tab def : data.tabs)

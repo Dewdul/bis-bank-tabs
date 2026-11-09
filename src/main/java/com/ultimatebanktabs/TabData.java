@@ -37,6 +37,18 @@ class TabData
 	List<Integer> neverAlch = Collections.emptyList();
 	/** gear that spends charges or degrades as you use it -> what keeping it going costs (blood runes...) */
 	Map<String, String> charged = Collections.emptyMap();
+	/** quest and miniquest names (OSRS Wiki pages) that questItems points into */
+	List<String> quests = Collections.emptyList();
+	/** quest item id -> its quests (indexes into quests): a quest leftover once they are all finished */
+	Map<String, List<Integer>> questItems = Collections.emptyMap();
+	/** item id -> the quests whose "Items required" name it (a bucket, a hammer): kept until they are finished */
+	Map<String, List<Integer>> questNeeds = Collections.emptyMap();
+	/** wiki quest name -> RuneLite's, where they differ beyond "The", "Freeing"... */
+	Map<String, String> questAliases = Collections.emptyMap();
+	/** never junk: money, clue steps, pets, XP rewards, storage, loot keys, quest rewards with a lasting use */
+	List<Integer> junkKeep = Collections.emptyList();
+	/** never junk either: a pattern for in-game names (clue steps the wiki has no item id for) */
+	String junkKeepNames;
 
 	/** What a slayer task wants (tools/slayer_tasks.py, from the OSRS Wiki). */
 	static class SlayerTaskData
@@ -96,6 +108,12 @@ class TabData
 		{
 			return "cosmetic".equals(kind);
 		}
+
+		/** Built in game: what you hold that no other tab would ever show (TabBuilder.junk). */
+		boolean isJunk()
+		{
+			return "junk".equals(kind);
+		}
 	}
 
 	static class Section
@@ -136,6 +154,8 @@ class TabData
 		boolean cheaper;
 		/** with cheaper alternatives on, shown even when an "unless" pick resolved (a combat potion beside super combats) */
 		boolean budgetKeeps;
+		/** "named" picks: what the item's in-game name must match (clue scrolls: each step is its own item) */
+		String pattern;
 		/** hover text: one per entry (may be shorter than entries), else the label */
 		List<String> reasons = Collections.emptyList();
 		/** "all" picks: the outfit/set each entry belongs to, kept together on one row by the "sets" layout */

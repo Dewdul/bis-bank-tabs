@@ -32,6 +32,12 @@ Open the bank and it's done. There's nothing to tag, no setup to build and no ca
 
   Then come your special attack weapons, the right ammunition for the launchers in the tab, and your potions. Divine and regular potions both show, because each suits different trips. Each kind shows its best version: super combat, or the attack, strength and defence potions when you have no super combat; bastion or ranging; battlemage or magic; the magic brews; and every restore (super restore, sanfew serum, prayer potion, prayer regeneration, Menaphite remedy). Last is your best food on a row of its own: six by default (up to 16), ranked by what one bite heals you right now. The heal amounts come live from RuneLite's own item stats, the numbers in the Item Stats tooltips, so anglerfish follow your Hitpoints level and new foods count as soon as RuneLite knows them. Below those, after a blank row, are your **blighted supplies** (blighted food and super restores, plus the blighted spell sacks on the magic tab), which only work in the Wilderness and PvP areas.
 - **Movement.** Your lightest gear in the shape of the equipment screen: full graceful if you own every piece (colours can mix, and the Agility cape counts as the cape), otherwise the lightest weight-reducing item for each slot, with the ring of endurance. Then stamina potions, teleport jewellery, diary rewards and other teleport items. It also has every teleport tablet and scroll, and the runes for teleport spells.
+- **Clues.** Under Alchables, with a clue scroll icon: everything for Treasure Trails, in this order:
+  - your graceful, laid out like the equipment screen;
+  - your clues, caskets, scroll boxes, bottles, geodes and nests, a row per tier from beginner to master, then puzzle and light boxes;
+  - the spade, sextant, watch and chart;
+  - every teleport from the Movement tab;
+  - the items emote steps ask you to wear, a section per tier, with each step's items kept together (hover one to see which step and emotes).
 - **Slayer task.** While you have a slayer task, the Slayer tab leads with the best setup for it from what you own: your best gear for the style the task suits (the first recommended style you can hurt the monster with, preferring one whose bane weapon you own), your slayer helmet, a salve amulet on undead when it beats the helmet, the bane weapon (dragon hunter lance on dragons, arclight on demons, keris on kalphites...) and whatever the task needs in a slot (mirror shield for basilisks, insulated boots for killerwatts, boots of stone in Mount Karuulm...). Gear it only suggests stands beside it, and a shield the task needs means a one-handed weapon. Your prayer gear for that style is drawn as a second equipment screen beside the setup, as on the combat tabs. Then the task's items (bag of salt, rock hammer, ice cooler, light source...) and its potions and food. Every task from every master is covered, bosses included. Without a task the tab is the general Slayer tab.
 - **Skills.** Prayer, Slayer, Agility, Thieving, Herblore, Crafting, Fletching, Hunter, Mining, Smithing, Fishing, Cooking, Firemaking, Woodcutting, Farming, Runecraft, Construction and Sailing. Tabs with special equipment (rogue's outfit, angler, prospector, graceful on Agility...) start with your best item for each slot in the shape of the equipment screen, like the combat tabs, with the skill cape (or max cape) in the cape slot and alternatives beside it: the other angler look, gloves of silence, Varrock armour and so on. A slot the skill has nothing for takes an alternative you own for it (Varrock armour, goldsmith gauntlets...), else your lightest gear (graceful, or boots of lightness and the like), as on the Movement tab; the skill's own pieces always come first, with your graceful piece for that slot beside them to swap in for running. Then come your best tools, then the supplies you own for that skill, grouped and in level order. For example, Herblore gives each herb a row: grimy, clean, its secondary, the unfinished potion, then the potion's doses 4 to 1, each in its own column. At the bottom, after a blank row, each skill tab shows its **finished goods**: what the skill makes, grouped by what it is made from (potions, jewellery, d'hide, bows and arrows, smithed items, cooked food, runes and so on), plus logs, ores, gems, raw fish and hunter catches for the gathering skills.
 - **Alchables.** Under Sailing, with the High Level Alchemy icon: what you hold that's worth alching, highest High Alch value first.
@@ -43,6 +49,21 @@ Open the bank and it's done. There's nothing to tag, no setup to build and no ca
     - What gathering skills bring in (logs, ores, gems, raw fish, empty bird nests): those are materials for other skills.
   - **Spare gear:** gear another tab uses still shows when you hold more than one. You keep one and alch the rest (three dragon daggers: alch two).
   - **Your choices:** right-click an item and pick *Remove-alch* to keep it off. *Bring back removed alchables* puts those back.
+- **Junk.** The last tab: what you could sell, drop or destroy.
+  - **Which items:** anything in your bank that no other tab uses, even with every tab, supply list and food switched on.
+  - **Groups**, each starting a new row:
+    - *Quest leftovers*, grouped by quest;
+    - *Outclassed gear*, in equipment-slot order;
+    - *Tradeable leftovers*, most valuable stack first (the hover says what it sells for);
+    - *Other leftovers*;
+    - your cosmetics, at the bottom after a blank row. This includes costumes: worn items with no attack, strength or prayer bonus and next to no defence (H.A.M. robes, the cabbage cape), even ones a quest gave you.
+  - **What it never calls junk:**
+    - Anything a quest or miniquest you haven't finished uses, either as a quest item or in its list of items needed. A quest RuneLite can't check, such as an event or a diary, counts as unfinished.
+    - What you make things with or use as a tool: every recipe's ingredients and tools (secondaries, crafting materials, buckets, shears), plus seeds, herbs, ores, logs, gems, bones, fish, food, potions, ammo, hunter items, fossils, light sources and greegrees.
+    - Anything from a minigame (tickets, points items, minigame gear and rewards).
+    - Money, clues and caskets, pets, XP lamps and books, storage (looting bag, seed box...), loot keys, charged items, and anything you open, rub or fill.
+    - Quest rewards you keep using, such as the ghostspeak amulet, dramen staff, ring of charos, salve shard and snake charm.
+  - **Your choices:** right-click an item and pick *Not junk* to keep it off. *Bring back removed junk* puts those back.
 
 Only items you own appear. That means your bank, including placeholders, potion storage, and (optionally) what you are wearing and carrying. An item can appear in several tabs. Tabs with nothing in them are not created.
 

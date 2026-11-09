@@ -13,6 +13,7 @@ Stdlib only. Usage:
   python tools/generate_data.py            # use cached wiki data if present
   python tools/generate_data.py --refresh  # re-download everything
 """
+import copy
 import json
 import re
 import subprocess
@@ -53,6 +54,84 @@ def cached(name, fetch):
 def fetch_items():
     return wiki_recipes.fetch_all("infobox_item", ["page_name", "page_name_sub", "item_name", "item_id", "removal_date", "quest",
                                                    "tradeable"])
+
+
+def fetch_quests():
+    """Each quest's "Items required" (wikitext), from the wiki's quest bucket."""
+    return wiki_recipes.fetch_all("quest", ["page_name", "items_required"])
+
+
+QUEST_LINK = re.compile(r"\[\[([^\]|#]+)(?:#[^\]|]*)?(?:\|[^\]]*)?\]\]")
+
+
+def quest_items(wiki, rows):
+    """The quests (and miniquests) behind each item: (names, quest items, quest needs). Quest items name the quest
+    in their own infobox "quest" field ("" when it isn't linked: never counted as finished); quest needs are
+    named in a quest's "Items required" (a bucket, a hammer). Both are kept while one of their quests isn't done;
+    only quest items are quest leftovers once they all are."""
+    uses = defaultdict(set)
+    needs = defaultdict(set)
+    for r in rows:
+        q = r.get("quest")
+        if not isinstance(q, str) or q.strip() in ("", "No"):
+            continue
+        names = [n.strip() for n in QUEST_LINK.findall(q)] or [""]
+        for raw in r.get("item_id") or []:
+            try:
+                uses[int(str(raw).strip())].update(names)
+            except ValueError:
+                pass
+    for quest in cached("quests.json", fetch_quests):
+        for link in QUEST_LINK.findall(quest.get("items_required") or ""):
+            for i in wiki.page_ids.get(link.strip().lower(), []):
+                needs[i].add(quest["page_name"])
+    names = sorted({n for m in (uses, needs) for qs in m.values() for n in qs})
+    index = {n: k for k, n in enumerate(names)}
+
+    def emit(m):
+        return {str(i): sorted(index[n] for n in qs) for i, qs in sorted(m.items())}
+    return names, emit(uses), emit(needs)
+
+
+def fetch_clues():
+    """Every clue step (tier, emotes, where) and the items each emote step asks you to wear."""
+    return {"equipment": wiki_recipes.fetch_all("clue_equipment", ["clue_id", "set_id", "group_id", "item", "base_item"]),
+            "info": wiki_recipes.fetch_all("clue_info", ["id", "tier", "emote", "location"])}
+
+
+LINK_TEXT = re.compile(r"\[\[(?:[^\]|]*\|)?([^\]|]*)\]\]")
+
+
+def emote_sections(wiki):
+    """One section per tier: the items its emote steps ask for, each step's items kept together on a row."""
+    data = cached("clues.json", fetch_clues)
+    info = {r["id"]: r for r in data["info"]}
+    steps = defaultdict(list)
+    for r in sorted(data["equipment"], key=lambda r: (r["clue_id"], r.get("set_id") or 0, r.get("group_id") or 0)):
+        step = info.get(r["clue_id"]) or {}
+        if step.get("tier") in curated.CLUE_TIERS:
+            steps[r["clue_id"]].append((r.get("item") or r.get("base_item") or "").split("#")[0].strip())
+    sections = []
+    for tier in curated.CLUE_TIERS:
+        entries, groups, reasons = [], [], []
+        for cid, names in sorted(steps.items()):
+            step = info[cid]
+            if step.get("tier") != tier:
+                continue
+            where = re.sub(r"\{\{[^}]*\}\}|'{2,}", "", LINK_TEXT.sub(r"\1", step.get("location") or "")).strip()
+            emotes = ", ".join(step.get("emote") or [])
+            why = "Emote clue (%s): %s" % (tier, " - ".join(x for x in (emotes, where[:110]) if x))
+            for name in dict.fromkeys(names):
+                ids = wiki.page_ids.get(name.lower())
+                if ids:
+                    entries.append(list(ids))
+                    groups.append("step%d" % cid)
+                    reasons.append(why)
+        if entries:
+            sections.append({"key": "emote_" + tier, "title": tier.capitalize() + " emote items", "layout": "sets",
+                             "picks": [{"key": "emote_" + tier, "mode": "all", "entries": entries, "groups": groups,
+                                        "reasons": reasons}]})
+    return sections
 
 
 def fetch_variations():
@@ -262,7 +341,7 @@ def slayer_tasks(res):
 def build_pick(res, pick):
     out = {"key": pick["key"], "mode": pick["mode"]}
     for k in ("slot", "profile", "style", "launcher", "fallback", "complete", "fill", "unless", "take", "groups", "repeat",
-              "one", "slots", "cheaper", "budgetKeeps"):
+              "one", "slots", "cheaper", "budgetKeeps", "pattern"):
         if pick.get(k):
             out[k] = pick[k]
     if pick.get("why"):
@@ -405,20 +484,35 @@ def fetch_bonuses():
                                                       "weapon_attack_speed"] + STAT_FIELDS)
 
 
+def category_members(title, kind="page"):
+    """Titles of a category's pages (or subcategories, kind="subcat")."""
+    titles, cont = [], {}
+    while True:
+        q = {"action": "query", "list": "categorymembers", "cmtitle": title, "cmlimit": "500", "cmtype": kind}
+        q.update(cont)
+        d = wiki_recipes.api(q)
+        titles += [m["title"] for m in d["query"]["categorymembers"]]
+        if "continue" not in d:
+            return titles
+        cont = d["continue"]
+
+
 def fetch_categories():
     out = {}
-    for cat in curated.COSMETIC_CATEGORIES + curated.NEVER_ALCH_CATEGORIES:
-        titles, cont = [], {}
-        while True:
-            q = {"action": "query", "list": "categorymembers", "cmtitle": "Category:" + cat, "cmlimit": "500",
-                 "cmtype": "page"}
-            q.update(cont)
-            d = wiki_recipes.api(q)
-            titles += [m["title"] for m in d["query"]["categorymembers"]]
-            if "continue" not in d:
-                break
-            cont = d["continue"]
-        out[cat] = titles
+    for cat in (curated.COSMETIC_CATEGORIES + curated.NEVER_ALCH_CATEGORIES + curated.JUNK_KEEP_CATEGORIES
+                + curated.JUNK_KEEP_UNLESS_QUEST_CATEGORIES):
+        out[cat] = category_members("Category:" + cat)
+    return out
+
+
+def fetch_category_trees():
+    """root -> every page of its subcategories (one level down: each minigame's own category)."""
+    out = {}
+    for root in curated.JUNK_KEEP_CATEGORY_TREES:
+        pages = set()
+        for sub in category_members("Category:" + root, "subcat"):
+            pages |= set(category_members(sub))
+        out[root] = sorted(pages)
     return out
 
 
@@ -610,15 +704,25 @@ def main():
 
     tabs = []
     for t in curated.TABS:
-        icon = res.base_ids(curated.DEFAULT_ICONS.get(t["key"], t["icon"]))
+        icon = curated.DEFAULT_ICONS.get(t["key"], t["icon"])
+        icon = [icon] if isinstance(icon, int) else res.base_ids(icon)
         tab = {"key": t["key"], "name": t["name"], "kind": t["kind"], "icon": icon[0] if icon else 0,
                "sections": [dict({"key": s["key"], "title": s["title"], "layout": s["layout"],
                                   "picks": [build_pick(res, p) for p in s["picks"]]},
                                  **({"supplies": True} if s.get("supplies") else {}))
                             for s in t["sections"]]}
+        if isinstance(t["icon"], int):
+            # an icon given by item id is fixed: never the first item shown (the Clues tab's graceful hood)
+            tab["iconEntries"] = [[t["icon"]]]
+            tab["iconStrict"] = True
         tabs.append(tab)
 
     by_key = {t["key"]: t for t in tabs}
+    # the clue tab: every Movement teleport right under the tools, then each tier's emote step items
+    clues = by_key["clues"]
+    at = next(k for k, s in enumerate(clues["sections"]) if s["key"] == "clue_tools") + 1
+    teleports = [copy.deepcopy(s) for s in by_key["movement"]["sections"] if s["key"] not in ("main", "situational")]
+    clues["sections"][at:at] = teleports + emote_sections(wiki)
     uses = material_uses(wiki, recipes)
     for skill, key, rules in curated.SUPPLY_RULES:
         tab = by_key[key]
@@ -632,6 +736,9 @@ def main():
     for t in tabs:
         elsewhere |= curated_ids(t)
     tabs.append(cosmetics_tab(wiki, res, elsewhere))
+    junk = curated.JUNK
+    tabs.append({"key": junk["key"], "name": junk["name"], "kind": junk["kind"],
+                 "icon": (res.base_ids(junk["icon"]) or [0])[0], "sections": []})
     for t in tabs:
         if t["key"] in curated.TAB_ICONS:
             t["iconEntries"] = res.entries(curated.TAB_ICONS[t["key"]])
@@ -639,12 +746,35 @@ def main():
             t["iconStrict"] = t["key"] not in curated.ICON_FALLBACK_TO_FIRST_ITEM
 
     cats = cached("categories.json", fetch_categories)
-    if any(c not in cats for c in curated.COSMETIC_CATEGORIES + curated.NEVER_ALCH_CATEGORIES):
+    if any(c not in cats for c in curated.COSMETIC_CATEGORIES + curated.NEVER_ALCH_CATEGORIES
+           + curated.JUNK_KEEP_CATEGORIES + curated.JUNK_KEEP_UNLESS_QUEST_CATEGORIES):
         # a category added since the cache was made
         cats = fetch_categories()
         (CACHE / "categories.json").write_text(json.dumps(cats), encoding="utf-8")
     never_alch = sorted({i for c in curated.NEVER_ALCH_CATEGORIES for p in cats.get(c, [])
                          for i in wiki.page_ids.get(p.lower(), [])})
+    quests, quest_uses, quest_needs = quest_items(wiki, rows)
+    keep_pattern = re.compile(curated.JUNK_KEEP)
+    junk_keep = {i for c in curated.JUNK_KEEP_CATEGORIES for p in cats.get(c, []) for i in wiki.page_ids.get(p.lower(), [])}
+    junk_keep |= {i for c in curated.JUNK_KEEP_UNLESS_QUEST_CATEGORIES for p in cats.get(c, [])
+                  for i in wiki.page_ids.get(p.lower(), []) if str(i) not in quest_uses}
+    junk_keep |= {i for key, ids in wiki.page_ids.items() if keep_pattern.match(wiki.page_name[key]) for i in ids}
+    # functional clothing the cosmetics tab leaves out (desert robes, earmuffs, candles...) is kept too
+    functional = re.compile(curated.COSMETIC_EXCLUDE)
+    junk_keep |= {i for key, ids in wiki.page_ids.items() if functional.match(wiki.page_name[key]) for i in ids}
+    # every recipe's ingredients and tools: secondaries, crafting materials, buckets, shears...
+    for r in recipes:
+        junk_keep |= {g["itemId"] for g in r.get("ingredients") or [] if g.get("itemId")}
+        junk_keep |= {t for t in r.get("tools") or [] if isinstance(t, int)}
+    # anything to do with a minigame
+    trees = cached("category_trees.json", fetch_category_trees)
+    if any(t not in trees for t in curated.JUNK_KEEP_CATEGORY_TREES):
+        trees = fetch_category_trees()
+        (CACHE / "category_trees.json").write_text(json.dumps(trees), encoding="utf-8")
+    junk_keep |= {i for t in curated.JUNK_KEEP_CATEGORY_TREES for p in trees.get(t, [])
+                  for i in wiki.page_ids.get(p.lower(), [])}
+    # every version of a kept item (a spice's other doses, a mould's other states)
+    junk_keep |= {i for k in list(junk_keep) if k in wiki.id_page for i in wiki.page_ids[wiki.id_page[k]]}
 
     launcher_ammo = {}
     for name, cls in curated.LAUNCHER_AMMO.items():
@@ -670,6 +800,14 @@ def main():
         "neverAlch": never_alch,
         # gear that uses charges up: with cheaper alternatives on, the best item that doesn't stands beside it
         "charged": {str(i): uses for name, uses in curated.CHARGED for i in res.flat([name])},
+        # the Junk tab: quests that use each item (finished ones free it), and what is never junk
+        "quests": quests,
+        "questItems": quest_uses,
+        "questNeeds": quest_needs,
+        "questAliases": curated.QUEST_ALIASES,
+        "junkKeep": sorted(junk_keep),
+        # the same names matched in game, for item ids the wiki doesn't list (each clue step has its own)
+        "junkKeepNames": curated.JUNK_KEEP,
     }
     if res.errors:
         print("\n".join(sorted(set(res.errors))))

@@ -11,6 +11,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.function.IntFunction;
@@ -19,6 +20,7 @@ import java.util.function.ToDoubleFunction;
 import java.util.stream.Collectors;
 import lombok.Value;
 import net.runelite.api.EquipmentInventorySlot;
+import net.runelite.client.game.ItemVariationMapping;
 
 /**
  * Turns a tab definition plus the set of items the player owns into the items
@@ -75,6 +77,18 @@ class TabBuilder
 		Set<Integer> shownElsewhere = Collections.emptySet();
 		/** the player's current slayer task: the Slayer tab leads with its setup */
 		SlayerTask slayerTask;
+
+		// ---- the Junk tab (held, tradeable and gePrice above count too)
+		/** everything another tab shows or would show with all its content on, the Alchables tab included */
+		Set<Integer> kept = Collections.emptySet();
+		/** the Cosmetics tab's items in its order: they close the Junk tab */
+		List<Placement> cosmetics = Collections.emptyList();
+		/** finished quests (and miniquests), by wiki name; a name RuneLite doesn't know counts as unfinished */
+		java.util.function.Predicate<String> questDone = quest -> false;
+		/** what the player took off the Junk tab with Not junk */
+		Set<Integer> notJunk = Collections.emptySet();
+		/** kept for what you do with it: opened, rubbed, filled (a looting bag, a casket, a teleport) */
+		java.util.function.IntPredicate keepForUse = id -> false;
 	}
 
 	@Value
@@ -220,6 +234,15 @@ class TabBuilder
 	private final Map<Integer, String> charged = new HashMap<>();
 	/** kept for their charges (teleport jewellery, recoil rings...): never in the Alchables tab */
 	private final Set<Integer> neverAlch;
+	/** quest item -> its quests */
+	private final Map<Integer, List<String>> questsOf = new HashMap<>();
+	/** "named" picks' patterns, compiled once */
+	private final Map<String, java.util.regex.Pattern> patterns = new HashMap<>();
+	/** item -> the quests that need it (their "Items required") */
+	private final Map<Integer, List<String>> neededBy = new HashMap<>();
+	/** never junk */
+	private final Set<Integer> junkKeep;
+	private final java.util.regex.Pattern junkKeepName;
 
 	TabBuilder(TabData data, IntFunction<EquipStats> stats)
 	{
@@ -239,6 +262,12 @@ class TabBuilder
 		this.names = names;
 		data.charged.forEach((id, uses) -> charged.put(Integer.parseInt(id), uses));
 		this.neverAlch = new HashSet<>(data.neverAlch);
+		data.questItems.forEach((id, quests) -> questsOf.put(Integer.parseInt(id),
+			quests.stream().map(data.quests::get).collect(Collectors.toList())));
+		data.questNeeds.forEach((id, quests) -> neededBy.put(Integer.parseInt(id),
+			quests.stream().map(data.quests::get).collect(Collectors.toList())));
+		this.junkKeep = new HashSet<>(data.junkKeep);
+		this.junkKeepName = data.junkKeepNames == null ? null : java.util.regex.Pattern.compile(data.junkKeepNames);
 		this.notFood = new HashSet<>(data.notFood);
 		this.excludeAuto = new HashSet<>(data.excludeAuto);
 		this.situationalOnly = new HashSet<>(data.situationalOnly);
@@ -254,6 +283,10 @@ class TabBuilder
 		if (tab.isAlch())
 		{
 			return alch(tab, options);
+		}
+		if (tab.isJunk())
+		{
+			return junk(tab, options);
 		}
 		if (tab.isCosmetic() && !options.shownElsewhere.isEmpty())
 		{
@@ -379,6 +412,146 @@ class TabBuilder
 		String title = tab.sections.isEmpty() ? tab.name : tab.sections.get(0).title;
 		List<Section> sections = Collections.singletonList(new Section("alch", title, "rows", items));
 		return new Built(tab, sections, items.isEmpty() ? -1 : items.get(0).getItemId());
+	}
+
+	/**
+	 * The Junk tab: what you hold that no other tab shows or would show, safe to sell, drop or destroy. Never what a
+	 * quest you haven't finished uses (as a quest item or in its item list), money, clue steps, pets, XP rewards,
+	 * storage, loot keys, charged items, or anything you open, rub or fill. Grouped: quest leftovers by quest,
+	 * outclassed gear by slot, tradeable leftovers by what they sell for, other leftovers; the cosmetics close it.
+	 */
+	private Built junk(TabData.Tab tab, Options o)
+	{
+		Set<Integer> cosmetic = o.cosmetics.stream().map(Placement::getItemId).collect(Collectors.toSet());
+		List<int[]> quest = new ArrayList<>();
+		List<int[]> gear = new ArrayList<>();
+		List<int[]> sell = new ArrayList<>();
+		List<int[]> other = new ArrayList<>();
+		List<Integer> clothes = new ArrayList<>();
+		Map<Integer, String> questOf = new HashMap<>();
+		for (Map.Entry<Integer, Integer> held : o.held.entrySet())
+		{
+			int id = held.getKey();
+			if (o.kept.contains(id) || cosmetic.contains(id) || o.notJunk.contains(id) || junkKeep.contains(id)
+				|| neverAlch.contains(id) || o.keepForUse.test(id))
+			{
+				continue;
+			}
+			List<String> quests = questsOf.getOrDefault(id, Collections.emptyList());
+			if (quests.stream().anyMatch(q -> q.isEmpty() || !o.questDone.test(q))
+				|| neededBy.getOrDefault(id, Collections.emptyList()).stream().anyMatch(q -> !o.questDone.test(q)))
+			{
+				// a quest you haven't finished needs it
+				continue;
+			}
+			EquipStats s = stats.apply(id);
+			String itemName = names.apply(id);
+			if (s != null && s.getSlot() == EquipmentInventorySlot.AMMO.getSlotIdx()
+				|| junkKeepName != null && itemName != null && junkKeepName.matcher(itemName).matches())
+			{
+				// ammo is spent, not outgrown; named keeps (clue steps...) by their in-game name
+				continue;
+			}
+			if (s != null && costume(s))
+			{
+				// clothes with no real bonuses (a quest's or not): costumes go with the cosmetics
+				clothes.add(id);
+			}
+			else if (!quests.isEmpty())
+			{
+				questOf.put(id, quests.get(0));
+				quest.add(new int[]{id});
+			}
+			else if (s != null && s.getSlot() >= 0)
+			{
+				gear.add(new int[]{id, s.getSlot()});
+			}
+			else if (o.tradeable.test(id))
+			{
+				int price = o.gePrice.applyAsInt(id);
+				sell.add(new int[]{id, price, (int) Math.min(Integer.MAX_VALUE, (long) price * held.getValue())});
+			}
+			else
+			{
+				other.add(new int[]{id});
+			}
+		}
+		Comparator<int[]> byName = Comparator.comparing((int[] r) -> Objects.toString(name(r[0]), ""))
+			.thenComparingInt(r -> r[0]);
+		quest.sort(Comparator.comparing((int[] r) -> questOf.get(r[0])).thenComparing(byName));
+		gear.sort(Comparator.<int[]>comparingInt(r -> r[1]).thenComparing(byName));
+		sell.sort(Comparator.<int[]>comparingInt(r -> -r[2]).thenComparing(byName));
+		other.sort(byName);
+
+		List<Section> sections = new ArrayList<>();
+		List<Placement> items = new ArrayList<>();
+		for (int[] r : quest)
+		{
+			List<String> names = questsOf.get(r[0]).stream().map(q -> q.replace("/", ": ")).collect(Collectors.toList());
+			items.add(new Placement(r[0], null, questOf.get(r[0]), "Quest leftover: "
+				+ (names.size() == 1 ? names.get(0) + " is" : String.join(", ", names) + " are all") + " done"));
+		}
+		addJunk(sections, "junk_quest", "Quest leftovers", "sets", items);
+		items = new ArrayList<>();
+		for (int[] r : gear)
+		{
+			items.add(new Placement(r[0], null, "junk_gear", "Gear no tab uses: better or more useful gear fills its place"));
+		}
+		addJunk(sections, "junk_gear", "Outclassed gear", "rows", items);
+		items = new ArrayList<>();
+		for (int[] r : sell)
+		{
+			items.add(new Placement(r[0], null, "junk_sell", "No tab uses this" + (o.ironman || r[1] <= 0 ? ""
+				: ". Sells for about " + gp(r[1]) + (r[2] > r[1] ? " each, " + gp(r[2]) + " in all" : ""))));
+		}
+		addJunk(sections, "junk_sell", "Tradeable leftovers", "rows", items);
+		items = new ArrayList<>();
+		for (int[] r : other)
+		{
+			items.add(new Placement(r[0], null, "junk_other", "No tab uses this"));
+		}
+		addJunk(sections, "junk_other", "Other leftovers", "rows", items);
+		items = new ArrayList<>();
+		for (Placement p : o.cosmetics)
+		{
+			if (o.held.containsKey(p.getItemId()) && !o.notJunk.contains(p.getItemId()))
+			{
+				items.add(new Placement(p.getItemId(), null, p.getGroup(), "Cosmetic: no tab needs it"));
+			}
+		}
+		clothes.sort(Comparator.<Integer>comparingInt(id -> stats.apply(id).getSlot())
+			.thenComparing(id -> Objects.toString(name(id), "")).thenComparing(Comparator.naturalOrder()));
+		for (int id : clothes)
+		{
+			items.add(new Placement(id, null, "junk_clothes", "Cosmetic: clothing with no real bonuses"));
+		}
+		addJunk(sections, "junk_cosmetic", "Cosmetics", "bottom", items);
+		return new Built(tab, sections, -1);
+	}
+
+	/** worn slots where a piece with no real bonuses is a costume (a shield too: the Runefest shield) */
+	private static final Set<Integer> CLOTHING_SLOTS = new HashSet<>(Arrays.asList(
+		EquipmentInventorySlot.HEAD.getSlotIdx(), EquipmentInventorySlot.CAPE.getSlotIdx(),
+		EquipmentInventorySlot.BODY.getSlotIdx(), EquipmentInventorySlot.SHIELD.getSlotIdx(),
+		EquipmentInventorySlot.LEGS.getSlotIdx(), EquipmentInventorySlot.GLOVES.getSlotIdx(),
+		EquipmentInventorySlot.BOOTS.getSlotIdx()));
+	/** H.A.M. robes and the cabbage cape have a few points of defence; real armour has far more */
+	private static final int COSTUME_MAX_DEFENCE = 10;
+
+	/** No attack, strength, damage or prayer bonus and next to no defence: worn for the look. */
+	private static boolean costume(EquipStats s)
+	{
+		return CLOTHING_SLOTS.contains(s.getSlot()) && s.getStab() <= 0 && s.getSlash() <= 0 && s.getCrush() <= 0
+			&& s.getRanged() <= 0 && s.getMagic() <= 0 && s.getStr() <= 0 && s.getRstr() <= 0 && s.getMdmg() <= 0
+			&& s.getPrayer() <= 0 && s.getDefence() <= COSTUME_MAX_DEFENCE;
+	}
+
+	private static void addJunk(List<Section> sections, String key, String title, String layout, List<Placement> items)
+	{
+		if (!items.isEmpty())
+		{
+			sections.add(new Section(key, title, layout, items));
+		}
 	}
 
 	private static String gp(int coins)
@@ -877,6 +1050,7 @@ class TabBuilder
 		{
 			if (ctx.placed.add(p.getItemId()))
 			{
+				ctx.families.add(ItemVariationMapping.map(p.getItemId()));
 				out.add(p);
 			}
 		}
@@ -927,6 +1101,12 @@ class TabBuilder
 		final Set<Integer> owned;
 		final Options options;
 		final Set<Integer> placed = new LinkedHashSet<>();
+		/**
+		 * the variant groups (ItemVariationMapping: charge, dose and degrade states) of what is placed. A later pick
+		 * never adds another state of an item the tab shows: Bank Tags would draw the one banked copy in both cells
+		 * (a worn Guthan's chainskirt 100 beside the banked undamaged one).
+		 */
+		final Set<Integer> families = new HashSet<>();
 		/** pick key -> every item the pick settled on, including ones placed earlier */
 		final Map<String, List<Integer>> resolved = new HashMap<>();
 		String sectionTitle;
@@ -1033,6 +1213,25 @@ class TabBuilder
 					}
 				}
 				break;
+			case "named":
+			{
+				// owned items whose in-game name matches, by name: every clue step of a tier
+				java.util.regex.Pattern pattern = patterns.computeIfAbsent(pick.pattern, java.util.regex.Pattern::compile);
+				List<Integer> got = new ArrayList<>();
+				for (int id : ctx.owned)
+				{
+					String n = names.apply(id);
+					if (n != null && pattern.matcher(n).matches())
+					{
+						got.add(id);
+					}
+				}
+				got.sort(Comparator.comparing((Integer id) -> names.apply(id)).thenComparing(Comparator.naturalOrder()));
+				chosen.addAll(got);
+				String reason = pick.label != null ? pick.label : ctx.sectionTitle;
+				add(out, got, pick.slot, pick.key, ctx, id -> reason);
+				break;
+			}
 			case "auto":
 				chosen.addAll(firstOwned(pick.entries, ctx, 1 + ctx.options.backups));
 				if (chosen.isEmpty())
@@ -1344,8 +1543,17 @@ class TabBuilder
 	private static void add(List<Placement> out, Collection<Integer> ids, String slot, String group, Context ctx,
 		IntFunction<String> reason)
 	{
+		// one pick may show several states of an item (a potion's doses); a later pick adds none of them again
+		Set<Integer> mine = new HashSet<>();
 		for (int id : ids)
 		{
+			int family = ItemVariationMapping.map(id);
+			if (!mine.contains(family) && ctx.families.contains(family))
+			{
+				continue;
+			}
+			mine.add(family);
+			ctx.families.add(family);
 			if (ctx.placed.add(id))
 			{
 				out.add(new Placement(id, slot, group, reason.apply(id)));
@@ -1566,8 +1774,11 @@ class TabBuilder
 				scores.put(id, s);
 			}
 		}
+		// the next best is another item, never another charge or degrade state of a better one
+		Set<Integer> families = new HashSet<>();
 		return scores.keySet().stream()
 			.sorted(Comparator.<Integer>comparingDouble(scores::get).reversed().thenComparing(Comparator.naturalOrder()))
+			.filter(id -> families.add(ItemVariationMapping.map(id)))
 			.limit(count)
 			.collect(Collectors.toList());
 	}

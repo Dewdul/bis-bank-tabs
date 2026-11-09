@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import net.runelite.api.Quest;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -90,6 +91,11 @@ public class TabBuilderTest
 	static Set<Integer> items(TabBuilder.Section s)
 	{
 		return s.getItems().stream().map(TabBuilder.Placement::getItemId).collect(Collectors.toSet());
+	}
+
+	static List<Integer> order(TabBuilder.Section s)
+	{
+		return s.getItems().stream().map(TabBuilder.Placement::getItemId).collect(Collectors.toList());
 	}
 
 	static final String[] MAXED_MELEE = {
@@ -313,6 +319,24 @@ public class TabBuilderTest
 	}
 
 	@Test
+	public void gearMadeForAnotherStyleNeverFillsAMeleeSlot()
+	{
+		// the Eclipse Moon tassets' +1 melee strength is for the atlatl: they are ranged gear
+		Set<Integer> owned = own("Guthan's chainskirt", "Eclipse Moon tassets", "Rune platelegs");
+		for (TabBuilder.Built built : Arrays.asList(build("melee", owned), builder.build(tab("melee"), owned, budget())))
+		{
+			assertFalse(built.itemIds().contains(id("Eclipse Moon tassets")));
+		}
+		TabBuilder.Built budget = builder.build(tab("melee"), owned, budget());
+		assertEquals(id("Guthan's chainskirt"), (int) bySlot(section(budget, "main")).get("LEGS"));
+		assertTrue("the charge-free legs are melee legs",
+			budget.reasons().get(id("Rune platelegs")).contains("No charges to keep up"));
+		assertEquals("+1 strength wins outright", id("Obsidian platelegs"), (int) bySlot(section(
+			build("melee", own("Guthan's chainskirt", "Obsidian platelegs")), "main")).get("LEGS"));
+		assertTrue(Scoring.armour(Scoring.RANGED, STATS.get(id("Eclipse Moon tassets"))) > 0);
+	}
+
+	@Test
 	public void theFracturedArchivesItemsGoWhereTheyAreUsed()
 	{
 		TabBuilder.Built ranged = build("ranged", own("Ascension crossbows", "Ascension bolts", "Diamond ascension bolts (e)",
@@ -335,6 +359,107 @@ public class TabBuilderTest
 
 		assertTrue(items(section(build("prayer", own("Horn of Bran")), "unlocks")).contains(id("Horn of Bran")));
 		assertTrue(build("movement", own("Archivist's folio")).itemIds().contains(id("Archivist's folio")));
+	}
+
+	@Test
+	public void cluesTabHoldsCluesByTierToolsEmoteItemsAndTeleports()
+	{
+		// every clue step is its own item: they are matched by in-game name
+		Map<Integer, String> clueNames = new HashMap<>();
+		clueNames.put(990001, "Clue scroll (hard)");
+		clueNames.put(990002, "Reward casket (easy)");
+		clueNames.put(990003, "Clue scroll (easy)");
+		TabBuilder named = new TabBuilder(data, STATS::get, id -> -1, clueNames::get);
+		Set<Integer> owned = own("Spade", "Abyssal whip", "Graceful hood", "Varrock teleport (tablet)");
+		owned.addAll(clueNames.keySet());
+		TabBuilder.Built clues = named.build(tab("clues"), owned, new TabBuilder.Options());
+
+		assertEquals("a row per tier, by name", Arrays.asList(990003, 990002), order(section(clues, "clues_easy")));
+		assertEquals(Collections.singletonList(990001), order(section(clues, "clues_hard")));
+		assertTrue(items(section(clues, "clue_tools")).contains(id("Spade")));
+		assertTrue("an emote step asks for it", clues.reasons().get(id("Abyssal whip")).startsWith("Emote clue"));
+		assertTrue("graceful", clues.itemIds().contains(id("Graceful hood")));
+		assertTrue("the Movement tab's teleports", clues.itemIds().contains(id("Varrock teleport (tablet)")));
+		assertTrue("the icon is the clue scroll, never the graceful hood shown first",
+			clues.getHero() == -1 || clues.getHero() == tab("clues").icon);
+		assertEquals(19835, tab("clues").icon);
+	}
+
+	@Test
+	public void anItemShowsOnceWhateverItsChargeState()
+	{
+		// the undamaged Guthan's chainskirt banked (4730), a worn one at 100 (4922): the best legs, and the Guthan's
+		// set must not add the other state, or Bank Tags draws the banked skirt in both cells
+		Set<Integer> owned = new HashSet<>(Arrays.asList(4730, 4922));
+		TabBuilder.Options backup = new TabBuilder.Options();
+		backup.backups = 1;
+		for (TabBuilder.Built melee : Arrays.asList(build("melee", owned), builder.build(tab("melee"), owned, backup)))
+		{
+			Set<Integer> shown = melee.itemIds();
+			assertTrue(shown.contains(4730) ^ shown.contains(4922));
+		}
+	}
+
+	@Test
+	public void junkIsWhatNoTabUsesAndNoUnfinishedQuestNeeds()
+	{
+		Map<Integer, Integer> held = new HashMap<>();
+		for (int id : own("Rune scimitar", "Iron scimitar", "Rune kiteshield", "Leather boots", "Goblin symbol book",
+			"Ghostspeak amulet", "Crystal key", "Chef's hat"))
+		{
+			held.put(id, 1);
+		}
+		held.put(id("Rotten tomato"), 3);
+		held.put(id("Blighted vengeance sack"), 100);
+		TabBuilder.Options o = new TabBuilder.Options();
+		o.held = held;
+		o.kept = own("Rune scimitar");
+		o.tradeable = own("Rotten tomato", "Blighted vengeance sack")::contains;
+		o.gePrice = id -> id == id("Blighted vengeance sack") ? 50 : 100;
+		o.questDone = q -> true;
+		o.cosmetics = Collections.singletonList(new TabBuilder.Placement(id("Chef's hat"), null, "hats", "Cosmetic"));
+		TabBuilder.Built junk = builder.build(tab("junk"), held.keySet(), o);
+
+		List<String> keys = junk.getSections().stream().map(TabBuilder.Section::getKey).collect(Collectors.toList());
+		assertEquals(Arrays.asList("junk_quest", "junk_gear", "junk_sell", "junk_cosmetic"), keys);
+		assertEquals("a quest item", Collections.singletonList(id("Goblin symbol book")), order(section(junk, "junk_quest")));
+		assertEquals("only needed by finished quests: plain junk, most valuable stack first",
+			Arrays.asList(id("Blighted vengeance sack"), id("Rotten tomato")), order(section(junk, "junk_sell")));
+		assertEquals("by slot", Arrays.asList(id("Iron scimitar"), id("Rune kiteshield")), order(section(junk, "junk_gear")));
+		assertTrue("next to no defence: a costume, with the cosmetics",
+			items(section(junk, "junk_cosmetic")).contains(id("Leather boots")));
+		assertTrue(junk.reasons().get(id("Blighted vengeance sack")).contains("50 gp each, 5,000 gp in all"));
+		assertEquals("cosmetics close the tab", "bottom", section(junk, "junk_cosmetic").getLayout());
+		for (String keep : new String[]{"Rune scimitar", "Ghostspeak amulet", "Crystal key"})
+		{
+			assertFalse(keep, junk.itemIds().contains(id(keep)));
+		}
+
+		// a quest still to do keeps what it uses; Not junk and what you open stay off too
+		o.questDone = q -> !q.startsWith("Recipe for Disaster") && !q.equals("Lost Tribe");
+		o.notJunk = own("Rune kiteshield");
+		o.keepForUse = id -> id == id("Blighted vengeance sack");
+		junk = builder.build(tab("junk"), held.keySet(), o);
+		for (String kept : new String[]{"Goblin symbol book", "Rotten tomato", "Rune kiteshield", "Blighted vengeance sack"})
+		{
+			assertFalse(kept, junk.itemIds().contains(id(kept)));
+		}
+	}
+
+	@Test
+	public void wikiQuestNamesFindRuneLitesQuests()
+	{
+		Map<String, String> none = Collections.emptyMap();
+		assertEquals(Quest.THE_LOST_TRIBE, UltimateBankTabsPlugin.quest("Lost Tribe", none));
+		assertEquals(Quest.SEA_SLUG, UltimateBankTabsPlugin.quest("Sea Slug Quest", none));
+		assertEquals(Quest.ROMEO__JULIET, UltimateBankTabsPlugin.quest("Romeo & Juliet", none));
+		assertEquals(Quest.RECIPE_FOR_DISASTER__EVIL_DAVE,
+			UltimateBankTabsPlugin.quest("Recipe for Disaster/Freeing Evil Dave", none));
+		assertEquals(Quest.RECIPE_FOR_DISASTER, UltimateBankTabsPlugin.quest("Recipe for Disaster/Full guide", none));
+		assertEquals(Quest.DESERT_TREASURE_II__THE_FALLEN_EMPIRE, UltimateBankTabsPlugin.quest("Desert Treasure II", none));
+		assertEquals(Quest.DRAGON_SLAYER_I, UltimateBankTabsPlugin.quest("Dragon Slayer I", none));
+		assertNull("not a quest RuneLite tracks", UltimateBankTabsPlugin.quest("Achievement Diary", none));
+		assertNull("two quests start that way: neither", UltimateBankTabsPlugin.quest("Dragon Slayer", none));
 	}
 
 	/** prices for the alch tests: item -> {High Alch, Grand Exchange}; one of each held */
