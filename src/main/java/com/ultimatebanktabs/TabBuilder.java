@@ -514,7 +514,8 @@ class TabBuilder
 		items = new ArrayList<>();
 		for (Placement p : o.cosmetics)
 		{
-			if (o.held.containsKey(p.getItemId()) && !o.notJunk.contains(p.getItemId()))
+			// never pets, minigame rewards or anything else that is never junk
+			if (o.held.containsKey(p.getItemId()) && !o.notJunk.contains(p.getItemId()) && !junkKeep.contains(p.getItemId()))
 			{
 				items.add(new Placement(p.getItemId(), null, p.getGroup(), "Cosmetic: no tab needs it"));
 			}
@@ -1050,7 +1051,7 @@ class TabBuilder
 		{
 			if (ctx.placed.add(p.getItemId()))
 			{
-				ctx.families.add(ItemVariationMapping.map(p.getItemId()));
+				ctx.families.putIfAbsent(ItemVariationMapping.map(p.getItemId()), "task");
 				out.add(p);
 			}
 		}
@@ -1102,11 +1103,14 @@ class TabBuilder
 		final Options options;
 		final Set<Integer> placed = new LinkedHashSet<>();
 		/**
-		 * the variant groups (ItemVariationMapping: charge, dose and degrade states) of what is placed. A later pick
-		 * never adds another state of an item the tab shows: Bank Tags would draw the one banked copy in both cells
-		 * (a worn Guthan's chainskirt 100 beside the banked undamaged one).
+		 * variant group (ItemVariationMapping: charge, dose and degrade states) -> the pick that placed it. Another
+		 * pick never adds a second state of an item the tab shows: Bank Tags would draw the one banked copy in both
+		 * cells (a worn Guthan's chainskirt 100 beside the banked undamaged one). One pick may list several items
+		 * RuneLite groups together (every bird nest, every partyhat colour).
 		 */
-		final Set<Integer> families = new HashSet<>();
+		final Map<Integer, String> families = new HashMap<>();
+		/** the pick being resolved */
+		String pick = "";
 		/** pick key -> every item the pick settled on, including ones placed earlier */
 		final Map<String, List<Integer>> resolved = new HashMap<>();
 		String sectionTitle;
@@ -1129,6 +1133,7 @@ class TabBuilder
 
 	private List<Placement> resolve(TabData.Pick pick, Context ctx)
 	{
+		ctx.pick = pick.key;
 		if (!pick.requires.isEmpty())
 		{
 			Set<Integer> pool = pick.requiresPlaced ? ctx.placed : ctx.owned;
@@ -1543,17 +1548,14 @@ class TabBuilder
 	private static void add(List<Placement> out, Collection<Integer> ids, String slot, String group, Context ctx,
 		IntFunction<String> reason)
 	{
-		// one pick may show several states of an item (a potion's doses); a later pick adds none of them again
-		Set<Integer> mine = new HashSet<>();
 		for (int id : ids)
 		{
-			int family = ItemVariationMapping.map(id);
-			if (!mine.contains(family) && ctx.families.contains(family))
+			// a pick may show several items of one variant group; another pick adds none of them again
+			String owner = ctx.families.putIfAbsent(ItemVariationMapping.map(id), ctx.pick);
+			if (owner != null && !owner.equals(ctx.pick))
 			{
 				continue;
 			}
-			mine.add(family);
-			ctx.families.add(family);
 			if (ctx.placed.add(id))
 			{
 				out.add(new Placement(id, slot, group, reason.apply(id)));

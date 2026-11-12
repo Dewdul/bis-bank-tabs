@@ -909,6 +909,9 @@ PRAYER = tab("prayer", "Prayer", "Dragon bones", sections=[
                        "Ensouled demon head", "Ensouled hellhound head", "Ensouled aviansie head",
                        "Ensouled abyssal head", "Ensouled dragon head", "re:^Ensouled [\\w' -]+ head$"]),
     ]),
+    section("currency", "Rewards", "rows", [
+        all_("prayer_currency", [("Ecto-token", "Ectofuntus tokens: pay the ghost disciple, Port Phasmatys entry")]),
+    ]),
 ])
 
 SLAYER = tab("slayer", "Slayer", "Enchanted gem", sections=[
@@ -955,6 +958,22 @@ SLAYER = tab("slayer", "Slayer", "Enchanted gem", sections=[
         first("slayer_gloves", ["Slayer gloves"]),
         first("insulated", ["Insulated boots"]),
         first("wyvern_boots", ["Boots of brimstone", "Boots of stone", "Granite boots"]),
+    ]),
+    # keys and totem pieces slayer tasks drop, and the keys that open boss lairs
+    section("keys", "Keys and totems", "rows", [
+        all_("slayer_keys", [("Brimstone key", "Konar task drop: opens the brimstone chest"),
+                             ("Larran's key", "Wilderness slayer drop: opens Larran's chest"),
+                             ("Dark totem", "Summons Skotizo in the Catacombs of Kourend"),
+                             ("Dark totem base", "Catacombs of Kourend: join base, middle and top into a dark totem"),
+                             ("Dark totem middle", "Catacombs of Kourend: join base, middle and top into a dark totem"),
+                             ("Dark totem top", "Catacombs of Kourend: join base, middle and top into a dark totem"),
+                             ("Ancient shard", "Catacombs of Kourend: teleports between the catacomb altars"),
+                             ("Mossy key", "Opens Bryophyta's lair"), ("Giant key", "Opens Obor's lair"),
+                             ("Dusty key", "Opens the gate to Taverley Dungeon's blue dragons"),
+                             ("Crystal key", "Opens the crystal chest in Taverley"),
+                             ("Enhanced crystal key", "Opens the elven crystal chest in Prifddinas"),
+                             ("Loop half of key", "Join with the tooth half to make a crystal key"),
+                             ("Tooth half of key", "Join with the loop half to make a crystal key")]),
     ]),
     # carried tools: light, finishers, lures and access, task weapons, consumables, boss helpers
     section("task_tools", "Task tools", "rows", [
@@ -1148,6 +1167,17 @@ HUNTER = tab("hunter", "Hunter", "Box trap", sections=[
         first("crossbow", ["Hunters' sunlight crossbow", "Hunters' crossbow"]),
         first("spear", ["Hunter's spear"]),
     ]),
+    section("camouflage", "Camouflage", "rows", [
+        all_("camouflage", ["Graahk headdress", "Graahk top", "Graahk legs", "Larupia hat", "Larupia top",
+                            "Larupia legs", "Kyatt hat", "Kyatt top", "Kyatt legs", "Polar camo top", "Polar camo legs",
+                            "Wood camo top", "Wood camo legs", "Jungle camo top", "Jungle camo legs",
+                            "Desert camo top", "Desert camo legs"], why="Hunter camouflage"),
+    ]),
+    section("butterflies", "Butterflies and moths", "rows", [
+        all_("butterflies", ["Ruby harvest (item)", "Sapphire glacialis (item)", "Snowy knight (item)",
+                             "Black warlock (item)", "Sunlight moth (item)", "Moonlight moth (item)"],
+             why="Caught in a butterfly jar: release for Hunter XP, or use in potions"),
+    ]),
 ])
 
 ROGUE = "Rogue equipment: +15% double pickpocket loot per piece, 100% with all 5"
@@ -1171,6 +1201,7 @@ THIEVING = tab("thieving", "Thieving", "Lockpick", sections=[
     ]),
     section("gear", "Gear", "rows", [
         first("lockpick", ["Lockpick"]),
+        first("rogue_kit", [("Rogue kit", "Rogues' Den reward: makes lockpicks and the like")]),
         first("stethoscope", ["Stethoscope"]),
     ]),
 ])
@@ -1184,8 +1215,8 @@ AGILITY = tab("agility", "Agility", "Graceful hood", sections=[
         first("agility_potion", ["Agility potion"]),
     ]),
     section("currency", "Rewards", "rows", [
-        all_("currency", ["Mark of grace", "Amylase crystal", "Agility arena ticket", "Hallowed mark",
-                          "Hallowed crystal shard"]),
+        all_("currency", ["Mark of grace", "Amylase crystal", "Agility arena ticket", "Brimhaven voucher",
+                          "Wilderness agility ticket", "Hallowed mark", "Hallowed crystal shard"]),
     ]),
 ])
 
@@ -1219,6 +1250,14 @@ FARMING = tab("farming", "Farming", "Seed dibber", sections=[
                          ("Compost potion", "Turns compost into supercompost"),
                          ("Volcanic ash", "Turns supercompost into ultracompost")]),
         first("cure", ["Plant cure"]),
+        first("hespori", [("Hespori seed", "Plant in the Hespori patch in the Farming Guild (65 Farming)")]),
+    ]),
+    section("produce", "Baskets and sacks", "rows", [
+        all_("produce_containers", [("Basket", "Holds 5 fruit: apples, bananas, oranges, strawberries or tomatoes"),
+                                    ("Basket pack", "Opens into empty baskets"),
+                                    ("Empty sack", "Holds 10 potatoes, onions or cabbages")]),
+        all_("produce_filled", ["Apples", "Bananas", "Oranges", "Strawberries", "Tomatoes", "Potatoes", "Onions",
+                                "Cabbages"]),
     ]),
 ])
 
@@ -1257,12 +1296,19 @@ RUNECRAFT = tab("runecraft", "Runecraft", "Pure essence", sections=[
     section("essence", "Essence", "rows", [
         all_("essence", ["Rune essence", "Pure essence", "Daeyalt essence"]),
     ]),
+    section("currency", "Rewards", "rows", [
+        all_("rc_currency", [("Abyssal pearls", "Guardians of the Rift currency: outfit pieces, pouches, lanterns")]),
+    ]),
 ])
 
 COOKING = tab("cooking", "Cooking", "Cooking gauntlets", sections=[
     section("gear", "Gear", "rows", [
         first("gauntlets", ["Cooking gauntlets"]),
         cape("Cooking cape"),
+    ]),
+    section("spices", "Spices", "rows", [
+        all_("spices", ["Brown spice", "Orange spice", "Red spice", "Yellow spice", "Empty spice shaker"],
+             why="Spices for spicy stews (from the Evil Dave's hell-rats)"),
     ]),
 ])
 
@@ -1311,6 +1357,7 @@ CRAFTING = tab("crafting", "Crafting", "Chisel", sections=[
         first("needle", ["Needle"]),
         first("thread", ["Thread"]),
         first("costume_needle", ["Costume needle"]),
+        first("shears", [("Shears", "Shear sheep for wool to spin")]),
         first("pipe", ["Glassblowing pipe"]),
         # gold moulds, then silver, each by the level of what they make
         all_("moulds", ["Ring mould", "Necklace mould", "Bracelet mould", "Amulet mould", "Holy mould",
@@ -1403,6 +1450,12 @@ CONSTRUCTION = tab("construction", "Construction", "Saw", sections=[
         *SAWS,
         first("hammer", ["Imcando hammer", "Hammer"]),
         first("plank_sack", ["Plank sack"]),
+        all_("sawmill_coupons", ["Sawmill coupon (wood plank)", "Sawmill coupon (oak plank)",
+                                 "Sawmill coupon (teak plank)", "Sawmill coupon (mahogany plank)",
+                                 "Sawmill coupon (camphor plank)", "Sawmill coupon (ironwood plank)"],
+             why="Turn in at a sawmill for planks"),
+        all_("dorgesh_bones", [("Long bone", "Give to Barlak in Dorgesh-Kaan for Construction XP"),
+                               ("Curved bone", "Give to Barlak in Dorgesh-Kaan for Construction XP")]),
     ]),
 ])
 
@@ -1552,6 +1605,9 @@ JUNK_KEEP = (r"(?i)^(Old school bond.*|Ghostspeak amulet|Dramen staff|Lunar staf
              r".* ticket|Sawmill coupon.*|Long bone|Curved bone|Granite dust|Hespori seed|Bird's egg|"
              # boosts and food the categories miss, and tools
              r"Dwarven stout.*|Purple sweets|Rock pick|Empty spice shaker)$")
+# leftovers no recipe places: these wiki categories go to a skill tab's "Other supplies" when no tab lists them
+CATEGORY_HOMES = {"Herbs": "herblore", "Herblore secondaries": "herblore", "Light sources": "firemaking"}
+
 # wiki quest names RuneLite spells differently (the rest match after dropping "The", "Freeing"...)
 QUEST_ALIASES = {
     "Recipe for Disaster/Freeing the Goblin generals": "Recipe for Disaster - Wartface & Bentnoze",
@@ -2046,7 +2102,8 @@ GOODS_LISTS = {
     "woodcutting": [("Logs", ["Logs", "Oak logs", "Willow logs", "Teak logs", "Maple logs", "Arctic pine logs",
                               "Mahogany logs", "Camphor logs", "Yew logs", "Ironwood logs", "Magic logs",
                               "Redwood logs", "Rosewood logs"]),
-                    ("Bird nests", ["Bird nest (seeds)", "Bird nest (ring)", "Bird nest (egg)", "Bird nest (empty)"])],
+                    ("Bird nests", ["Bird nest (seeds)", "Bird nest (ring)", "Bird nest (egg)", "Bird nest (empty)",
+                                    "Bird's egg"])],
     "mining": [("Ores", ["Clay", "Copper ore", "Tin ore", "Blurite ore", "Iron ore", "Silver ore", "Lead ore", "Coal",
                          "Gold ore", "Lovakite ore", "Mithril ore", "Adamantite ore", "Nickel ore", "Runite ore",
                          "Amethyst", "Infernal shale"]),

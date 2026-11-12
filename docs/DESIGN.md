@@ -139,6 +139,17 @@ Started 2026-10-04. The request was an "ultimate bank plugin" that does three th
   - `emote_<tier>` "sets" sections from the wiki buckets `clue_equipment` and `clue_info` (cached as `tools/cache/clues.json`). Each emote step's items share a group (`step<clue_id>`), so they stay together, and the hover names the emotes and the place.
 - **Variant groups.** An item placed once is never placed again in another charge or degrade state by a later pick (`Context.families`, ItemVariationMapping), since Bank Tags would draw the one banked copy in both cells.
 
+## Other supplies and tools
+
+Each skill tab ends its supplies with "Other tools" and "Other supplies" (`generate_data.other_sections`).
+- **What they hold:** every ingredient and tool of the skill's wiki recipes that no tab lists anywhere.
+- **Recipes with no skill:** filling a bucket or grinding with a pestle counts for the skill that uses the product most.
+- **Which tab:** an item goes to its busiest skill, and to a second skill only when that one uses it in two or more recipes.
+- **Left out:** money, quest-only items, and worn gear unless it is a tool.
+- **Category homes:** herbs, Herblore secondaries and light sources that no recipe placed go to their tab (`CATEGORY_HOMES`).
+- **Pets** are a group on the Cosmetics tab. Junk never shows a cosmetic that `junkKeep` protects.
+- **Variant groups:** a pick may list several items RuneLite groups together (every bird nest, every partyhat). Only a *different* pick is stopped from adding another state of a placed item.
+
 ## Items the player adds
 
 Dragging an item onto a plugin tab makes Bank Tags tag it with the tab's name, and the tab shows it next to the plugin's picks (the registered tag and item tags combine). Remove-tag is stripped only for items the plugin itself shows in the tab (`BankTagsWriter.shows`), so an item the player added can be taken back out.

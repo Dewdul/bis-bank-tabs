@@ -473,6 +473,95 @@ def supply_sections(wiki, recipes, uses, skill, rules, taken):
     return sections
 
 
+def other_sections(wiki, recipes, tabs, cats):
+    """For each skill tab, what its recipes use that no section of the tab lists: "Other tools" and "Other
+    supplies" (buckets, pots, vials, the pestle and mortar, dyes, ale yeast...). A recipe with no skill (filling a
+    bucket, grinding with a pestle) counts for the skill that uses what it makes most. An ingredient needs two of
+    the skill's recipes, a tool one; an item shows in at most its two busiest skills. Never what any tab already
+    lists (runes stay on Magic, bones on Prayer, logs on Woodcutting), money, quest-only items, or gear you wear
+    (unless it is a tool)."""
+    skills = {t["key"] for t in tabs if t["kind"] == "skill"}
+    used_in = defaultdict(lambda: defaultdict(int))
+    for r in recipes:
+        s = (r.get("skill") or "").lower()
+        if s:
+            for g in r.get("ingredients") or []:
+                used_in[g.get("itemId")][s] += 1
+
+    def skill_of(r):
+        s = (r.get("skill") or "").lower()
+        if s:
+            return s
+        u = used_in.get(r.get("productId"))
+        return max(u, key=u.get) if u else None
+
+    ingredient = defaultdict(lambda: defaultdict(int))
+    tool = defaultdict(lambda: defaultdict(int))
+    for r in recipes:
+        s = skill_of(r)
+        if s not in skills:
+            continue
+        for g in r.get("ingredients") or []:
+            page = wiki.id_page.get(g.get("itemId"))
+            if page:
+                ingredient[page][s] += 1
+        for t in r.get("tools") or []:
+            page = wiki.id_page.get(t) if isinstance(t, int) else None
+            if page:
+                tool[page][s] += 1
+    money = {p.lower() for p in cats.get("Currency", [])}
+    worn = {(r.get("page_name") or "").lower() for r in cached("bonuses.json", fetch_bonuses)
+            if r.get("equipment_slot")}
+    wanted = defaultdict(list)  # skill -> (count, name, page, is tool)
+    for page in set(ingredient) | set(tool):
+        if page in money or page in wiki.quest_only:
+            continue
+        counts = {s: tool[page].get(s, 0) + ingredient[page].get(s, 0) for s in skills}
+        counts = {s: n for s, n in counts.items() if n > 0}
+        if page in worn and not tool.get(page):
+            continue
+        ranked = sorted(counts, key=lambda s: -counts[s])
+        for k, s in enumerate(ranked[:2]):
+            if k == 0 or counts[s] >= 2:
+                wanted[s].append((counts[s], wiki.page_name[page], page, bool(tool[page].get(s))))
+    # herbs, secondaries and light sources no recipe placed: their skill's "Other supplies"
+    placed = {page for found in wanted.values() for _, _, page, _ in found}
+    for cat, s in curated.CATEGORY_HOMES.items():
+        for p in cats.get(cat, []):
+            page = p.lower()
+            if s in skills and page in wiki.page_ids and page not in placed and page not in money:
+                placed.add(page)
+                wanted[s].append((0, wiki.page_name[page], page, False))
+    by_key = {t["key"]: t for t in tabs}
+    have = set()
+    for t in tabs:
+        have |= curated_ids(t)
+    for s, found in wanted.items():
+        tab = by_key[s]
+        rows = {True: [], False: []}
+        for n, name, page, is_tool in sorted(found, key=lambda x: (-x[0], x[1].lower())):
+            ids = wiki.page_ids[page]
+            if any(i in have for i in ids):
+                continue
+            why = (("Tool in %d %s recipe%s" if is_tool else "Used in %d %s recipe%s") % (n, s.capitalize(),
+                                                                                       "" if n == 1 else "s")
+                   if n else s.capitalize() + " supply")
+            rows[is_tool].append((ids, why))
+        extra = []
+        for is_tool, key, title in ((True, "other_tools", "Other tools"), (False, "other_supplies", "Other supplies")):
+            if rows[is_tool]:
+                section = {"key": key, "title": title, "layout": "rows",
+                           "picks": [{"key": key, "mode": "all", "entries": [ids for ids, _ in rows[is_tool]],
+                                      "reasons": [why for _, why in rows[is_tool]]}]}
+                if not is_tool:
+                    section["supplies"] = True
+                extra.append(section)
+        # before the finished goods, which close the tab
+        at = next((k for k, sec in enumerate(tab["sections"]) if sec["layout"] == "goods"), len(tab["sections"]))
+        tab["sections"][at:at] = extra
+        print("  other %-12s %3d tools, %3d supplies" % (s, len(rows[True]), len(rows[False])))
+
+
 STAT_FIELDS = ["stab_attack_bonus", "slash_attack_bonus", "crush_attack_bonus", "range_attack_bonus",
                "magic_attack_bonus", "strength_bonus", "ranged_strength_bonus", "magic_damage_bonus", "prayer_bonus",
                "stab_defence_bonus", "slash_defence_bonus", "crush_defence_bonus", "range_defence_bonus",
@@ -580,6 +669,7 @@ def cosmetics_tab(wiki, res, elsewhere):
          [p for p in wiki.pages if equipable(p) and zero_stats(p) and slot(p) in curated.COSMETIC_ZERO_STAT_SLOTS]
          + curated.COSMETIC_EXTRA),
         ("kits", "Ornament kits", [p for p in cats.get("Ornament kits", []) if not equipable(p)]),
+        ("pets", "Pets", [p for p in cats.get("Pets", []) if not equipable(p)]),
     ]
     sections = []
     for key, title, pages in groups:
@@ -731,6 +821,7 @@ def main():
     for t in curated.TABS:
         if t["kind"] == "skill":
             add_goods(wiki, recipes, res, by_key[t["key"]], gear)
+    other_sections(wiki, recipes, tabs, cached("categories.json", fetch_categories))
 
     elsewhere = set()
     for t in tabs:

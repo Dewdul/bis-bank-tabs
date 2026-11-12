@@ -395,6 +395,30 @@ public class TabBuilderTest
 	}
 
 	@Test
+	public void recipeItemsNoGroupTakesLandInOtherSupplies()
+	{
+		TabBuilder.Built cooking = build("cooking", own("Ale yeast", "Bucket"));
+		assertTrue(cooking.reasons().get(id("Ale yeast")).startsWith("Used in"));
+		assertTrue("buckets have a home too", cooking.itemIds().contains(id("Bucket"))
+			|| build("farming", own("Bucket")).itemIds().contains(id("Bucket")));
+	}
+
+	@Test
+	public void herbloreShowsThePestleBesideABloomWeapon()
+	{
+		TabBuilder.Built herblore = build("herblore", own("Pestle and mortar", "Ivandis flail"));
+		assertTrue(herblore.getSections().stream().map(s -> s.getKey() + "=" + order(s)).collect(Collectors.joining("; ")),
+			herblore.itemIds().contains(id("Pestle and mortar")));
+	}
+
+	@Test
+	public void farmingHasBasketsAndSacks()
+	{
+		TabBuilder.Built farming = build("farming", own("Spade", "Basket", "Empty sack"));
+		assertEquals(Arrays.asList(id("Basket"), id("Empty sack")), order(section(farming, "produce")));
+	}
+
+	@Test
 	public void farmingToolsIncludePlantPots()
 	{
 		TabBuilder.Built farming = build("farming", own("Spade", "Filled plant pot", "Empty plant pot"));
@@ -415,6 +439,9 @@ public class TabBuilderTest
 			Set<Integer> shown = melee.itemIds();
 			assertTrue(shown.contains(4730) ^ shown.contains(4922));
 		}
+		// one pick listing items RuneLite groups together keeps them all: the ring nest and the empty nest
+		Set<Integer> nests = new HashSet<>(Arrays.asList(5074, 5075));
+		assertTrue(build("woodcutting", nests).itemIds().containsAll(nests));
 	}
 
 	@Test

@@ -68,6 +68,12 @@ ITEMS = [
     "Filled plant pot", "Empty plant pot",
     # movement: the fairy ring staff beside the Ardougne cloak
     "Dramen staff", "Lunar staff", "Ardougne cloak 1",
+    # farming: baskets and sacks
+    "Basket", "Empty sack",
+    # herblore tools
+    "Pestle and mortar", "Ivandis flail",
+    # other supplies: ale yeast (Cooking), a bucket
+    "Ale yeast", "Bucket",
     # mining rewards
     "Golden nugget", "Stardust",
     # smithing alternatives
