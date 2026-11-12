@@ -386,6 +386,14 @@ public class TabBuilderTest
 	}
 
 	@Test
+	public void farmingToolsIncludePlantPots()
+	{
+		TabBuilder.Built farming = build("farming", own("Spade", "Filled plant pot", "Empty plant pot"));
+		assertEquals("filled first, with the tools", Arrays.asList(id("Spade"), id("Filled plant pot"), id("Empty plant pot")),
+			order(section(farming, "gear")));
+	}
+
+	@Test
 	public void anItemShowsOnceWhateverItsChargeState()
 	{
 		// the undamaged Guthan's chainskirt banked (4730), a worn one at 100 (4922): the best legs, and the Guthan's

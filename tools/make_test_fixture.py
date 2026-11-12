@@ -64,6 +64,8 @@ ITEMS = [
     "Rotten tomato", "Goblin symbol book", "Ghostspeak amulet", "Crystal key",
     # the clues tab
     "Spade", "Sextant",
+    # farming tools
+    "Filled plant pot", "Empty plant pot",
     # mining rewards
     "Golden nugget", "Stardust",
     # smithing alternatives
