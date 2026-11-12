@@ -200,8 +200,9 @@ class BankTagsWriter
 					name = freeName(titles.getOrDefault(key, key), tagTabs);
 					names.put(key, name);
 					configManager.setConfiguration(UltimateBankTabsConfig.GROUP, NAME_PREFIX + key, name);
-					register(name);
 				}
+				// every time: another plugin with a tab of this name replaces ours in Bank Tags (one per name)
+				register(name);
 				members.put(name, tab.items);
 				hiddenKeys.remove(key);
 				hiddenLayouts.remove(key);
@@ -822,6 +823,15 @@ class BankTagsWriter
 		members.remove(name);
 		written.remove(name);
 		writtenBlock.remove(name);
+	}
+
+	/**
+	 * Claim every tab name again. Bank Tags keeps one handler per name: another plugin making a tab of the same
+	 * name replaces ours, and turning that plugin off removes the name, ours included.
+	 */
+	void reregister()
+	{
+		names.values().forEach(this::register);
 	}
 
 	private void register(String name)

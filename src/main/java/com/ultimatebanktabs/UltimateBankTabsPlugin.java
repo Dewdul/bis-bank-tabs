@@ -121,6 +121,8 @@ public class UltimateBankTabsPlugin extends Plugin
 		{"bank-assistant", "Bank Assistant", "re-lays out the bank its own way"},
 		{"bank-sorter", "Bank Sorter", "re-sorts the items inside tabs"},
 		{"sorted-bank", "Sorted Bank", "re-sorts the items inside tabs"},
+		{"smart-bank-sorter", "Smart Bank Sorter", "makes its own category and outfit tabs"},
+		{"slayer-bank-tab", "Slayer Bank Tab", "makes its own Slayer tab"},
 	};
 
 	@Inject
@@ -225,6 +227,13 @@ public class UltimateBankTabsPlugin extends Plugin
 		writer.reserve(replacedTabs().stream().map(t -> t.name).collect(Collectors.toList()));
 		skillIcons = new SkillIcons(client);
 		accepted = Boolean.parseBoolean(configManager.getConfiguration(UltimateBankTabsConfig.GROUP, ACCEPTED_KEY));
+		boolean allOff = accepted && data.tabs.stream().noneMatch(t -> enabled(t.key));
+		if (allOff)
+		{
+			// a plugin with every tab off does nothing: someone turning it off and on again wants it back
+			data.tabs.forEach(t -> configManager.setConfiguration(UltimateBankTabsConfig.GROUP,
+				UltimateBankTabsConfig.TAB_PREFIX + t.key, true));
+		}
 		overlayManager.add(reasonOverlay);
 		BankTagsWriter w = writer;
 		clientThread.invokeLater(() ->
@@ -249,6 +258,10 @@ public class UltimateBankTabsPlugin extends Plugin
 				loadSnapshot();
 				slayerTask = SlayerTask.read(client);
 				rebuild(false);
+			}
+			if (allOff)
+			{
+				chat("BiS Bank Tabs: every tab was switched off, so they're all back on. Open your bank to see them.");
 			}
 		});
 	}
@@ -574,6 +587,11 @@ public class UltimateBankTabsPlugin extends Plugin
 	{
 		if (event.getScriptId() == ScriptID.BANKMAIN_INIT)
 		{
+			if (writer != null && accepted)
+			{
+				// another tab plugin may have taken our tab names, or dropped them when it was turned off
+				writer.reregister();
+			}
 			ItemContainer bank = client.getItemContainer(InventoryID.BANK);
 			if (bank != null)
 			{
@@ -997,7 +1015,8 @@ public class UltimateBankTabsPlugin extends Plugin
 		{
 			configManager.setConfiguration(UltimateBankTabsConfig.GROUP, UltimateBankTabsConfig.TAB_PREFIX + key, false);
 			String name = data.tabs.stream().filter(t -> t.key.equals(key)).map(t -> t.name).findFirst().orElse(key);
-			chat("BiS Bank Tabs: the " + name + " tab is off now. Turn it back on in the plugin settings.");
+			chat("BiS Bank Tabs: you deleted its " + name + " tab, so that tab is off now. Turn it back on in this"
+				+ " plugin's settings, or turn the plugin off and on to bring every tab back.");
 		}
 	}
 
