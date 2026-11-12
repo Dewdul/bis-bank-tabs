@@ -386,6 +386,15 @@ public class TabBuilderTest
 	}
 
 	@Test
+	public void fairyRingStaffSitsBesideTheArdougneCloak()
+	{
+		List<Integer> diary = order(section(build("movement", own("Ardougne cloak 1", "Dramen staff", "Lunar staff")), "diary"));
+		assertEquals("the Dramen staff, right after the cloak", Arrays.asList(id("Ardougne cloak 1"), id("Dramen staff")), diary);
+		assertTrue("the Lunar staff when there's no Dramen staff", items(section(build("movement", own("Lunar staff")), "diary"))
+			.contains(id("Lunar staff")));
+	}
+
+	@Test
 	public void farmingToolsIncludePlantPots()
 	{
 		TabBuilder.Built farming = build("farming", own("Spade", "Filled plant pot", "Empty plant pot"));

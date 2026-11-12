@@ -719,6 +719,8 @@ MOVEMENT = tab("movement", "Movement", "Graceful boots", kind="movement", sectio
     section("diary", "Diary rewards", "rows", [
         # in-game Achievement Diary order; Ghommal's hilt (combat achievements) last
         first("ardy", tiers("Ardougne cloak")),
+        # the fairy ring staff sits beside the Ardougne cloak (the player's ask), Dramen staff first
+        first("fairy", [("Dramen staff", "Fairy rings without a diary"), ("Lunar staff", "Fairy rings without a diary")]),
         first("desert", tiers("Desert amulet")),
         first("fremennik", tiers("Fremennik sea boots")),
         first("kandarin", tiers("Kandarin headgear")),
@@ -731,7 +733,6 @@ MOVEMENT = tab("movement", "Movement", "Graceful boots", kind="movement", sectio
         first("ghommal", tiers("Ghommal's hilt", 6)),
     ]),
     section("items", "Teleport items", "rows", [
-        first("fairy", ["Lunar staff", "Dramen staff"]),
         first("ectophial", ["Ectophial"]),
         # keys match unique_uses.py groups so every version of an item stays together
         first("seed_pod", ["Royal seed pod", "Grand seed pod"]),

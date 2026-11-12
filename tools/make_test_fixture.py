@@ -66,6 +66,8 @@ ITEMS = [
     "Spade", "Sextant",
     # farming tools
     "Filled plant pot", "Empty plant pot",
+    # movement: the fairy ring staff beside the Ardougne cloak
+    "Dramen staff", "Lunar staff", "Ardougne cloak 1",
     # mining rewards
     "Golden nugget", "Stardust",
     # smithing alternatives
