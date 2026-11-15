@@ -1218,6 +1218,31 @@ class TabBuilder
 					}
 				}
 				break;
+			case "tank":
+			{
+				// the owned item for the slot with the most defence, when that isn't the best-in-slot one already
+				Integer best = ctx.bis.get(pick.slot);
+				EquipStats b = best == null ? null : stats.apply(best);
+				List<Integer> top = bestBy(slotCandidates(pick.slot, ctx), id -> stats.apply(id).getDefence(), 1);
+				if (top.isEmpty() || b != null && stats.apply(top.get(0)).getDefence() <= b.getDefence())
+				{
+					break;
+				}
+				int id = top.get(0);
+				String of = best == null ? null : name(best);
+				String reason = "Best defence for the " + slotName(pick.slot) + ": " + stats.apply(id).getDefence()
+					+ " in all" + (of != null ? " against " + b.getDefence() + " on your " + of : "");
+				chosen.add(id);
+				if (ctx.placed.contains(id))
+				{
+					ctx.notes.merge(id, reason, (was, more) -> was + "; " + more);
+				}
+				else
+				{
+					add(out, Collections.singletonList(id), pick.slot, pick.key, ctx, x -> reason);
+				}
+				break;
+			}
 			case "named":
 			{
 				// owned items whose in-game name matches, by name: every clue step of a tier

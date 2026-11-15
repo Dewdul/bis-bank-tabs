@@ -395,6 +395,18 @@ public class TabBuilderTest
 	}
 
 	@Test
+	public void sturdiestShieldStandsBesideADefender()
+	{
+		TabBuilder.Built melee = build("melee", own("Abyssal whip", "Dragon defender", "Rune kiteshield"));
+		assertEquals(id("Dragon defender"), (int) bySlot(section(melee, "main")).get("SHIELD"));
+		assertTrue(melee.reasons().get(id("Rune kiteshield")).startsWith("Best defence for the shield"));
+		// a kiteshield that is already the best-in-slot shield isn't shown twice
+		TabBuilder.Built kite = build("melee", own("Abyssal whip", "Rune kiteshield"));
+		assertEquals(id("Rune kiteshield"), (int) bySlot(section(kite, "main")).get("SHIELD"));
+		assertFalse(kite.reasons().get(id("Rune kiteshield")).contains("Best defence"));
+	}
+
+	@Test
 	public void recipeItemsNoGroupTakesLandInOtherSupplies()
 	{
 		TabBuilder.Built cooking = build("cooking", own("Ale yeast", "Bucket"));
@@ -409,6 +421,16 @@ public class TabBuilderTest
 		TabBuilder.Built herblore = build("herblore", own("Pestle and mortar", "Ivandis flail"));
 		assertTrue(herblore.getSections().stream().map(s -> s.getKey() + "=" + order(s)).collect(Collectors.joining("; ")),
 			herblore.itemIds().contains(id("Pestle and mortar")));
+	}
+
+	@Test
+	public void farmingHasTheArdougneCloakAndFairyRingStaff()
+	{
+		TabBuilder.Built farming = build("farming", own("Ardougne cloak 1", "Dramen staff", "Lunar staff",
+			"Varrock teleport (tablet)"));
+		assertEquals("the cloak and staff first, then the patch teleports",
+			Arrays.asList(id("Ardougne cloak 1"), id("Dramen staff"), id("Varrock teleport (tablet)")),
+			order(section(farming, "teleports")));
 	}
 
 	@Test
