@@ -1240,19 +1240,17 @@ FARMING = tab("farming", "Farming", "Seed dibber", sections=[
         first("rake", ["Rake"]),
         first("dibber", ["Seed dibber"]),
         first("secateurs", ["Secateurs"], unless=["magic_secateurs"]),
-        first("trowel", ["Gardening trowel"]),
-        all_("plant_pots", [("Filled plant pot", "Plant a tree seed in it to grow a seedling"),
-                            ("Empty plant pot", "Fill it with soil using a gardening trowel"),
-                            ("Plant pot pack", "Opens into empty plant pots")]),
         first("can", ["Gricoller's can", "Watering can"]),
-        first("bucket", ["Bottomless compost bucket"]),
         first("seed_box", ["Seed box"]),
+        first("cure", ["Plant cure"]),
+    ]),
+    section("compost", "Compost", "rows", [
+        first("bucket", ["Bottomless compost bucket"]),
+        first("empty_bucket", [("Bucket", "Collects compost from a compost bin")]),
         all_("compost", [("Ultracompost", "Best compost: +3 harvest lives, more disease protection"),
                          ("Supercompost", "Compost: +2 harvest lives"), ("Compost", "Compost: +1 harvest life"),
                          ("Compost potion", "Turns compost into supercompost"),
                          ("Volcanic ash", "Turns supercompost into ultracompost")]),
-        first("cure", ["Plant cure"]),
-        first("hespori", [("Hespori seed", "Plant in the Hespori patch in the Farming Guild (65 Farming)")]),
     ]),
     # getting round the patches
     section("teleports", "Teleports", "rows", [
@@ -1285,14 +1283,43 @@ FARMING = tab("farming", "Farming", "Seed dibber", sections=[
                               ("Harmony island teleport (tablet)", "Harmony Island herb patch"),
                               ("Trollheim teleport (tablet)", "Troll Stronghold herb patch")]),
     ]),
-    section("produce", "Baskets and sacks", "rows", [
+    # generate_data puts the crop chains here (FARM_BLOCKS)
+])
+
+# Farming chains (generate_data.farm_sections, from the wiki's "Farming info" for every crop): a row per crop, each
+# stage in its own column, by Farming level. A block takes the crops whose patch matches; "Other crops" takes the
+# rest. Chains of three stages or fewer share a row. Logs are never a crop here (they are Woodcutting's).
+FARM_BLOCKS = [
+    ("herbs", "Herbs", r"(?i)^herb", ["seed", "crop"]),
+    ("allotments", "Allotments", r"(?i)^allotment", ["seed", "crop", "container", "payment"]),
+    ("flowers", "Flowers", r"(?i)^flower", ["seed", "crop"]),
+    ("trees", "Trees", r"(?i)^tree", ["seed", "seedling", "sapling", "payment"]),
+    ("fruit_trees", "Fruit trees", r"(?i)^fruit tree", ["seed", "seedling", "sapling", "crop", "container", "payment"]),
+    ("hardwood", "Hardwood trees", r"(?i)^hardwood", ["seed", "seedling", "sapling", "payment"]),
+    ("special_trees", "Special trees", r"(?i)^(?:calquat|celastrus|redwood|spirit tree|crystal tree|hespori)",
+     ["seed", "seedling", "sapling", "crop", "payment"]),
+    ("hops", "Hops", r"(?i)^hops", ["seed", "crop", "payment"]),
+    ("bushes", "Bushes", r"(?i)^bush", ["seed", "crop", "payment"]),
+    ("other_crops", "Other crops", r".", ["seed", "crop", "payment"]),
+]
+# rows that lead a block: the empty baskets and sacks before the allotments; the trowel, pots and coins before trees
+FARM_INTROS = {
+    "allotments": section("baskets", "Baskets and sacks", "rows", [
         all_("produce_containers", [("Basket", "Holds 5 fruit: apples, bananas, oranges, strawberries or tomatoes"),
                                     ("Basket pack", "Opens into empty baskets"),
                                     ("Empty sack", "Holds 10 potatoes, onions or cabbages")]),
-        all_("produce_filled", ["Apples", "Bananas", "Oranges", "Strawberries", "Tomatoes", "Potatoes", "Onions",
-                                "Cabbages"]),
     ]),
-])
+    "trees": section("pots", "Plant pots", "rows", [
+        first("trowel", [("Gardening trowel", "Fills plant pots with soil and plants seeds in them")]),
+        all_("plant_pots", [("Filled plant pot", "Plant a tree seed in it to grow a seedling"),
+                            ("Empty plant pot", "Fill it with soil using a gardening trowel"),
+                            ("Plant pot pack", "Opens into empty plant pots")]),
+        first("coins", [("Coins", "Pay a gardener 200 coins to chop down a fully grown tree")]),
+    ]),
+}
+# a crop's full basket or sack
+CROP_CONTAINERS = {"Potato": "Potatoes", "Onion": "Onions", "Cabbage": "Cabbages", "Tomato": "Tomatoes",
+                   "Strawberry": "Strawberries", "Cooking apple": "Apples", "Banana": "Bananas", "Orange": "Oranges"}
 
 EYE = "Raiments of the Eye: +10% bonus runes per piece, 60% with all 4"
 RUNECRAFT = tab("runecraft", "Runecraft", "Pure essence", sections=[
@@ -1437,10 +1464,10 @@ def herb_columns():
         n = sum(1 for k in keys if k == h or k.startswith(h + " ("))
         keys.append(h if n == 0 else "%s (%d)" % (h, n + 1))
 
-    def row(key, title, items, one=False):
+    def row(key, title, items, one=False, spread=False):
         # repeat: a secondary shared by two herbs (eye of newt...) shows under both
-        return section(key, title, "columns", [dict(all_(key, items), groups=keys, repeat=True, one=one)],
-                       supplies=True)
+        return section(key, title, "columns", [dict(all_(key, items), groups=keys, repeat=True, one=one,
+                                                    spread=spread)], supplies=True)
 
     return [
         row("herbs_grimy", "Grimy herbs",
@@ -1454,7 +1481,7 @@ def herb_columns():
             [(unf, "Add %s to make %s" % (sec.lower(), pot.lower())) for _, unf, sec, pot in HERB_CHAINS]),
         # every dose you own, each in its own column of the herb's row (4 to 1)
         row("herbs_potion", "Potions",
-            [(pot, "%s: %s + %s" % (pot, h.lower(), sec.lower())) for h, _, sec, pot in HERB_CHAINS]),
+            [(pot, "%s: %s + %s" % (pot, h.lower(), sec.lower())) for h, _, sec, pot in HERB_CHAINS], spread=True),
     ]
 
 

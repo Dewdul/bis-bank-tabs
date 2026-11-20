@@ -15,6 +15,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import net.runelite.api.Quest;
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -437,15 +438,51 @@ public class TabBuilderTest
 	public void farmingHasBasketsAndSacks()
 	{
 		TabBuilder.Built farming = build("farming", own("Spade", "Basket", "Empty sack"));
-		assertEquals(Arrays.asList(id("Basket"), id("Empty sack")), order(section(farming, "produce")));
+		assertEquals(Arrays.asList(id("Basket"), id("Empty sack")), order(section(farming, "baskets")));
 	}
 
 	@Test
-	public void farmingToolsIncludePlantPots()
+	public void plantPotsAndBucketsSitWithTreesAndCompost()
 	{
-		TabBuilder.Built farming = build("farming", own("Spade", "Filled plant pot", "Empty plant pot"));
-		assertEquals("filled first, with the tools", Arrays.asList(id("Spade"), id("Filled plant pot"), id("Empty plant pot")),
-			order(section(farming, "gear")));
+		TabBuilder.Built farming = build("farming", own("Spade", "Filled plant pot", "Empty plant pot", "Bucket"));
+		assertEquals("filled first", Arrays.asList(id("Filled plant pot"), id("Empty plant pot")),
+			order(section(farming, "pots")));
+		assertTrue(items(section(farming, "compost")).contains(id("Bucket")));
+	}
+
+	/** where an item sits in a planned layout: {row, column} */
+	static int[] cell(int[] layout, int itemId)
+	{
+		for (int i = 0; i < layout.length; i++)
+		{
+			if (layout[i] == itemId)
+			{
+				return new int[]{i / LayoutPlanner.WIDTH, i % LayoutPlanner.WIDTH};
+			}
+		}
+		return null;
+	}
+
+	@Test
+	public void eachCropIsARowOfItsStages()
+	{
+		// a tree: seed, seedling, sapling and its payment (a basket of tomatoes) on one row, a column each
+		Set<Integer> owned = own("Acorn", "Oak sapling", "Tomatoes");
+		TabBuilder.Built farming = build("farming", owned);
+		int[] layout = LayoutPlanner.plan(farming, false);
+		int[] acorn = cell(layout, id("Acorn"));
+		assertArrayEquals(new int[]{acorn[0], acorn[1] + 2}, cell(layout, id("Oak sapling")));
+		// the same basket of tomatoes is also the tomato crop's basket, on the allotment row above
+		assertEquals(id("Tomatoes"), layout[acorn[0] * LayoutPlanner.WIDTH + acorn[1] + 3]);
+		assertTrue(farming.reasons().get(id("Tomatoes")).contains("Pay the gardener 1 Tomatoes(5) to protect your oak tree"));
+
+		// two-stage chains share a row, a blank column apart: guam seed, guam | marrentill seed, marrentill
+		layout = LayoutPlanner.plan(build("farming", own("Guam seed", "Grimy guam leaf", "Marrentill seed",
+			"Grimy marrentill")), false);
+		int[] guam = cell(layout, id("Guam seed"));
+		assertArrayEquals(new int[]{guam[0], guam[1] + 1}, cell(layout, id("Grimy guam leaf")));
+		assertArrayEquals(new int[]{guam[0], guam[1] + 3}, cell(layout, id("Marrentill seed")));
+		assertArrayEquals(new int[]{guam[0], guam[1] + 4}, cell(layout, id("Grimy marrentill")));
 	}
 
 	@Test

@@ -159,11 +159,12 @@ public class LayoutPlannerTest
 		int[] layout = plan(
 			new TabBuilder.Section("grimy", "Grimy", "columns", Arrays.asList(p(1, null, "tarromin")), herbs),
 			new TabBuilder.Section("clean", "Clean", "columns", Arrays.asList(p(2, null, "guam"), p(3, null, "tarromin")), herbs));
-		// marrentill has nothing, so it gets no row; grimy is column 0, clean column 1
+		// marrentill has nothing, so it gets no place; two-stage chains share a row a blank column apart:
+		// guam in columns 0-1 (grimy, clean), tarromin in columns 3-4
 		assertEquals(-1, at(layout, 0, 0));
 		assertEquals(2, at(layout, 0, 1));
-		assertEquals(1, at(layout, 1, 0));
-		assertEquals(3, at(layout, 1, 1));
+		assertEquals(1, at(layout, 0, 3));
+		assertEquals(3, at(layout, 0, 4));
 	}
 
 	@Test

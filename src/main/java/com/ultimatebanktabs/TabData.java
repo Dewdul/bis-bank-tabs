@@ -146,6 +146,8 @@ class TabData
 		boolean requiresPlaced;
 		/** "all" picks: an item may show again (a secondary shared by two herb columns) */
 		boolean repeat;
+		/** "repeat" picks in a chain's last stage: each version (a potion's doses) gets its own column */
+		boolean spread;
 		/** "all" picks: show only the first owned version of each entry (the fullest dose) */
 		boolean one;
 		/** "outfit" picks: only fill the slots the section left empty */

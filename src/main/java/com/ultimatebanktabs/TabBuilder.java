@@ -1209,7 +1209,8 @@ class TabBuilder
 						for (int id : got)
 						{
 							ctx.placed.add(id);
-							out.add(new Placement(id, pick.slot, group, reason, pick.entries.get(i).indexOf(id)));
+							// a potion's doses each get a column; anything else keeps its stage's column
+							out.add(new Placement(id, pick.slot, group, reason, pick.spread ? pick.entries.get(i).indexOf(id) : -1));
 						}
 					}
 					else

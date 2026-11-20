@@ -189,16 +189,6 @@ class LayoutPlanner
 				rowSections.add(s);
 			}
 		}
-		List<String> columns = activeColumns(rowSections);
-		// every herb-chain stage keeps its column, even one you own nothing for
-		List<String> stages = new ArrayList<>();
-		for (TabBuilder.Section s : tab.getSections())
-		{
-			if ("columns".equals(s.getLayout()))
-			{
-				stages.add(s.getKey());
-			}
-		}
 		boolean first = !block;
 		boolean goodsStarted = false;
 		boolean lastSeparate = false;
@@ -221,12 +211,15 @@ class LayoutPlanner
 			rowKey = s.getKey();
 			if ("columns".equals(s.getLayout()))
 			{
+				// one chain block: the run of stage sections that share its chains (Herblore's herbs, Farming's trees)
 				int end = i;
-				while (end + 1 < rowSections.size() && "columns".equals(rowSections.get(end + 1).getLayout()))
+				while (end + 1 < rowSections.size() && "columns".equals(rowSections.get(end + 1).getLayout())
+					&& rowSections.get(end + 1).getColumns().equals(s.getColumns()))
 				{
 					end++;
 				}
-				row = placeChains(rowSections.subList(i, end + 1), stages, columns, row);
+				List<TabBuilder.Section> run = rowSections.subList(i, end + 1);
+				row = placeChains(run, stagesOf(tab, s.getColumns()), activeColumns(run), row);
 				i = end;
 				continue;
 			}
@@ -291,19 +284,36 @@ class LayoutPlanner
 		return active;
 	}
 
+	/** Every stage of a chain block, owned or not, so each keeps its column. */
+	private static List<String> stagesOf(TabBuilder.Built tab, List<String> chains)
+	{
+		List<String> stages = new ArrayList<>();
+		for (TabBuilder.Section s : tab.getSections())
+		{
+			if ("columns".equals(s.getLayout()) && s.getColumns().equals(chains))
+			{
+				stages.add(s.getKey());
+			}
+		}
+		return stages;
+	}
+
 	/**
-	 * Lay a run of columns sections (herb chains) out a row per herb: each stage is a column in order
-	 * (grimy, clean, secondary, unfinished) and the last stage (the potion) spreads its doses over the
-	 * rest of the row, fullest first, each dose in its own column. Herbs with nothing owned get no row.
-	 * Returns the next free row.
+	 * One row per chain, each stage in its own column; the last stage spreads its versions (a potion's doses)
+	 * to the right. Chains of three stages or fewer share a row, a blank column apart (seed and herb, seed and
+	 * herb, seed and herb).
 	 */
 	private int placeChains(List<TabBuilder.Section> sections, List<String> stages, List<String> herbs, int row)
 	{
 		int last = stages.size() - 1;
+		int perRow = stages.size() <= 3 ? Math.max(1, (WIDTH + 1) / (stages.size() + 1)) : 1;
 		List<TabBuilder.Placement> extra = new ArrayList<>();
+		int placed = 0;
 		for (String herb : herbs)
 		{
 			rowKey = "herb:" + herb;
+			int r = row + placed / perRow;
+			int offset = (placed % perRow) * (stages.size() + 1);
 			boolean used = false;
 			for (TabBuilder.Section s : sections)
 			{
@@ -314,8 +324,9 @@ class LayoutPlanner
 					{
 						continue;
 					}
-					int col = stage < last ? stage : Math.min(WIDTH - 1, stage + Math.max(0, p.getVariant()));
-					if (stage >= 0 && put(row, col, p.getItemId()))
+					int col = perRow > 1 || stage < last ? offset + stage
+						: Math.min(WIDTH - 1, stage + Math.max(0, p.getVariant()));
+					if (stage >= 0 && put(r, col, p.getItemId()))
 					{
 						used = true;
 					}
@@ -327,9 +338,10 @@ class LayoutPlanner
 			}
 			if (used)
 			{
-				row++;
+				placed++;
 			}
 		}
+		row += (placed + perRow - 1) / perRow;
 		int col = 0;
 		rowKey = "columns_extra";
 		for (TabBuilder.Placement p : extra)

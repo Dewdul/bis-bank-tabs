@@ -139,6 +139,25 @@ Started 2026-10-04. The request was an "ultimate bank plugin" that does three th
   - `emote_<tier>` "sets" sections from the wiki buckets `clue_equipment` and `clue_info` (cached as `tools/cache/clues.json`). Each emote step's items share a group (`step<clue_id>`), so they stay together, and the hover names the emotes and the place.
 - **Variant groups.** An item placed once is never placed again in another charge or degrade state by a later pick (`Context.families`, ItemVariationMapping), since Bank Tags would draw the one banked copy in both cells.
 
+## Farming chains
+
+The Farming tab is laid out in this order:
+1. Tools.
+2. Compost, including buckets.
+3. Teleports.
+4. One chain block per patch type. `generate_data.farm_sections` builds these from the wiki's "Farming info" template on every crop page (cached as `tools/cache/farming_crops.json`).
+
+How the chain blocks work:
+- **Blocks** (`curated.FARM_BLOCKS`): herbs, allotments, flowers, trees, fruit trees, hardwood, special trees, hops, bushes and other crops.
+- **Rows:** each block is a run of "columns" sections, one per stage (seed, seedling, sapling, crop, container, payment). Every stage has an entry for every crop, empty where the crop has nothing, so each crop is one row ordered by level.
+- **Payments** come from the wiki. A container like "Tomatoes(5)" resolves to its page, fullest first.
+- **Intro rows** (`FARM_INTROS`): the empty baskets and sacks lead the allotments; the trowel, plant pots and coins (a gardener chops a grown tree for 200) lead the trees.
+- **Layout** (`LayoutPlanner.placeChains`):
+  - stage columns are counted per block, which is a run of sections sharing one chain list;
+  - chains of three stages or fewer share a row, a blank column apart;
+  - only picks with `spread` (Herblore's potion doses) put each version in its own column.
+- **Repeats:** an item can sit in several chains (a basket of apples is a crop's basket and two trees' payment), and its hover joins the reasons.
+
 ## Other supplies and tools
 
 Each skill tab ends its supplies with "Other tools" and "Other supplies" (`generate_data.other_sections`).

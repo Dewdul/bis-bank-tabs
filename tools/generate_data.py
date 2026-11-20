@@ -134,6 +134,120 @@ def emote_sections(wiki):
     return sections
 
 
+def fetch_farming_crops():
+    """Every crop's "Farming info" (patch, level, seed, seedling, sapling, payment, crop) from its wiki page."""
+    titles, cont = [], {}
+    while True:
+        q = {"action": "query", "list": "embeddedin", "eititle": "Template:Farming info", "eilimit": "500",
+             "einamespace": "0"}
+        q.update(cont)
+        d = wiki_recipes.api(q)
+        titles += [x["title"] for x in d["query"]["embeddedin"]]
+        if "continue" not in d:
+            break
+        cont = d["continue"]
+    rows = []
+    for i in range(0, len(titles), 40):
+        d = wiki_recipes.api({"action": "query", "prop": "revisions", "titles": "|".join(titles[i:i + 40]),
+                              "rvprop": "content", "rvslots": "main"})
+        for p in d["query"]["pages"].values():
+            text = (p.get("revisions") or [{}])[0].get("slots", {}).get("main", {}).get("*", "")
+            for m in re.finditer(r"\{\{Farming info(.*?)\n\}\}", text, re.S):
+                fields = {k.strip().lower(): v.strip() for k, v in re.findall(r"\n\|\s*([^=\n]+?)\s*=([^\n]*)", m.group(1))}
+                fields["page"] = p["title"]
+                rows.append(fields)
+    return rows
+
+
+FARM_LINK = re.compile(r"\{\{plink\|([^}|]+)[^}]*\}\}|\[\[([^\]|#]+)(?:#[^\]|]*)?(?:\|[^\]]*)?\]\]")
+
+
+def farm_links(value):
+    """Item pages a Farming info field names ({{plink|Oak sapling}}, [[Apples#(5)|...]])."""
+    return [(a or b).split("#")[0].strip() for a, b in FARM_LINK.findall(value or "")]
+
+
+def farm_text(value):
+    """A Farming info field as plain text ("8 {{plink|poison ivy berries}}" -> "8 poison ivy berries")."""
+    value = re.sub(r"\{\{plink\|([^}|]+)[^}]*\}\}", r"\1", value or "")
+    return re.sub(r"\[\[(?:[^\]|]*\|)?([^\]|]*)\]\]", r"\1", value).strip()
+
+
+def farm_sections(wiki, res):
+    """The Farming tab's crop chains: for each block of FARM_BLOCKS, a "columns" section per stage, each with an
+    entry for every crop of the block (empty where the crop has nothing at that stage), so a crop is one row."""
+    crops = cached("farming_crops.json", fetch_farming_crops)
+    by_block = defaultdict(list)
+    seen = set()
+    for r in crops:
+        seeds = farm_links(r.get("seed"))
+        seed = seeds[0] if seeds else ""
+        if not seed or seed.lower() not in wiki.page_ids or seed.lower() in seen:
+            continue
+        seen.add(seed.lower())
+        patch = farm_text(r.get("patch"))
+        level = int(re.sub(r"\D", "", r.get("level") or "") or 0)
+        key = next(k for k, _, rx, _ in curated.FARM_BLOCKS if re.search(rx, patch))
+        by_block[key].append((level, farm_text(r.get("name")) or seed, seed, patch, r))
+    def ids_of(page):
+        # "Tomatoes(5)": a full basket is a version of the Tomatoes page; fullest first
+        found = wiki.page_ids.get(page.lower()) or wiki.page_ids.get(re.sub(r"\s*\(\d+\)$", "", page).lower(), [])
+
+        def fill(i):
+            m = re.search(r"\((\d+)\)$", wiki.id_name.get(i, ""))
+            return -int(m.group(1)) if m else 0
+        return sorted(found, key=fill)
+
+    sections = []
+    for key, title, _, stages in curated.FARM_BLOCKS:
+        chains = sorted(by_block[key], key=lambda c: (c[0], c[2].lower()))
+        if not chains:
+            continue
+        if key in curated.FARM_INTROS:
+            intro = curated.FARM_INTROS[key]
+            sections.append({"key": intro["key"], "title": intro["title"], "layout": intro["layout"],
+                             "picks": [build_pick(res, p) for p in intro["picks"]]})
+        names = []
+        for _, name, seed, _, _ in chains:
+            names.append(name if name not in names else "%s (%s)" % (name, seed))
+        for stage in stages:
+            entries, reasons = [], []
+            for (level, name, seed, patch, r), group in zip(chains, names):
+                name = re.sub(r"(?i) seeds?$", "", name)
+                patch_name = patch.lower() if patch.lower().endswith("patch") else patch.lower() + " patch"
+                crops_named = [c for c in farm_links(r.get("crop")) if not c.lower().endswith(" logs")]
+                if stage == "seed":
+                    pages = [seed]
+                    why = ("Plant in a filled plant pot: grows into a %s seedling" % name.lower()
+                           if farm_links(r.get("seedling")) else
+                           "%s: plant in a %s (Farming %d)" % (name, patch_name, level))
+                elif stage in ("seedling", "sapling"):
+                    pages = farm_links(r.get(stage))
+                    why = ("Water it, and it grows into a sapling" if stage == "seedling"
+                           else "%s: plant in a %s (Farming %d)" % (name, patch_name, level))
+                elif stage == "crop":
+                    pages = crops_named
+                    why = "What a %s grows" % name.lower()
+                elif stage == "container":
+                    pages = [curated.CROP_CONTAINERS[c] for c in crops_named if c in curated.CROP_CONTAINERS]
+                    why = "Your %s crop, by the basket or sack" % name.lower()
+                else:
+                    pages = farm_links(r.get("payment"))
+                    why = "Pay the gardener %s to protect your %s" % (farm_text(r.get("payment")), name.lower())
+                ids = []
+                for p in pages:
+                    ids += [i for i in ids_of(p) if i not in ids]
+                entries.append(ids)
+                reasons.append(why)
+            section_key = "farm_%s_%s" % (key, stage)
+            sections.append({"key": section_key, "title": title if stage == stages[0] else "", "layout": "columns",
+                             "supplies": True,
+                             "picks": [{"key": section_key, "mode": "all", "entries": entries, "groups": names,
+                                        "reasons": reasons, "repeat": True}]})
+        print("  farming %-14s %2d crops" % (key, len(chains)))
+    return sections
+
+
 def fetch_variations():
     req = urllib.request.Request(VARIATIONS_URL, headers={"User-Agent": wiki_recipes.USER_AGENT})
     with urllib.request.urlopen(req, timeout=60) as r:
@@ -341,7 +455,7 @@ def slayer_tasks(res):
 def build_pick(res, pick):
     out = {"key": pick["key"], "mode": pick["mode"]}
     for k in ("slot", "profile", "style", "launcher", "fallback", "complete", "fill", "unless", "take", "groups", "repeat",
-              "one", "slots", "cheaper", "budgetKeeps", "pattern"):
+              "one", "slots", "cheaper", "budgetKeeps", "pattern", "spread"):
         if pick.get(k):
             out[k] = pick[k]
     if pick.get("why"):
@@ -808,6 +922,10 @@ def main():
         tabs.append(tab)
 
     by_key = {t["key"]: t for t in tabs}
+    # the Farming tab's crop chains go after its teleports, before the supplies and goods that fill in the rest
+    farming = by_key["farming"]
+    at = next(k for k, s in enumerate(farming["sections"]) if s["key"] == "teleports") + 1
+    farming["sections"][at:at] = farm_sections(wiki, res)
     # the clue tab: every Movement teleport right under the tools, then each tier's emote step items
     clues = by_key["clues"]
     at = next(k for k, s in enumerate(clues["sections"]) if s["key"] == "clue_tools") + 1
