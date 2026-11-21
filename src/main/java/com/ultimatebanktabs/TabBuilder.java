@@ -236,6 +236,8 @@ class TabBuilder
 	private final Set<Integer> neverAlch;
 	/** quest item -> its quests */
 	private final Map<Integer, List<String>> questsOf = new HashMap<>();
+	/** melee bane weapon -> {accuracy, damage} bonus on its task */
+	private final Map<Integer, double[]> baneBonus = new HashMap<>();
 	/** "named" picks' patterns, compiled once */
 	private final Map<String, java.util.regex.Pattern> patterns = new HashMap<>();
 	/** item -> the quests that need it (their "Items required") */
@@ -267,6 +269,7 @@ class TabBuilder
 		data.questNeeds.forEach((id, quests) -> neededBy.put(Integer.parseInt(id),
 			quests.stream().map(data.quests::get).collect(Collectors.toList())));
 		this.junkKeep = new HashSet<>(data.junkKeep);
+		data.baneBonus.forEach((id, b) -> baneBonus.put(Integer.parseInt(id), new double[]{b.get(0), b.get(1)}));
 		this.junkKeepName = data.junkKeepNames == null ? null : java.util.regex.Pattern.compile(data.junkKeepNames);
 		this.notFood = new HashSet<>(data.notFood);
 		this.excludeAuto = new HashSet<>(data.excludeAuto);
@@ -843,7 +846,7 @@ class TabBuilder
 				continue;
 			}
 			Choice c = new Choice(style, def, build(def, pool, styleOptions), in);
-			c.bane = bane(def, style, categories, in);
+			c.bane = bane(def, style, categories, in, mainItem(c.built, "WEAPON"));
 			// the lance, arclight and leaf-bladed weapons stay out of the main weapon pick: a bane counts too
 			Placement weapon = c.bane != null ? c.bane : mainItem(c.built, "WEAPON");
 			boolean limited = false;
@@ -877,9 +880,10 @@ class TabBuilder
 	/**
 	 * The style's owned bane weapon for these task categories (a later category's wins: the Wilderness
 	 * weapon over demonbane), or null. Read from the pick itself: the style's build may show the weapon in
-	 * a stab, slash or crush row instead.
+	 * a stab, slash or crush row instead. A melee bane with a known bonus must beat the style's best weapon
+	 * with it (Darklight's +60% on demons doesn't beat a whip); weapons a task needs are always picked.
 	 */
-	private static Placement bane(TabData.Tab def, String style, List<String> categories, Context in)
+	private Placement bane(TabData.Tab def, String style, List<String> categories, Context in, Placement best)
 	{
 		Placement bane = null;
 		for (String category : categories)
@@ -888,6 +892,10 @@ class TabBuilder
 			{
 				TabData.Pick pick = pick(def, key);
 				List<Integer> got = pick == null ? Collections.emptyList() : firstOwned(pick.entries, in, 1);
+				if (!got.isEmpty() && !beatsWithBane(got.get(0), best))
+				{
+					continue;
+				}
 				if (!got.isEmpty())
 				{
 					bane = new Placement(got.get(0), "WEAPON", "task_WEAPON", entryReason(pick, got.get(0), in));
@@ -896,6 +904,24 @@ class TabBuilder
 			}
 		}
 		return bane;
+	}
+
+	/** Whether a bane weapon, with its bonus on the task, out-damages the style's best weapon (or no bonus is known). */
+	private boolean beatsWithBane(int bane, Placement best)
+	{
+		double[] bonus = baneBonus.get(bane);
+		if (bonus == null || best == null || best.getItemId() == bane)
+		{
+			return true;
+		}
+		EquipStats b = stats.apply(bane);
+		EquipStats w = stats.apply(best.getItemId());
+		if (b == null || w == null)
+		{
+			return true;
+		}
+		return scoring.meleeWeapon(bane, b, "any") * bonus[0] * bonus[1]
+			>= scoring.meleeWeapon(best.getItemId(), w, "any");
 	}
 
 	/** The owned item of a style's only means that works with its weapon (broad bolts need a crossbow), or null. */

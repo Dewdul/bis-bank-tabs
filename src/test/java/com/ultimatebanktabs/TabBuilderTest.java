@@ -972,6 +972,19 @@ public class TabBuilderTest
 	}
 
 	@Test
+	public void aBaneWeaponOnlyWhenItBeatsYourBest()
+	{
+		// bloodveld are demons: Darklight's +60% accuracy and damage beats a whip in good gear
+		assertEquals(id("Darklight"), (int) bySlot(section(slayerOnTask("bloodveld", "Abyssal whip", "Darklight"),
+			"ontask_main")).get("WEAPON"));
+		// Silverlight's weaker stats don't get past a scythe, even with the same +60%
+		assertEquals(id("Scythe of Vitur"), (int) bySlot(section(slayerOnTask("bloodveld", "Scythe of Vitur",
+			"Silverlight"), "ontask_main")).get("WEAPON"));
+		assertEquals(id("Emberlight"), (int) bySlot(section(slayerOnTask("bloodveld", "Abyssal whip", "Emberlight"),
+			"ontask_main")).get("WEAPON"));
+	}
+
+	@Test
 	public void theSlayerTabFollowsTheTask()
 	{
 		TabBuilder.Built built = slayerOnTask("basilisks", "Abyssal whip", "Slayer helmet (i)", "Rune platebody",

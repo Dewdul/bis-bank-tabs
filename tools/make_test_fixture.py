@@ -74,6 +74,8 @@ ITEMS = [
     "Pestle and mortar", "Ivandis flail",
     # other supplies: ale yeast (Cooking), a bucket
     "Ale yeast", "Bucket",
+    # slayer: a weak bane weapon
+    "Darklight",
     # farming chains: a tree, two herbs
     "Acorn", "Oak seedling", "Oak sapling", "Tomatoes", "Guam seed", "Grimy guam leaf", "Marrentill seed",
     "Grimy marrentill",

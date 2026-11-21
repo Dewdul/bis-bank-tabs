@@ -1668,6 +1668,18 @@ JUNK_KEEP = (r"(?i)^(Old school bond.*|Ghostspeak amulet|Dramen staff|Lunar staf
 # leftovers no recipe places: these wiki categories go to a skill tab's "Other supplies" when no tab lists them
 CATEGORY_HOMES = {"Herbs": "herblore", "Herblore secondaries": "herblore", "Light sources": "firemaking"}
 
+# melee bane weapons' bonus on a matching task (accuracy, damage), from unique_uses.py's wiki research. The Slayer
+# tab's task setup picks one only when, with this bonus, it beats the style's best weapon. Leaf-bladed weapons and
+# the vampyre flails aren't here: some tasks can't be done without them, so they're always picked.
+BANE_BONUS = {
+    "Emberlight": (1.7, 1.7), "Arclight": (1.7, 1.7), "Darklight": (1.6, 1.6), "Silverlight": (1.6, 1.6),
+    "Dragon hunter lance": (1.2, 1.2),
+    "Granite hammer": (1.3, 1.3), "Barronite mace": (1.15, 1.15),
+    "Keris partisan of breaching": (1.33, 1.33), "Keris partisan": (1.0, 1.33), "Keris partisan of the sun": (1.0, 1.33),
+    "Keris partisan of corruption": (1.0, 1.33), "Keris partisan of amascut": (1.0, 1.15), "Keris": (1.0, 1.33),
+    "Ursine chainmace": (1.5, 1.5), "Viggora's chainmace": (1.5, 1.5),
+}
+
 # wiki quest names RuneLite spells differently (the rest match after dropping "The", "Freeing"...)
 QUEST_ALIASES = {
     "Recipe for Disaster/Freeing the Goblin generals": "Recipe for Disaster - Wartface & Bentnoze",

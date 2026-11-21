@@ -37,6 +37,8 @@ class TabData
 	List<Integer> neverAlch = Collections.emptyList();
 	/** gear that spends charges or degrades as you use it -> what keeping it going costs (blood runes...) */
 	Map<String, String> charged = Collections.emptyMap();
+	/** melee bane weapon -> its {accuracy, damage} bonus on a matching task (Darklight 1.6, 1.6 on demons) */
+	Map<String, List<Double>> baneBonus = Collections.emptyMap();
 	/** quest and miniquest names (OSRS Wiki pages) that questItems points into */
 	List<String> quests = Collections.emptyList();
 	/** quest item id -> its quests (indexes into quests): a quest leftover once they are all finished */

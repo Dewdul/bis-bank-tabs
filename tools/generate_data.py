@@ -1009,6 +1009,8 @@ def main():
         "neverAlch": never_alch,
         # gear that uses charges up: with cheaper alternatives on, the best item that doesn't stands beside it
         "charged": {str(i): uses for name, uses in curated.CHARGED for i in res.flat([name])},
+        # melee bane weapons' (accuracy, damage) bonus on a matching slayer task
+        "baneBonus": {str(i): list(bonus) for name, bonus in curated.BANE_BONUS.items() for i in res.flat([name])},
         # the Junk tab: quests that use each item (finished ones free it), and what is never junk
         "quests": quests,
         "questItems": quest_uses,
